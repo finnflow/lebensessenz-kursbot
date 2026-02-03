@@ -92,7 +92,7 @@ def update_conversation_timestamp(conversation_id: str):
             UPDATE conversations SET updated_at = ? WHERE id = ?
         """, (now, conversation_id))
 
-def create_message(conversation_id: str, role: str, content: str) -> str:
+def create_message(conversation_id: str, role: str, content: str, image_path: Optional[str] = None) -> str:
     """Create a new message and return its ID."""
     import uuid
     message_id = str(uuid.uuid4())
@@ -100,9 +100,9 @@ def create_message(conversation_id: str, role: str, content: str) -> str:
 
     with get_db() as conn:
         conn.execute("""
-            INSERT INTO messages (id, conversation_id, role, content, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        """, (message_id, conversation_id, role, content, now))
+            INSERT INTO messages (id, conversation_id, role, content, created_at, image_path)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (message_id, conversation_id, role, content, now, image_path))
 
     update_conversation_timestamp(conversation_id)
     return message_id

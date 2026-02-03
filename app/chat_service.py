@@ -21,6 +21,13 @@ from app.database import (
     generate_title_from_message,
     conversation_belongs_to_guest,
 )
+from app.vision_service import (
+    analyze_meal_image,
+    categorize_food_groups,
+    generate_trennkost_query,
+    VisionAnalysisError
+)
+from app.image_handler import ImageValidationError
 
 # Config
 CHROMA_DIR = os.getenv("CHROMA_DIR", "storage/chroma")
@@ -196,22 +203,24 @@ def update_conversation_summary(conversation_id: str, conv_data: Dict[str, Any])
 def handle_chat(
     conversation_id: Optional[str],
     user_message: str,
-    guest_id: Optional[str] = None
+    guest_id: Optional[str] = None,
+    image_path: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Main chat handler with rolling summary.
+    Main chat handler with rolling summary and optional image analysis.
 
     Flow:
     1. Create conversation if needed
     2. Verify guest access
     3. Save user message
     4. Auto-generate title if first message
-    5. Load summary + last N messages
-    6. Rewrite query if needed
-    7. Retrieve course snippets
-    8. Generate response with LLM
-    9. Save assistant message
-    10. Update summary if threshold reached
+    5. Analyze image if provided (Vision API)
+    6. Load summary + last N messages
+    7. Rewrite query if needed (or use vision-based query)
+    8. Retrieve course snippets
+    9. Generate response with LLM (include vision analysis)
+    10. Save assistant message
+    11. Update summary if threshold reached
     """
     # 1. Create or get conversation
     if not conversation_id:
@@ -233,26 +242,43 @@ def handle_chat(
         from app.database import update_conversation_guest_id
         update_conversation_guest_id(conversation_id, guest_id)
 
-    # 4. Save user message
-    create_message(conversation_id, "user", user_message)
+    # 4. Save user message (with image_path if provided)
+    create_message(conversation_id, "user", user_message, image_path=image_path)
 
     # 5. Auto-generate title if first message
     if is_new_conversation:
         title = generate_title_from_message(user_message, max_words=10)
         update_conversation_title(conversation_id, title)
 
-    # 6. Load context
+    # 6. Analyze image if provided
+    vision_analysis = None
+    food_groups = None
+    if image_path:
+        try:
+            vision_analysis = analyze_meal_image(image_path, user_message)
+            if vision_analysis.get("items"):
+                food_groups = categorize_food_groups(vision_analysis["items"])
+        except VisionAnalysisError as e:
+            # Log error but continue with text-only response
+            print(f"Vision analysis failed: {e}")
+
+    # 7. Load context
     summary = conv_data.get("summary_text")
     last_messages = get_last_n_messages(conversation_id, LAST_N)
 
-    # 7. Rewrite query for better retrieval
-    standalone_query = rewrite_standalone_query(summary, last_messages[:-1], user_message)  # Exclude current user msg
+    # 8. Rewrite query for better retrieval
+    if image_path and food_groups:
+        # Use vision-based query for RAG retrieval
+        standalone_query = generate_trennkost_query(food_groups)
+    else:
+        # Standard query rewriting
+        standalone_query = rewrite_standalone_query(summary, last_messages[:-1], user_message)  # Exclude current user msg
 
-    # 8. Retrieve course snippets
+    # 9. Retrieve course snippets
     docs, metas, dists = retrieve_course_snippets(standalone_query)
     course_context = build_context(docs, metas)
 
-    # 9. Build LLM input
+    # 10. Build LLM input
     input_parts = []
 
     if summary:
@@ -265,13 +291,43 @@ def handle_chat(
             input_parts.append(f"{role}: {msg['content']}")
         input_parts.append("")
 
+    # Include vision analysis if available
+    if vision_analysis:
+        input_parts.append("BILD-ANALYSE (Mahlzeit):")
+        input_parts.append(f"Zusammenfassung: {vision_analysis.get('summary', 'Keine Beschreibung')}")
+
+        if vision_analysis.get("items"):
+            input_parts.append("\nIdentifizierte Lebensmittel:")
+            for item in vision_analysis["items"]:
+                name = item.get("name", "Unbekannt")
+                category = item.get("category", "?")
+                amount = item.get("amount", "?")
+                input_parts.append(f"  - {name} ({category}, Menge: {amount})")
+
+        if food_groups:
+            input_parts.append("\nLebensmittelgruppen:")
+            if food_groups.get("carbs"):
+                input_parts.append(f"  Kohlenhydrate: {', '.join(food_groups['carbs'])}")
+            if food_groups.get("proteins"):
+                input_parts.append(f"  Proteine: {', '.join(food_groups['proteins'])}")
+            if food_groups.get("fats"):
+                input_parts.append(f"  Fette: {', '.join(food_groups['fats'])}")
+            if food_groups.get("vegetables"):
+                input_parts.append(f"  Gemüse: {', '.join(food_groups['vegetables'])}")
+
+        input_parts.append("")
+
     input_parts.append(f"KURS-SNIPPETS (FAKTENBASIS):\n{course_context}\n")
     input_parts.append(f"AKTUELLE FRAGE:\n{user_message}\n")
-    input_parts.append("ANTWORT (deutsch, präzise, materialgebunden):")
+
+    if vision_analysis:
+        input_parts.append("ANTWORT (deutsch, präzise, materialgebunden - bewerte die Mahlzeit nach Trennkost-Regeln):")
+    else:
+        input_parts.append("ANTWORT (deutsch, präzise, materialgebunden):")
 
     llm_input = "\n".join(input_parts)
 
-    # 10. Generate response
+    # 11. Generate response
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -283,15 +339,15 @@ def handle_chat(
 
     assistant_message = response.choices[0].message.content.strip()
 
-    # 11. Save assistant message
+    # 12. Save assistant message
     create_message(conversation_id, "assistant", assistant_message)
 
-    # 12. Update summary if needed
+    # 13. Update summary if needed
     conv_data_updated = get_conversation(conversation_id)
     if should_update_summary(conversation_id, conv_data_updated):
         update_conversation_summary(conversation_id, conv_data_updated)
 
-    # 13. Prepare sources
+    # 14. Prepare sources
     sources = []
     for m, d in zip(metas, dists):
         sources.append({

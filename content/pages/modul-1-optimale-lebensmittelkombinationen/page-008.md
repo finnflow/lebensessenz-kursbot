@@ -20,58 +20,60 @@ tags:
   - ökologische Landwirtschaft
   - Wildfang
   - Fett-Quelle
-qa_notes: |
-  - [UNKLAR: Darstellung/Zuordnung der Verbinder 'UND/ODER' und 'ODER' im Diagramm (Layout); als Logik-Satz formuliert, nicht als Standalone-Bullets.]
-  - [UNKLAR: hängende Klammer in 'roh oder gedämpft)' im Extrakt; hier ohne ')'.]
-  - [UNKLAR: Schreibweise 'Nuss-Muss' im Extrakt (so übernommen).]
+qa_notes: ""
 ---
 
-# Teller-Zusammenstellung nach Lebensmittelgruppen: proteinreiche Lebensmittel
+# 3) Die richtige Kombination von Lebensmitteln
 
-## Kernaussagen
-- Teller-Zusammenstellung nach Lebensmittelgruppen (proteinreiche Lebensmittel)
-  - 50%: Gemüse, Salat
-  - 50%: Protein-Quellen
+## Teller-Zusammenstellung nach Lebensmittelgruppen: proteinreiche Lebensmittel.
 
-## Begriffe/Definitionen (nur was im Material steht)
+### 50%: Gemüse, Salat
 
-## Regeln/Kombinationen
-- 50%: Gemüse, Salat
-- 50%: Protein-Quellen
-- Stärkearmes Gemüse: roh oder gedämpft
-- + ca. 1-2 TL: Fett-Quelle
-- Diagramm-Logikhinweise: 'ODER' / 'UND/ODER' (siehe qa_notes)
+#### Salat
+- Endiviensalat
+- Feldsalat
+- Rucola
+- Postelein
+- Eichblatt,...
 
-## Tabellen/Listen/Zuordnungen
-- 50%: Gemüse, Salat
-  - Salat
-    - Endiviensalat
-    - Feldsalat
-    - Rucola
-    - Postelein
-    - Eichblatt, ...
-  - Stärkearmes Gemüse
-    - roh oder gedämpft
-      - Zucchini
-      - Möhren
-      - Paprika
-      - Brokkoli
-      - Tomaten
-      - Blumenkohl
-      - Pilze, ...
-  - Fett-Quelle (ca. 1-2 TL)
-    - Nüsse
-    - Nuss-Muss
-    - Samen und Mus aus diesen (z.B. Tahin=Sesam-Mus)
-    - kaltgepresste Öle
-    - Avocado ...
-- 50%: Protein-Quellen
-  - Eier (möglichst aus ökologischer Landwirtschaft)
-  - Fisch (möglichst aus ökologischer Landwirtschaft oder Wildfang)
-  - Fleisch (möglichst aus ökologischer Landwirtschaft oder Wildfang)
-  - Milchprodukte
-    - möglichst aus Rohmilch
-    - Butter eher zu bevorzugen als andere Milchprodukte
-      - geringer Anteil tierischem Eiweiß
+UND/ ODER
 
-## Einschränkungen/Ausnahmen
+#### Stärkearmes Gemüse
+- roh oder gedämpft)
+  - Zucchini
+  - Möhren
+  - Paprika
+  - Brokkoli
+  - Tomaten
+  - Blumenkohl
+  - Pilze,...
+
+### 50%: Protein-Quellen
+
+#### Eier
+- (möglichst aus ökologischer Landwirtschaft)
+
+ODER
+
+#### Fisch
+- möglichst aus ökologischer Landwirtschaft oder Wildfang
+
+ODER
+
+#### Fleisch
+- möglichst aus ökologischer Landwirtschaft oder Wildfang
+
+ODER
+
+#### Milchprodukte
+- möglichst aus Rohmilch
+- Butter eher zu bevorzugen als andere Milchprodukte
+  - geringer Anteil tierischem Eiweiß
+
+### + ca. 1-2 TL Fett-Quelle
+- Nüsse
+- Nuss-Muss
+- Samen und Mus aus diesen
+  - (z.B. Tahin=Sesam-Mus)
+- kaltgepresste Öle,
+- Avocado...

@@ -52,6 +52,17 @@ def run_migrations():
             ON conversations(guest_id, updated_at DESC)
         """)
 
+        # Check if image_path column exists in messages table
+        cursor.execute("PRAGMA table_info(messages)")
+        message_columns = [row[1] for row in cursor.fetchall()]
+
+        if 'image_path' not in message_columns:
+            print("  ✓ Adding image_path column to messages table...")
+            cursor.execute("""
+                ALTER TABLE messages
+                ADD COLUMN image_path TEXT
+            """)
+
         print("✅ Migrations completed successfully!")
 
 if __name__ == "__main__":

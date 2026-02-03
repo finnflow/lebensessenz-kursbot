@@ -152,6 +152,7 @@
       box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
       overflow: hidden;
       animation: slideUp 0.5s ease-out;
+      position: relative;
     }
 
     @keyframes slideUp {
@@ -319,10 +320,165 @@
       background: #fafafa;
     }
 
+    .input-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
     .input-group {
       display: flex;
-      gap: 20px;
+      gap: 12px;
       align-items: center;
+    }
+
+    .upload-btn {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      background: #e8dfd8;
+      color: #666;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .upload-btn:hover {
+      background: #ddd3cc;
+      transform: scale(1.05);
+    }
+
+    .upload-btn:active {
+      transform: scale(0.95);
+    }
+
+    .upload-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .image-preview {
+      display: none;
+      position: relative;
+      width: fit-content;
+      max-width: 200px;
+    }
+
+    .image-preview.show {
+      display: block;
+    }
+
+    .image-preview img {
+      max-width: 200px;
+      max-height: 150px;
+      border-radius: 12px;
+      border: 2px solid #e5e5e5;
+      object-fit: cover;
+    }
+
+    .image-preview-remove {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 24px;
+      height: 24px;
+      background: #c9a897;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      line-height: 1;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
+    }
+
+    .image-preview-remove:hover {
+      background: #b89786;
+      transform: scale(1.1);
+    }
+
+    /* Drag & Drop Overlay */
+    .drag-drop-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(201, 168, 151, 0.95);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(8px);
+      border-radius: 16px;
+    }
+
+    .drag-drop-overlay.active {
+      display: flex;
+    }
+
+    .drag-drop-content {
+      text-align: center;
+      color: white;
+      pointer-events: none;
+    }
+
+    .drag-drop-icon {
+      font-size: 4rem;
+      margin-bottom: 20px;
+      animation: bounce 1s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-15px); }
+    }
+
+    .drag-drop-text {
+      font-size: 1.5rem;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .drag-drop-subtext {
+      font-size: 1rem;
+      opacity: 0.9;
+    }
+
+    /* Image in message */
+    .message-image {
+      margin-top: 12px;
+      border-radius: 12px;
+      overflow: hidden;
+      max-width: 400px;
+    }
+
+    .message-image img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 12px;
+      border: 2px solid #e5e5e5;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .message-image img:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .message.user .message-image img {
+      border-color: #c9a897;
     }
 
     textarea {
@@ -495,7 +651,16 @@
     </div>
 
     <!-- Main Chat Area -->
-    <div class="main-area">
+    <div class="main-area" id="mainArea">
+      <!-- Drag & Drop Overlay -->
+      <div class="drag-drop-overlay" id="dragDropOverlay">
+        <div class="drag-drop-content">
+          <div class="drag-drop-icon">📸</div>
+          <div class="drag-drop-text">Bild hier ablegen</div>
+          <div class="drag-drop-subtext">JPG, PNG, HEIC oder WebP</div>
+        </div>
+      </div>
+
       <div class="chat-header">
         <h1>Kursbot</h1>
         <p class="subtitle">Stelle deine Fragen zum Kursmaterial</p>
@@ -510,17 +675,32 @@
       </div>
 
       <div class="input-container">
-        <div class="input-group">
-          <textarea
-            id="messageInput"
-            placeholder="Stelle eine Frage..."
-            onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"
-          ></textarea>
-          <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Senden">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 19V5M5 12l7-7 7 7"/>
-            </svg>
-          </button>
+        <div class="input-wrapper">
+          <!-- Image Preview -->
+          <div class="image-preview" id="imagePreview">
+            <img id="previewImg" src="" alt="Preview">
+            <button class="image-preview-remove" onclick="removeImage()" title="Bild entfernen">×</button>
+          </div>
+
+          <!-- Input Group -->
+          <div class="input-group">
+            <input type="file" id="imageInput" accept="image/jpeg,image/jpg,image/png,image/heic,image/webp" style="display: none;" onchange="handleImageSelect(event)">
+            <button class="upload-btn" onclick="document.getElementById('imageInput').click()" title="Bild hochladen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+            </button>
+            <textarea
+              id="messageInput"
+              placeholder="Stelle eine Frage oder lade ein Foto hoch..."
+              onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"
+            ></textarea>
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Senden">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 19V5M5 12l7-7 7 7"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -531,6 +711,8 @@
 let guestId = localStorage.getItem('guestId');
 let conversationId = null;
 let conversations = [];
+let selectedImage = null;
+let selectedImageDataUrl = null; // For displaying in chat
 
 // Initialize guest ID
 if (!guestId) {
@@ -545,6 +727,87 @@ function generateUUID() {
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+}
+
+// Drag & Drop Handlers
+function initDragAndDrop() {
+  const mainArea = document.getElementById('mainArea');
+  const overlay = document.getElementById('dragDropOverlay');
+  let dragCounter = 0;
+
+  // Prevent default drag behaviors on whole document
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    document.body.addEventListener(eventName, preventDefaults, false);
+  });
+
+  function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  // Highlight drop area when dragging over main area
+  mainArea.addEventListener('dragenter', (e) => {
+    dragCounter++;
+    if (e.dataTransfer.types.includes('Files')) {
+      overlay.classList.add('active');
+    }
+  });
+
+  mainArea.addEventListener('dragleave', (e) => {
+    dragCounter--;
+    if (dragCounter === 0) {
+      overlay.classList.remove('active');
+    }
+  });
+
+  mainArea.addEventListener('dragover', (e) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  });
+
+  mainArea.addEventListener('drop', (e) => {
+    dragCounter = 0;
+    overlay.classList.remove('active');
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleDroppedFile(files[0]);
+    }
+  });
+}
+
+function handleDroppedFile(file) {
+  // Validate file type
+  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/webp'];
+  if (!validTypes.includes(file.type)) {
+    alert('Bitte wähle ein gültiges Bildformat (JPG, PNG, HEIC, WebP)');
+    return;
+  }
+
+  // Validate file size (10MB max)
+  const maxSize = 10 * 1024 * 1024;
+  if (file.size > maxSize) {
+    alert('Bild ist zu groß. Maximale Größe: 10MB');
+    return;
+  }
+
+  selectedImage = file;
+
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    selectedImageDataUrl = e.target.result;
+    const previewDiv = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImg');
+    previewImg.src = selectedImageDataUrl;
+    previewDiv.classList.add('show');
+  };
+  reader.readAsDataURL(file);
+
+  // Update placeholder and focus
+  document.getElementById('messageInput').placeholder = 'Beschreibe deine Frage zum Bild...';
+  document.getElementById('messageInput').focus();
 }
 
 function formatSource(path) {
@@ -661,14 +924,21 @@ async function loadConversation(convId) {
     chatHistory.innerHTML = '';
 
     for (const msg of data.messages) {
-      renderMessage(msg.role, msg.content);
+      // Convert image_path to URL if present
+      let imageUrl = null;
+      if (msg.image_path) {
+        // Extract filename from path (e.g., "storage/uploads/abc123.jpg" -> "abc123.jpg")
+        const filename = msg.image_path.split('/').pop();
+        imageUrl = `/uploads/${filename}`;
+      }
+      renderMessage(msg.role, msg.content, null, imageUrl);
     }
   } catch (error) {
     console.error('Failed to load conversation:', error);
   }
 }
 
-function renderMessage(role, content, sources = null) {
+function renderMessage(role, content, sources = null, imageUrl = null) {
   const chatHistory = document.getElementById('chatHistory');
   const emptyState = chatHistory.querySelector('.empty-state');
   if (emptyState) {
@@ -685,6 +955,15 @@ function renderMessage(role, content, sources = null) {
     <div class="message-role">${roleLabel}</div>
     <div class="message-content">${formattedContent}</div>
   `;
+
+  // Add image if provided
+  if (imageUrl) {
+    html += `
+      <div class="message-image">
+        <img src="${imageUrl}" alt="Hochgeladenes Bild" onclick="window.open('${imageUrl}', '_blank')">
+      </div>
+    `;
+  }
 
   if (sources && sources.length > 0) {
     const sourceTags = sources
@@ -703,11 +982,54 @@ function renderMessage(role, content, sources = null) {
   chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
+function handleImageSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // Validate file type
+  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/webp'];
+  if (!validTypes.includes(file.type)) {
+    alert('Bitte wähle ein gültiges Bildformat (JPG, PNG, HEIC, WebP)');
+    return;
+  }
+
+  // Validate file size (10MB max)
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  if (file.size > maxSize) {
+    alert('Bild ist zu groß. Maximale Größe: 10MB');
+    return;
+  }
+
+  selectedImage = file;
+
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    selectedImageDataUrl = e.target.result;
+    const previewDiv = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImg');
+    previewImg.src = selectedImageDataUrl;
+    previewDiv.classList.add('show');
+  };
+  reader.readAsDataURL(file);
+
+  // Update placeholder
+  document.getElementById('messageInput').placeholder = 'Beschreibe deine Frage zum Bild...';
+}
+
+function removeImage() {
+  selectedImage = null;
+  selectedImageDataUrl = null;
+  document.getElementById('imageInput').value = '';
+  document.getElementById('imagePreview').classList.remove('show');
+  document.getElementById('messageInput').placeholder = 'Stelle eine Frage oder lade ein Foto hoch...';
+}
+
 async function sendMessage() {
   const input = document.getElementById('messageInput');
   const message = input.value.trim();
 
-  if (!message) return;
+  if (!message && !selectedImage) return;
 
   const sendBtn = document.getElementById('sendBtn');
   const sendBtnText = document.getElementById('sendBtnText');
@@ -717,20 +1039,50 @@ async function sendMessage() {
   sendBtn.disabled = true;
   sendBtn.innerHTML = '<div class="spinner"></div>';
 
-  // Render user message immediately
-  renderMessage('user', message);
+  // Store image refs and clear for next message
+  const imageToSend = selectedImage;
+  const imageDataUrl = selectedImageDataUrl;
+
+  // Render user message immediately (with image if present)
+  renderMessage('user', message, null, imageDataUrl);
   input.value = '';
 
+  if (selectedImage) {
+    removeImage();
+  }
+
   try {
-    const response = await fetch('/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        conversationId: conversationId,
-        message: message,
-        guestId: guestId
-      })
-    });
+    let response;
+
+    if (imageToSend) {
+      // Use multipart form data for image upload
+      const formData = new FormData();
+      formData.append('message', message || 'Was siehst du auf diesem Bild?');
+      if (conversationId) formData.append('conversationId', conversationId);
+      if (guestId) formData.append('guestId', guestId);
+      formData.append('image', imageToSend);
+
+      response = await fetch('/chat/image', {
+        method: 'POST',
+        body: formData
+      });
+    } else {
+      // Use JSON for regular text chat
+      response = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: conversationId,
+          message: message,
+          guestId: guestId
+        })
+      });
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Server error');
+    }
 
     const data = await response.json();
 
@@ -775,6 +1127,9 @@ function newChat() {
 
 // Load conversations on page load
 window.addEventListener('DOMContentLoaded', async () => {
+  // Initialize drag and drop
+  initDragAndDrop();
+
   await loadConversations();
 
   // Check for conversation ID in URL

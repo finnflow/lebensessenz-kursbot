@@ -1,8 +1,9 @@
 import os
 from typing import Optional
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.database import (
@@ -12,6 +13,7 @@ from app.database import (
     conversation_belongs_to_guest,
 )
 from app.chat_service import handle_chat
+from app.image_handler import save_image, ImageValidationError
 
 load_dotenv()
 
@@ -19,6 +21,11 @@ load_dotenv()
 init_db()
 
 app = FastAPI(title="Lebensessenz Kursbot Chat")
+
+# Mount uploads directory for serving images
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "storage/uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 class ChatRequest(BaseModel):
     conversationId: Optional[str] = None
@@ -37,7 +44,7 @@ def health():
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
     """
-    Main chat endpoint with rolling summary.
+    Main chat endpoint with rolling summary (JSON-based).
 
     Flow:
     - If conversationId is missing, creates new conversation
@@ -52,6 +59,50 @@ def chat(request: ChatRequest):
 
     try:
         result = handle_chat(request.conversationId, message, request.guestId)
+        return ChatResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+@app.post("/chat/image", response_model=ChatResponse)
+async def chat_with_image(
+    message: str = Form(...),
+    conversationId: Optional[str] = Form(None),
+    guestId: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None)
+):
+    """
+    Chat endpoint with optional image upload for meal analysis.
+
+    Supports multipart/form-data with:
+    - message: User question/message (required)
+    - conversationId: Existing conversation ID (optional)
+    - guestId: Guest identifier (optional)
+    - image: Image file (JPG, PNG, HEIC, WebP) (optional)
+
+    If image is provided:
+    - Uses GPT-4 Vision to analyze meal
+    - Categorizes food groups
+    - Generates Trennkost-based evaluation
+    """
+    message = message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    image_path = None
+    if image:
+        try:
+            # Read and validate image
+            file_content = await image.read()
+            image_path = save_image(file_content, image.filename)
+        except ImageValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Image processing error: {str(e)}")
+
+    try:
+        result = handle_chat(conversationId, message, guestId, image_path)
         return ChatResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
