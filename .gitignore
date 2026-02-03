@@ -1,0 +1,19 @@
+# Environment
+.env
+.venv/
+__pycache__/
+*.pyc
+
+# Vector DB / Storage
+storage/
+chroma/
+*.sqlite3
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
+
+# Temporary / Scratch
+einmaliges
+EIne

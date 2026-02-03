@@ -1,0 +1,1 @@
+# Lebensessenz Kursbot Chat Package
