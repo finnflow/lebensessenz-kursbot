@@ -61,6 +61,22 @@ TEST_CASES = [
         "should_have_fallback": False,
         "description": "Simple multi-fact test: should ground in material"
     },
+    {
+        "id": "specific_food_burger_fries",
+        "question": "Sind Burger und Pommes zusammen gut?",
+        "expect_keywords": ["kohlenhydrat", "protein", "nicht optimal"],
+        "min_sources": 2,
+        "should_have_fallback": False,
+        "description": "Generalization test: specific foods should map to general principles (Fallback 1)"
+    },
+    {
+        "id": "specific_food_fish_rice",
+        "question": "Sind Fisch und Reis eine gute Kombination?",
+        "expect_keywords": ["protein", "kohlenhydrat"],
+        "min_sources": 1,
+        "should_have_fallback": False,
+        "description": "Specific food pairing: should find relevant principles in material"
+    },
 ]
 
 
