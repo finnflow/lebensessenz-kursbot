@@ -224,6 +224,12 @@ def generalize_query(query: str) -> str:
         r"\bnudeln\b": "Kohlenhydrate",
         r"\beier?\b": "Protein",
         r"\bkäse\b": "Protein",
+        r"\bbanane?n?\b": "Obst",
+        r"\beis\b": "Süßigkeiten",
+        r"\bsahne\b": "Fett",
+        r"\bschokolade\b": "Süßigkeiten",
+        r"\bpudding\b": "Süßigkeiten",
+        r"\bkuchen\b": "Kohlenhydrate und Zucker",
     }
 
     import re
