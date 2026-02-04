@@ -40,7 +40,7 @@ TOP_K = int(os.getenv("TOP_K", "10"))  # Increased from 6 to 10
 LAST_N = int(os.getenv("LAST_N", "8"))  # Last N messages to include
 MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "9000"))
 SUMMARY_THRESHOLD = int(os.getenv("SUMMARY_THRESHOLD", "6"))  # Update summary every N messages
-DISTANCE_THRESHOLD = float(os.getenv("DISTANCE_THRESHOLD", "0.35"))  # Min relevance for retrieval
+DISTANCE_THRESHOLD = float(os.getenv("DISTANCE_THRESHOLD", "1.0"))  # Max L2 distance (0=identical, 1.0=moderate, 2.0=weak)
 
 # Initialize clients
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
