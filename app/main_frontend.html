@@ -30,7 +30,7 @@
       height: calc(100vh - 40px);
     }
 
-    /* Sidebar - Floating Design */
+    /* Sidebar - Floating Design with Collapse */
     .sidebar {
       width: 280px;
       background: white;
@@ -40,11 +40,26 @@
       flex-direction: column;
       flex-shrink: 0;
       overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .sidebar.collapsed {
+      width: 60px;
     }
 
     .sidebar-header {
       padding: 24px 20px 20px 20px;
       border-bottom: 1px solid #e5e5e5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .sidebar.collapsed .sidebar-header {
+      padding: 16px 8px;
+      flex-direction: column;
     }
 
     .sidebar-header h2 {
@@ -53,6 +68,38 @@
       margin-bottom: 16px;
       font-weight: 500;
       letter-spacing: -0.3px;
+      margin: 0;
+      flex: 1;
+    }
+
+    .sidebar.collapsed .sidebar-header h2 {
+      display: none;
+    }
+
+    .sidebar-toggle-btn {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      background: #f5f1ed;
+      color: #c9a897;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .sidebar-toggle-btn:hover {
+      background: #eee9e2;
+      transform: scale(1.05);
+    }
+
+    .sidebar-toggle-btn:active {
+      transform: scale(0.95);
     }
 
     .new-chat-btn {
@@ -109,6 +156,11 @@
       cursor: pointer;
       transition: all 0.2s ease;
       border: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      group: hover;
     }
 
     .conversation-item:hover {
@@ -118,6 +170,16 @@
     .conversation-item.active {
       background: #f5f1ed;
       border-color: #c9a897;
+    }
+
+    .conversation-content {
+      flex: 1;
+      min-width: 0;
+      cursor: pointer;
+    }
+
+    .sidebar.collapsed .conversation-content {
+      display: none;
     }
 
     .conversation-title {
@@ -133,6 +195,42 @@
     .conversation-date {
       font-size: 12px;
       color: #999;
+    }
+
+    .conversation-delete-btn {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background: transparent;
+      color: #c9a897;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .conversation-item:hover .conversation-delete-btn {
+      opacity: 1;
+    }
+
+    .conversation-delete-btn:hover {
+      background: #ffebee;
+      color: #e57373;
+      transform: scale(1.1);
+    }
+
+    .conversation-delete-btn:active {
+      transform: scale(0.95);
+    }
+
+    .sidebar.collapsed .conversation-delete-btn {
+      opacity: 1;
     }
 
     .empty-conversations {
@@ -758,10 +856,15 @@
         z-index: 1000;
         transform: translateX(-100%);
         transition: transform 0.3s ease;
+        width: 280px;
       }
 
       .sidebar.open {
         transform: translateX(0);
+      }
+
+      .sidebar.collapsed {
+        width: 60px;
       }
 
       .chat-header, .chat-history, .input-container {
@@ -786,6 +889,14 @@
     <div class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <h2>Lebensessenz</h2>
+        <button class="sidebar-toggle-btn" id="sidebarToggleBtn" onclick="toggleSidebar()" title="Sidebar ein-/ausklappen">
+          <span id="toggleIcon">◀</span>
+        </button>
+      </div>
+      <div style="padding: 8px; display: none;" id="collapsedNewChat" class="sidebar.collapsed">
+        <button class="new-chat-btn" onclick="newChat()" style="font-size: 12px; padding: 10px;">+</button>
+      </div>
+      <div style="padding: 8px; display: block;" id="expandedNewChat">
         <button class="new-chat-btn" onclick="newChat()">+ Neuer Chat</button>
       </div>
       <div class="conversation-list" id="conversationList">
@@ -1069,9 +1180,16 @@ function renderConversationList() {
 
   listEl.innerHTML = conversations.map(conv => `
     <div class="conversation-item ${conv.id === conversationId ? 'active' : ''}"
-         onclick="loadConversation('${conv.id}')">
-      <div class="conversation-title">${escapeHtml(conv.title || 'Neue Conversation')}</div>
-      <div class="conversation-date">${formatDate(conv.updated_at)}</div>
+         data-conv-id="${conv.id}">
+      <div class="conversation-content" onclick="loadConversation('${conv.id}')">
+        <div class="conversation-title">${escapeHtml(conv.title || 'Neue Conversation')}</div>
+        <div class="conversation-date">${formatDate(conv.updated_at)}</div>
+      </div>
+      <button class="conversation-delete-btn"
+              onclick="deleteConversation(event, '${conv.id}')"
+              title="Conversation löschen">
+        🗑️
+      </button>
     </div>
   `).join('');
 }
@@ -1330,6 +1448,72 @@ async function sendMessage() {
   }
 }
 
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const toggleIcon = document.getElementById('toggleIcon');
+  const collapsedBtn = document.getElementById('collapsedNewChat');
+  const expandedBtn = document.getElementById('expandedNewChat');
+
+  sidebar.classList.toggle('collapsed');
+
+  if (sidebar.classList.contains('collapsed')) {
+    toggleIcon.textContent = '▶';
+    collapsedBtn.style.display = 'block';
+    expandedBtn.style.display = 'none';
+  } else {
+    toggleIcon.textContent = '◀';
+    collapsedBtn.style.display = 'none';
+    expandedBtn.style.display = 'block';
+  }
+
+  localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+}
+
+async function deleteConversation(event, convId) {
+  event.stopPropagation();
+
+  const conv = conversations.find(c => c.id === convId);
+  const title = conv ? conv.title : 'Conversation';
+
+  if (!confirm(`Möchtest du "${title}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/conversations/${convId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ guest_id: guestId })
+    });
+
+    if (response.ok) {
+      conversations = conversations.filter(c => c.id !== convId);
+
+      if (conversationId === convId) {
+        conversationId = null;
+        localStorage.removeItem('conversationId');
+        const chatHistory = document.getElementById('chatHistory');
+        chatHistory.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">💬</div>
+            <div class="empty-state-text">Starte eine Konversation</div>
+            <div class="empty-state-subtext">Stelle eine Frage zum Kursmaterial</div>
+          </div>
+        `;
+      }
+
+      renderConversationList();
+    } else {
+      alert('Fehler beim Löschen der Conversation');
+    }
+  } catch (error) {
+    console.error('Delete failed:', error);
+    alert('Fehler beim Löschen der Conversation');
+  }
+}
+
 function newChat() {
   conversationId = null;
 
@@ -1350,6 +1534,20 @@ function newChat() {
 window.addEventListener('DOMContentLoaded', async () => {
   // Initialize drag and drop
   initDragAndDrop();
+
+  // Restore sidebar collapse state
+  const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+  if (sidebarCollapsed) {
+    const sidebar = document.getElementById('sidebar');
+    const toggleIcon = document.getElementById('toggleIcon');
+    const collapsedBtn = document.getElementById('collapsedNewChat');
+    const expandedBtn = document.getElementById('expandedNewChat');
+
+    sidebar.classList.add('collapsed');
+    toggleIcon.textContent = '▶';
+    collapsedBtn.style.display = 'block';
+    expandedBtn.style.display = 'none';
+  }
 
   await loadConversations();
 

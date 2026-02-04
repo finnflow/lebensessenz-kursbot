@@ -243,3 +243,16 @@ def conversation_belongs_to_guest(conversation_id: str, guest_id: Optional[str])
 
         # Otherwise, check if guest_id matches
         return conv_guest_id == guest_id
+
+def delete_conversation(conversation_id: str):
+    """Delete a conversation and all its messages."""
+    with get_db() as conn:
+        # Delete messages first (foreign key constraint)
+        conn.execute("""
+            DELETE FROM messages WHERE conversation_id = ?
+        """, (conversation_id,))
+
+        # Delete conversation
+        conn.execute("""
+            DELETE FROM conversations WHERE id = ?
+        """, (conversation_id,))

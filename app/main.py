@@ -142,6 +142,25 @@ def get_conversation_messages(conversation_id: str, guest_id: Optional[str] = No
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/conversations/{conversation_id}")
+def delete_conversation(conversation_id: str, guest_id: Optional[str] = None):
+    """
+    Delete a conversation.
+    Validates guest ownership before deletion.
+    """
+    try:
+        # Validate guest access
+        if guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        from app.database import delete_conversation
+        delete_conversation(conversation_id)
+        return {"status": "deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/", response_class=HTMLResponse)
 def home():
     # Read frontend HTML from file
