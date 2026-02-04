@@ -281,37 +281,86 @@
       margin-top: 0;
     }
 
-    .sources {
-      margin-top: 20px;
+    /* Sources Accordion */
+    .sources-accordion {
+      margin-top: 24px;
       padding-top: 20px;
       border-top: 1px solid #e0d7d0;
     }
 
-    .sources-title {
+    .sources-accordion details {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .sources-accordion summary {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      margin: -12px -16px 0 -16px;
       font-weight: 600;
       color: #666;
-      margin-bottom: 10px;
-      font-size: 12px;
+      font-size: 13px;
       text-transform: uppercase;
       letter-spacing: 0.8px;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+      background: #f9f7f5;
+    }
+
+    .sources-accordion summary:hover {
+      background: #f5f1ed;
+    }
+
+    .sources-accordion details[open] summary {
+      background: #f5f1ed;
+      margin-bottom: 12px;
+    }
+
+    .sources-accordion summary::before {
+      content: '▶';
+      display: inline-flex;
+      width: 16px;
+      transition: transform 0.3s ease;
+      transform: rotate(0deg);
+      font-size: 12px;
+      color: #c9a897;
+    }
+
+    .sources-accordion details[open] summary::before {
+      transform: rotate(90deg);
+    }
+
+    .sources-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 0 16px 12px 16px;
+      margin: 0 -16px -12px -16px;
     }
 
     .source-tag {
       display: inline-block;
       background: white;
       padding: 8px 14px;
-      border-radius: 20px;
-      margin: 4px 4px 4px 0;
+      border-radius: 18px;
       font-size: 13px;
       color: #c9a897;
       border: 1px solid #e5e5e5;
       font-weight: 500;
       transition: all 0.2s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
     }
 
     .source-tag:hover {
       border-color: #c9a897;
       background: #faf8f6;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(201, 168, 151, 0.2);
     }
 
     .input-container {
@@ -479,6 +528,100 @@
 
     .message.user .message-image img {
       border-color: #c9a897;
+    }
+
+    /* Bot Thinking Animation */
+    .message.thinking {
+      animation: fadeIn 0.4s ease-out;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .thinking-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 24px;
+      background: linear-gradient(135deg, #f5f1ed 0%, #faf8f6 100%);
+      border-radius: 12px;
+      border: 1px solid #e8dfd8;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .thinking-text {
+      font-size: 14px;
+      color: #666;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+
+    .thinking-dots {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 20px;
+    }
+
+    .thinking-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #c9a897 0%, #b89786 100%);
+      animation: thinkingPulse 1.4s ease-in-out infinite;
+      box-shadow: 0 2px 4px rgba(201, 168, 151, 0.3);
+    }
+
+    .thinking-dot:nth-child(1) {
+      animation-delay: 0s;
+    }
+
+    .thinking-dot:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .thinking-dot:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes thinkingPulse {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 0.7;
+      }
+      50% {
+        transform: scale(1.3);
+        opacity: 1;
+      }
+    }
+
+    /* Subtle shimmer effect */
+    .thinking-indicator::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.4) 50%,
+        transparent 100%
+      );
+      animation: shimmer 2s infinite;
+    }
+
+    .thinking-indicator {
+      position: relative;
+      overflow: hidden;
+    }
+
+    @keyframes shimmer {
+      0% {
+        left: -100%;
+      }
+      100% {
+        left: 200%;
+      }
     }
 
     textarea {
@@ -810,16 +953,43 @@ function handleDroppedFile(file) {
   document.getElementById('messageInput').focus();
 }
 
-function formatSource(path) {
-  // Parse: "modul-1-optimale-lebensmittelkombinationen/page-007.md#0"
-  // Output: "Modul 1 - Seite 7"
+function formatSource(source) {
+  /**
+   * Format source with professional module metadata display.
+   *
+   * New format: "Modul 1 (1.2 Frühstück und richtiger Obstverzehr), Seite 3"
+   * Fallback: Parse from path if metadata missing
+   */
+
+  // Use rich metadata if available
+  if (source.module_label && source.submodule_id && source.submodule_label) {
+    let result = source.module_label;
+
+    // Add submodule info in parentheses
+    result += ` (${source.submodule_id} ${source.submodule_label})`;
+
+    // Add page number
+    if (source.page) {
+      result += `, Seite ${source.page}`;
+    }
+
+    return result;
+  }
+
+  // Fallback: Parse from path (legacy or if metadata missing)
+  const path = source.path || source;
   const parts = path.split('/');
   let result = '';
 
   if (parts[0] && parts[0].startsWith('modul-')) {
-    const modulNum = parts[0].match(/modul-(\d+)/);
-    if (modulNum) {
-      result = `Modul ${modulNum[1]}`;
+    const modulMatch = parts[0].match(/modul-(\d+)\.(\d+)/);
+    if (modulMatch) {
+      result = `Modul ${modulMatch[1]} (${modulMatch[1]}.${modulMatch[2]})`;
+    } else {
+      const modulNum = parts[0].match(/modul-(\d+)/);
+      if (modulNum) {
+        result = `Modul ${modulNum[1]}`;
+      }
     }
   }
 
@@ -938,6 +1108,42 @@ async function loadConversation(convId) {
   }
 }
 
+function showThinkingIndicator() {
+  const chatHistory = document.getElementById('chatHistory');
+  const emptyState = chatHistory.querySelector('.empty-state');
+  if (emptyState) {
+    emptyState.remove();
+  }
+
+  const thinkingDiv = document.createElement('div');
+  thinkingDiv.className = 'message assistant thinking';
+  thinkingDiv.id = 'thinkingIndicator';
+
+  thinkingDiv.innerHTML = `
+    <div class="message-role">Kursbot</div>
+    <div class="thinking-indicator">
+      <span class="thinking-text">Denkt nach</span>
+      <div class="thinking-dots">
+        <div class="thinking-dot"></div>
+        <div class="thinking-dot"></div>
+        <div class="thinking-dot"></div>
+      </div>
+    </div>
+  `;
+
+  chatHistory.appendChild(thinkingDiv);
+  chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+function removeThinkingIndicator() {
+  const thinkingIndicator = document.getElementById('thinkingIndicator');
+  if (thinkingIndicator) {
+    thinkingIndicator.style.opacity = '0';
+    thinkingIndicator.style.transform = 'translateY(-10px)';
+    setTimeout(() => thinkingIndicator.remove(), 300);
+  }
+}
+
 function renderMessage(role, content, sources = null, imageUrl = null) {
   const chatHistory = document.getElementById('chatHistory');
   const emptyState = chatHistory.querySelector('.empty-state');
@@ -967,12 +1173,16 @@ function renderMessage(role, content, sources = null, imageUrl = null) {
 
   if (sources && sources.length > 0) {
     const sourceTags = sources
-      .map(s => `<span class="source-tag">${escapeHtml(formatSource(s.path))}</span>`)
+      .map(s => `<span class="source-tag" title="${escapeHtml(formatSource(s))}">${escapeHtml(formatSource(s))}</span>`)
       .join('');
     html += `
-      <div class="sources">
-        <div class="sources-title">Quellen</div>
-        ${sourceTags}
+      <div class="sources-accordion">
+        <details>
+          <summary>${sources.length} Quelle${sources.length > 1 ? 'n' : ''}</summary>
+          <div class="sources-container">
+            ${sourceTags}
+          </div>
+        </details>
       </div>
     `;
   }
@@ -1051,6 +1261,9 @@ async function sendMessage() {
     removeImage();
   }
 
+  // Show thinking indicator
+  showThinkingIndicator();
+
   try {
     let response;
 
@@ -1086,6 +1299,12 @@ async function sendMessage() {
 
     const data = await response.json();
 
+    // Remove thinking indicator before showing response
+    removeThinkingIndicator();
+
+    // Small delay to let the fade-out animation complete
+    await new Promise(resolve => setTimeout(resolve, 350));
+
     // Update conversation ID if new
     if (!conversationId) {
       conversationId = data.conversationId;
@@ -1100,6 +1319,8 @@ async function sendMessage() {
 
   } catch (error) {
     console.error('Error:', error);
+    removeThinkingIndicator();
+    await new Promise(resolve => setTimeout(resolve, 350));
     renderMessage('assistant', 'Fehler beim Abrufen der Antwort. Bitte versuche es erneut.');
   } finally {
     input.disabled = false;
