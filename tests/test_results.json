@@ -1,0 +1,34 @@
+{
+  "timestamp": "2026-02-04T18:59:38.088370",
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6
+  },
+  "results": [
+    {
+      "id": "trennkost_definition",
+      "status": "PASSED"
+    },
+    {
+      "id": "kohlenhydrate_protein",
+      "status": "PASSED"
+    },
+    {
+      "id": "verdauung_milieus",
+      "status": "PASSED"
+    },
+    {
+      "id": "nonexistent_topic",
+      "status": "PASSED"
+    },
+    {
+      "id": "diversification_test",
+      "status": "PASSED"
+    },
+    {
+      "id": "partial_question_edge_case",
+      "status": "PASSED"
+    }
+  ]
+}
