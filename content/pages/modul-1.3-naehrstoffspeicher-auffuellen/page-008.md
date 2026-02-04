@@ -1,7 +1,6 @@
 ---
 source: 1.3 Naehrstoffspeicher auffuellen.pdf
-page: "[UNKLAR: Seitenzahl nicht sichtbar]"
-type: diagram
+page: 8
 module_id: 1
 module_label: "Modul 1 – Optimale Lebensmittelkombinationen"
 submodule_id: "1.3"
