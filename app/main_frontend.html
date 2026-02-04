@@ -101,6 +101,10 @@
       transform: scale(0.95);
     }
 
+    .sidebar-toggle-btn svg {
+      transition: transform 0.3s ease;
+    }
+
     .new-chat-btn {
       width: 100%;
       padding: 14px 16px;
@@ -490,8 +494,8 @@
     }
 
     .upload-btn {
-      width: 44px;
-      height: 44px;
+      width: 66px;
+      height: 66px;
       padding: 0;
       background: #e8dfd8;
       color: #666;
@@ -503,6 +507,7 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      margin-right: 5px;
     }
 
     .upload-btn:hover {
@@ -515,8 +520,8 @@
     }
 
     .upload-btn svg {
-      width: 20px;
-      height: 20px;
+      width: 30px;
+      height: 30px;
     }
 
     .image-preview {
@@ -759,8 +764,8 @@
     }
 
     .send-btn {
-      width: 44px;
-      height: 44px;
+      width: 66px;
+      height: 66px;
       padding: 0;
       background: #c9a897;
       color: white;
@@ -775,6 +780,7 @@
       justify-content: center;
       box-shadow: 0 2px 8px rgba(201, 168, 151, 0.3);
       flex-shrink: 0;
+      margin-left: 5px;
     }
 
     .send-btn:hover:not(:disabled) {
@@ -793,8 +799,8 @@
     }
 
     .send-btn svg {
-      width: 20px;
-      height: 20px;
+      width: 30px;
+      height: 30px;
     }
 
     .loading {
@@ -901,7 +907,7 @@
         <h2>Lebensessenz</h2>
         <button class="sidebar-toggle-btn" id="sidebarToggleBtn" onclick="toggleSidebar()" title="Sidebar ein-/ausklappen">
           <svg id="toggleIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+            <path d="M15 18l-6-6 6-6"/>
           </svg>
         </button>
       </div>
@@ -1475,15 +1481,20 @@ function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
   const collapsedBtn = document.getElementById('collapsedNewChat');
   const expandedBtn = document.getElementById('expandedNewChat');
+  const toggleIcon = document.getElementById('toggleIcon');
 
   sidebar.classList.toggle('collapsed');
 
   if (sidebar.classList.contains('collapsed')) {
     collapsedBtn.style.display = 'block';
     expandedBtn.style.display = 'none';
+    // Rotate icon 180 degrees to point right
+    toggleIcon.style.transform = 'rotate(180deg)';
   } else {
     collapsedBtn.style.display = 'none';
     expandedBtn.style.display = 'block';
+    // Reset icon rotation to point left
+    toggleIcon.style.transform = 'rotate(0deg)';
   }
 
   localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
@@ -1561,10 +1572,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     const sidebar = document.getElementById('sidebar');
     const collapsedBtn = document.getElementById('collapsedNewChat');
     const expandedBtn = document.getElementById('expandedNewChat');
+    const toggleIcon = document.getElementById('toggleIcon');
 
     sidebar.classList.add('collapsed');
     collapsedBtn.style.display = 'block';
     expandedBtn.style.display = 'none';
+    toggleIcon.style.transform = 'rotate(180deg)';
   }
 
   await loadConversations();

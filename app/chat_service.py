@@ -56,10 +56,11 @@ WICHTIGE REGELN:
 1. FAKTENBASIS: Antworte ausschließlich basierend auf den bereitgestellten KURS-SNIPPETS.
 2. CHAT-KONTEXT: Nutze die Konversationshistorie nur für Referenzen und Disambiguierung (z.B. "das", "wie vorhin", "und noch").
 3. GRENZEN: Wenn die Information NICHT in den Kurs-Snippets steht, sag klar: "{FALLBACK_SENTENCE}"
-4. BEGRIFFS-ALIAS (wichtig): Wenn ein Begriff in der Frage NICHT wörtlich im Kursmaterial vorkommt (z.B. "Trennkost"),
+4. BEGRIFFS-ALIAS (wichtig): NUR wenn der USER einen Begriff verwendet, der NICHT wörtlich im Kursmaterial vorkommt (z.B. USER fragt nach "Trennkost"),
    aber das KONZEPT in den Snippets beschrieben ist, dann:
    - erkläre das Konzept ausschließlich aus den Snippets
    - und weise EINMAL kurz darauf hin: "Der Begriff X wird im Kursmaterial nicht wörtlich definiert; gemeint ist hier …"
+   WICHTIG: Führe NIEMALS selbst Begriffe ein, die nicht im Kursmaterial stehen! Verwende nur die Begriffe aus den Snippets.
 5. TEILANTWORTEN: Wenn die Frage mehrere Teile hat und nur ein Teil in den Snippets steht:
    - beantworte den belegbaren Teil
    - für den nicht belegbaren Teil verwende: "{FALLBACK_SENTENCE}"
@@ -632,15 +633,17 @@ def handle_chat(
         input_parts.append(
             "ANTWORT (deutsch, präzise, materialgebunden):\n"
             "- Bewerte die Mahlzeit nach den im Kursmaterial beschriebenen Regeln.\n"
-            "- Wenn ein Begriff der Frage nicht wörtlich vorkommt, aber das Konzept beschrieben ist, "
-            "erkläre das Konzept aus den Snippets und erwähne das einmal kurz.\n"
+            "- NUR wenn die USER-Frage einen Begriff verwendet, der nicht wörtlich in den Snippets vorkommt, "
+            "aber das Konzept beschrieben ist: erkläre das Konzept und erwähne einmal kurz, dass der Begriff selbst nicht definiert ist.\n"
+            "- Verwende AUSSCHLIESSLICH Begriffe aus den Kurs-Snippets. Führe keine eigenen Fachbegriffe ein.\n"
         )
     else:
         input_parts.append(
             "ANTWORT (deutsch, präzise, materialgebunden):\n"
             "- Beantworte die Frage aus den Snippets.\n"
-            "- Wenn der Begriff (z.B. Trennkost) nicht wörtlich definiert ist, aber die Regeln/Prinzipien "
-            "im Material beschrieben sind, erkläre diese Prinzipien aus den Snippets und erwähne das einmal kurz.\n"
+            "- NUR wenn die USER-Frage einen Begriff verwendet, der nicht wörtlich in den Snippets steht, "
+            "aber das Konzept beschrieben ist: erkläre das Konzept und erwähne einmal kurz, dass der Begriff selbst nicht definiert ist.\n"
+            "- Verwende AUSSCHLIESSLICH Begriffe aus den Kurs-Snippets. Führe keine eigenen Fachbegriffe ein.\n"
             f"- Nur wenn wirklich kein passender Inhalt in den Snippets ist, schreibe exakt: \"{FALLBACK_SENTENCE}\"\n"
         )
 
