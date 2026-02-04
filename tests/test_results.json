@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-02-04T18:59:38.088370",
+  "timestamp": "2026-02-04T19:10:16.442000",
   "summary": {
-    "passed": 6,
+    "passed": 8,
     "failed": 0,
-    "total": 6
+    "total": 8
   },
   "results": [
     {
@@ -28,6 +28,14 @@
     },
     {
       "id": "partial_question_edge_case",
+      "status": "PASSED"
+    },
+    {
+      "id": "specific_food_burger_fries",
+      "status": "PASSED"
+    },
+    {
+      "id": "specific_food_fish_rice",
       "status": "PASSED"
     }
   ]
