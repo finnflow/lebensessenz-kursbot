@@ -66,17 +66,33 @@ def parse_frontmatter(text: str) -> Tuple[Dict[str, Any], str]:
 
 
 def split_blocks(md: str) -> List[str]:
+    """
+    Split markdown into blocks respecting header structure.
+    First split at ## or ### headers, then at blank lines within blocks.
+    Ensures cohesive concepts stay together.
+    """
     md = md.replace("\r\n", "\n")
     blocks: List[str] = []
     buf: List[str] = []
 
     for line in md.split("\n"):
-        if line.strip() == "":
-            if buf:
-                blocks.append("\n".join(buf).strip())
-                buf = []
+        # Check if this is a header line (## or ###)
+        is_header = line.strip().startswith("##")
+
+        # If header and buffer has content, flush buffer first
+        if is_header and buf:
+            blocks.append("\n".join(buf).strip())
+            buf = []
+
+        # If blank line and buffer has content, flush
+        if line.strip() == "" and buf:
+            blocks.append("\n".join(buf).strip())
+            buf = []
             continue
-        buf.append(line)
+
+        # Add line to buffer if not blank
+        if line.strip():
+            buf.append(line)
 
     if buf:
         blocks.append("\n".join(buf).strip())
@@ -123,6 +139,37 @@ def chunk_blocks(blocks: List[str], chunk_size: int, overlap_chars: int) -> List
 def embed_batch(texts: List[str]) -> List[List[float]]:
     resp = client.embeddings.create(model=EMBED_MODEL, input=texts)
     return [d.embedding for d in resp.data]
+
+
+def ensure_metadata_defaults(meta: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Ensure all metadata fields have safe defaults (no None values).
+    Chroma doesn't handle None well; prefer sensible defaults.
+    """
+    defaults = {
+        "path": "unknown",
+        "source": "unknown",
+        "page": 0,
+        "type": "text",
+        "section": "General",
+        "module_id": "0",
+        "module_label": "Unknown Module",
+        "submodule_id": "unknown",
+        "submodule_label": "Unknown",
+    }
+
+    result = {}
+    for key, default_val in defaults.items():
+        val = meta.get(key)
+        # Use value if non-None, otherwise use default
+        result[key] = val if val is not None else default_val
+
+    # Preserve any extra keys not in defaults
+    for key, val in meta.items():
+        if key not in defaults:
+            result[key] = val if val is not None else ""
+
+    return result
 
 
 def main():
@@ -183,6 +230,11 @@ def main():
             "type": meta.get("type", None),
             "section": meta.get("section", None),
             "tags": tags_val,
+            # Module metadata for professional source display
+            "module_id": meta.get("module_id", None),
+            "module_label": meta.get("module_label", None),
+            "submodule_id": meta.get("submodule_id", None),
+            "submodule_label": meta.get("submodule_label", None),
         }
 
         for i, ch in enumerate(chunks):
@@ -260,6 +312,9 @@ def main():
 
 
         batch_metas = [_normalize_source_to_mdpath(_m) for _m in batch_metas]
+
+        # Ensure all metadata has safe defaults (no None values)
+        batch_metas = [ensure_metadata_defaults(_m) for _m in batch_metas]
 
         col.add(
             ids=batch_ids,

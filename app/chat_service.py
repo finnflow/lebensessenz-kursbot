@@ -1,9 +1,11 @@
 import os
+import json
 from typing import Optional, List, Dict, Any, Tuple
 from dotenv import load_dotenv
 from openai import OpenAI
 import chromadb
 from chromadb.config import Settings
+from pathlib import Path
 
 # Load environment variables
 load_dotenv()
@@ -33,6 +35,7 @@ from app.image_handler import ImageValidationError
 CHROMA_DIR = os.getenv("CHROMA_DIR", "storage/chroma")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "kursmaterial_v1")
 FALLBACK_SENTENCE = "Diese Information steht nicht im bereitgestellten Kursmaterial."
+DEBUG_RAG = os.getenv("DEBUG_RAG", "0").lower() in ("1", "true", "yes")
 
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 EMBED_MODEL = os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")
@@ -130,15 +133,38 @@ STANDALONE QUERY:"""
 
     return response.choices[0].message.content.strip()
 
+def load_alias_terms() -> Dict[str, List[str]]:
+    """Load alias terms from config file."""
+    config_path = Path(__file__).parent.parent / "config" / "alias_terms.json"
+    try:
+        if config_path.exists():
+            with open(config_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Warning: Could not load alias_terms.json: {e}")
+    return {}
+
+
+ALIAS_TERMS = load_alias_terms()
+
+
 def expand_alias_terms(query: str) -> str:
     """
-    Deterministically expand query with course-specific alias terms.
+    Deterministically expand query with course-specific alias terms from config.
     No LLM call - just adds search keywords for concepts that may use different terminology.
     """
     query_lower = query.lower()
-    if "trennkost" in query_lower:
-        return query + " | Lebensmittelkombinationen | Kohlenhydrate | Protein | nicht kombinieren | Verdauung | Milieu"
-    return query
+    expanded = query
+
+    # Check each alias key
+    for key, aliases in ALIAS_TERMS.items():
+        if key in query_lower:
+            # Add aliases separated by pipe
+            alias_str = " | " + " | ".join(aliases)
+            expanded += alias_str
+            break  # Only expand first match to avoid bloat
+
+    return expanded
 
 def retrieve_course_snippets(query: str) -> Tuple[List[str], List[Dict], List[float]]:
     """Retrieve relevant course snippets using vector search."""
@@ -154,6 +180,31 @@ def retrieve_course_snippets(query: str) -> Tuple[List[str], List[Dict], List[fl
     dists = res.get("distances", [[]])[0]
 
     return docs, metas, dists
+
+
+def deduplicate_by_source(docs: List[str], metas: List[Dict], dists: List[float], max_per_source: int = 2) -> Tuple[List[str], List[Dict], List[float]]:
+    """
+    Deduplicate chunks by source file to ensure diverse retrieval.
+    Keeps top-N chunks per source (by distance), skips rest.
+
+    Helps prevent one long page from dominating the context.
+    """
+    seen_sources = {}  # source -> count
+    deduped_docs = []
+    deduped_metas = []
+    deduped_dists = []
+
+    for doc, meta, dist in zip(docs, metas, dists):
+        source = meta.get("path", "unknown")
+        count = seen_sources.get(source, 0)
+
+        if count < max_per_source:
+            deduped_docs.append(doc)
+            deduped_metas.append(meta)
+            deduped_dists.append(dist)
+            seen_sources[source] = count + 1
+
+    return deduped_docs, deduped_metas, deduped_dists
 
 def generate_summary(old_summary: Optional[str], new_messages: List[Dict[str, Any]]) -> str:
     """
@@ -301,6 +352,17 @@ def handle_chat(
 
     # 9. Retrieve course snippets
     docs, metas, dists = retrieve_course_snippets(standalone_query)
+
+    # Deduplicate by source to ensure diverse retrieval (max 2 chunks per page)
+    docs, metas, dists = deduplicate_by_source(docs, metas, dists, max_per_source=2)
+
+    # Debug logging
+    if DEBUG_RAG:
+        print(f"\n[RAG] Query: {standalone_query}")
+        print(f"[RAG] Retrieved {len(docs)} chunk(s) after dedup")
+        for i, (doc, meta, dist) in enumerate(list(zip(docs, metas, dists))[:3], 1):
+            print(f"  {i}. path={meta.get('path', '?')} | page={meta.get('page', '?')} | chunk={meta.get('chunk', '?')} | dist={dist:.3f}")
+
     course_context = build_context(docs, metas)
 
     # Check relevance threshold - if best match is too distant, treat as no material

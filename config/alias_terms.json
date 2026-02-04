@@ -1,0 +1,32 @@
+{
+  "trennkost": [
+    "lebensmittelkombinationen",
+    "kohlenhydrate",
+    "protein",
+    "nicht kombinieren",
+    "verdauung",
+    "milieu"
+  ],
+  "blutgruppe": [
+    "blutgruppen-diät",
+    "blutgruppen-ernährung",
+    "blutgruppe o",
+    "blutgruppe a",
+    "blutgruppe b",
+    "blutgruppe ab"
+  ],
+  "darm": [
+    "darmbakterien",
+    "darm-gesundheit",
+    "darmflora",
+    "darm-flora",
+    "gut microbiome"
+  ],
+  "säure": [
+    "säure-basen",
+    "säure-basen-haushalt",
+    "ph-wert",
+    "basisch",
+    "alkalisch"
+  ]
+}
