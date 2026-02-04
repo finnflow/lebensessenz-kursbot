@@ -28,5 +28,14 @@
     "ph-wert",
     "basisch",
     "alkalisch"
+  ],
+  "obst": [
+    "wartedauer",
+    "zeitlicher abstand",
+    "nüchternem magen",
+    "obstverzehr",
+    "früchte",
+    "verzehr von obst",
+    "wartezeit"
   ]
 }

@@ -66,6 +66,11 @@ WICHTIGE REGELN:
 6. KEINE SPEKULATIONEN: Erfinde keine Fakten, die nicht in den Snippets stehen.
 7. KEINE MEDIZIN: Gib keine medizinische Diagnose oder Behandlungsanweisung.
 8. KEINE QUELLEN IM TEXT: Nenne keine Quellenlabels im Text. Die Quellen werden automatisch angezeigt.
+9. ZEITLICHE REGELN (KRITISCH):
+   - Lies Wartezeit-Tabellen SEHR GENAU: "Wartedauer BIS ZUM Verzehr von X" bedeutet: ERST warten, DANN X essen.
+   - Beispiel: "vor dem Obstverzehr 3h Abstand" = ERST 3h nach einer Mahlzeit warten, DANN Obst essen.
+   - Die Tabelle zeigt wie lange man NACH verschiedenen Mahlzeiten warten muss, BEVOR man Obst isst.
+   - Nach dem Obst selbst ist die Wartezeit kurz (20-30 Min für normales Obst).
 
 Du darfst auf frühere Nachrichten referenzieren, aber neue Fakten müssen aus den Kurs-Snippets kommen.
 """
@@ -207,10 +212,82 @@ def deduplicate_by_source(docs: List[str], metas: List[Dict], dists: List[float]
     return deduped_docs, deduped_metas, deduped_dists
 
 
+def classify_food_items(user_message: str, standalone_query: str) -> Optional[Dict[str, Any]]:
+    """
+    LLM-basierte Analyse von Lebensmitteln in der Frage.
+    Extrahiert und klassifiziert automatisch in Kurskategorien.
+    Erkennt auch Fragen zu Wartezeiten und mehrdeutige Lebensmittel.
+
+    Returns: Dict mit 'classification' (str) und optional 'needs_clarification' (str)
+    Example: {"classification": "Obst, Zucker/Süßes, Fett", "needs_clarification": None}
+    Example: {"classification": "Burger", "needs_clarification": "Ist der Burger vegan oder mit Fleisch?"}
+    """
+    classification_prompt = f"""Analysiere die folgende Frage über Lebensmittel und klassifiziere die Komponenten
+in diese Kategorien aus unserem Ernährungskurs:
+- Protein (Fleisch, Fisch, Eier, Käse, Hülsenfrüchte)
+- Komplexe Kohlenhydrate (Reis, Vollkornbrot, Kartoffeln, Hülsenfrüchte)
+- Obst (frisch, Säfte)
+- Gemüse / Salat
+- Fette / Öle
+- Zucker / Süßes
+
+WICHTIG:
+1. Bei zusammengesetzten Lebensmitteln (Döner, Burger, Pizza, etc.):
+   - Zerlege sie in ihre Standard-Komponenten
+   - Beispiele:
+     * Pizza → Teig (Kohlenhydrate), Käse (Protein), Sauce (Gemüse/Zucker)
+     * Döner (Standard) → Fleisch (Protein), Brot (Kohlenhydrate), Salat (Gemüse), Sauce (Fett)
+     * Burger (Standard) → Fleisch (Protein), Brötchen (Kohlenhydrate)
+
+2. Bei MEHRDEUTIGEN Lebensmitteln:
+   - Wenn wichtige Details fehlen (z.B. "Burger" - vegan oder Fleisch?)
+   - Oder wenn Varianten die Kombination ändern (z.B. "Pizza" - welcher Belag?)
+   - Markiere dies mit "NEEDS_CLARIFICATION: [konkrete Frage]"
+
+3. Bei Wartezeit-Fragen:
+   - Erkenne Richtung (VOR oder NACH dem Verzehr)
+   - Füge Keywords hinzu: "Wartedauer", "zeitlicher Abstand", "Obstverzehr"
+
+Frage: {user_message}
+
+Antworte im Format:
+1. Erkannte Lebensmittel: [...]
+2. Klassifikation: [...]
+3. Falls mehrdeutig: NEEDS_CLARIFICATION: [konkrete Frage an Nutzer]
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": classification_prompt}],
+            temperature=0.1,
+            max_tokens=200,
+            timeout=5
+        )
+        result = response.choices[0].message.content.strip()
+
+        # Check if clarification needed
+        needs_clarification = None
+        if "NEEDS_CLARIFICATION:" in result:
+            parts = result.split("NEEDS_CLARIFICATION:")
+            classification = parts[0].strip()
+            needs_clarification = parts[1].strip()
+        else:
+            classification = result
+
+        return {
+            "classification": classification,
+            "needs_clarification": needs_clarification
+        }
+    except Exception:
+        return None
+
+
 def generalize_query(query: str) -> str:
     """
-    Generalize query when specific terms aren't found.
-    E.g., "Burger und Pommes" → "Kohlenhydrate und Protein Kombination"
+    DEPRECATED: Legacy function for regex-based query generalization.
+    Kept for fallback in retrieve_with_fallback().
+    New code should use classify_food_items() instead.
     """
     # Extract main food words and map to course concepts
     generalization_map = {
@@ -443,6 +520,21 @@ def handle_chat(
     # Expand alias terms for better matching
     standalone_query = expand_alias_terms(standalone_query)
 
+    # LLM-based food classification for better retrieval
+    food_classification_result = classify_food_items(user_message, standalone_query)
+    needs_clarification = None
+    if food_classification_result:
+        classification = food_classification_result.get("classification", "")
+        needs_clarification = food_classification_result.get("needs_clarification")
+
+        if classification:
+            standalone_query += f"\n{classification}"
+
+        if DEBUG_RAG:
+            print(f"[RAG] Food Classification: {classification}")
+            if needs_clarification:
+                print(f"[RAG] Needs Clarification: {needs_clarification}")
+
     # 9. Retrieve course snippets with multi-step fallback strategy
     if DEBUG_RAG:
         print(f"\n[RAG] Primary query: {standalone_query}")
@@ -525,6 +617,15 @@ def handle_chat(
 
     input_parts.append(f"KURS-SNIPPETS (FAKTENBASIS):\n{course_context}\n")
     input_parts.append(f"AKTUELLE FRAGE:\n{user_message}\n")
+
+    # Add clarification note if needed
+    if needs_clarification:
+        input_parts.append(f"WICHTIG - MEHRDEUTIGES LEBENSMITTEL:\n{needs_clarification}\n")
+        input_parts.append(
+            "Bitte stelle diese Rückfrage ZUERST, bevor du die Hauptfrage beantwortest. "
+            "Erkläre kurz, warum die Info wichtig ist (z.B. 'Ein veganer Burger hat eine andere "
+            "Lebensmittelkombination als ein Fleisch-Burger').\n"
+        )
 
     # Answer instructions with concept alias handling
     if vision_analysis:
