@@ -80,12 +80,11 @@
       width: 36px;
       height: 36px;
       padding: 0;
-      background: #f5f1ed;
+      background: transparent;
       color: #c9a897;
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      font-size: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -94,7 +93,7 @@
     }
 
     .sidebar-toggle-btn:hover {
-      background: #eee9e2;
+      background: #f5f1ed;
       transform: scale(1.05);
     }
 
@@ -130,6 +129,11 @@
       flex: 1;
       overflow-y: auto;
       padding: 8px;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .sidebar.collapsed .conversation-list {
+      display: none;
     }
 
     .conversation-list::-webkit-scrollbar {
@@ -890,11 +894,19 @@
       <div class="sidebar-header">
         <h2>Lebensessenz</h2>
         <button class="sidebar-toggle-btn" id="sidebarToggleBtn" onclick="toggleSidebar()" title="Sidebar ein-/ausklappen">
-          <span id="toggleIcon">◀</span>
+          <svg id="toggleIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+          </svg>
         </button>
       </div>
       <div style="padding: 8px; display: none;" id="collapsedNewChat" class="sidebar.collapsed">
-        <button class="new-chat-btn" onclick="newChat()" style="font-size: 12px; padding: 10px;">+</button>
+        <button class="new-chat-btn" onclick="newChat()" style="padding: 8px; width: 100%; font-size: 0;" title="Neuer Chat">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <rect x="9" y="3" width="0" height="18"/>
+            <rect x="3" y="9" width="18" height="0"/>
+          </svg>
+        </button>
       </div>
       <div style="padding: 8px; display: block;" id="expandedNewChat">
         <button class="new-chat-btn" onclick="newChat()">+ Neuer Chat</button>
@@ -1450,18 +1462,15 @@ async function sendMessage() {
 
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
-  const toggleIcon = document.getElementById('toggleIcon');
   const collapsedBtn = document.getElementById('collapsedNewChat');
   const expandedBtn = document.getElementById('expandedNewChat');
 
   sidebar.classList.toggle('collapsed');
 
   if (sidebar.classList.contains('collapsed')) {
-    toggleIcon.textContent = '▶';
     collapsedBtn.style.display = 'block';
     expandedBtn.style.display = 'none';
   } else {
-    toggleIcon.textContent = '◀';
     collapsedBtn.style.display = 'none';
     expandedBtn.style.display = 'block';
   }
@@ -1539,12 +1548,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
   if (sidebarCollapsed) {
     const sidebar = document.getElementById('sidebar');
-    const toggleIcon = document.getElementById('toggleIcon');
     const collapsedBtn = document.getElementById('collapsedNewChat');
     const expandedBtn = document.getElementById('expandedNewChat');
 
     sidebar.classList.add('collapsed');
-    toggleIcon.textContent = '▶';
     collapsedBtn.style.display = 'block';
     expandedBtn.style.display = 'none';
   }
