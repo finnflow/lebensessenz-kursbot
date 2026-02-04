@@ -32,27 +32,37 @@ from app.image_handler import ImageValidationError
 # Config
 CHROMA_DIR = os.getenv("CHROMA_DIR", "storage/chroma")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "kursmaterial_v1")
+FALLBACK_SENTENCE = "Diese Information steht nicht im bereitgestellten Kursmaterial."
+
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 EMBED_MODEL = os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")
 TOP_K = int(os.getenv("TOP_K", "10"))  # Increased from 6 to 10
 LAST_N = int(os.getenv("LAST_N", "8"))  # Last N messages to include
 MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "9000"))
 SUMMARY_THRESHOLD = int(os.getenv("SUMMARY_THRESHOLD", "6"))  # Update summary every N messages
+DISTANCE_THRESHOLD = float(os.getenv("DISTANCE_THRESHOLD", "0.35"))  # Min relevance for retrieval
 
 # Initialize clients
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 chroma = chromadb.PersistentClient(path=CHROMA_DIR, settings=Settings(anonymized_telemetry=False))
 col = chroma.get_or_create_collection(name=COLLECTION_NAME)
 
-SYSTEM_INSTRUCTIONS = """Du bist ein kurs-assistierender Bot.
+SYSTEM_INSTRUCTIONS = f"""Du bist ein kurs-assistierender Bot.
 
 WICHTIGE REGELN:
 1. FAKTENBASIS: Antworte ausschließlich basierend auf den bereitgestellten KURS-SNIPPETS.
 2. CHAT-KONTEXT: Nutze die Konversationshistorie nur für Referenzen und Disambiguierung (z.B. "das", "wie vorhin", "und noch").
-3. GRENZEN: Wenn die Information NICHT in den Kurs-Snippets steht, sag klar: "Diese Information steht nicht im bereitgestellten Kursmaterial."
-4. KEINE SPEKULATIONEN: Erfinde keine Fakten, die nicht in den Snippets stehen.
-5. KEINE MEDIZIN: Gib keine medizinische Diagnose oder Behandlungsanweisung.
-6. KEINE QUELLEN IM TEXT: Nenne keine Quellenlabels im Text. Die Quellen werden automatisch angezeigt.
+3. GRENZEN: Wenn die Information NICHT in den Kurs-Snippets steht, sag klar: "{FALLBACK_SENTENCE}"
+4. BEGRIFFS-ALIAS (wichtig): Wenn ein Begriff in der Frage NICHT wörtlich im Kursmaterial vorkommt (z.B. "Trennkost"),
+   aber das KONZEPT in den Snippets beschrieben ist, dann:
+   - erkläre das Konzept ausschließlich aus den Snippets
+   - und weise EINMAL kurz darauf hin: "Der Begriff X wird im Kursmaterial nicht wörtlich definiert; gemeint ist hier …"
+5. TEILANTWORTEN: Wenn die Frage mehrere Teile hat und nur ein Teil in den Snippets steht:
+   - beantworte den belegbaren Teil
+   - für den nicht belegbaren Teil verwende: "{FALLBACK_SENTENCE}"
+6. KEINE SPEKULATIONEN: Erfinde keine Fakten, die nicht in den Snippets stehen.
+7. KEINE MEDIZIN: Gib keine medizinische Diagnose oder Behandlungsanweisung.
+8. KEINE QUELLEN IM TEXT: Nenne keine Quellenlabels im Text. Die Quellen werden automatisch angezeigt.
 
 Du darfst auf frühere Nachrichten referenzieren, aber neue Fakten müssen aus den Kurs-Snippets kommen.
 """
@@ -105,6 +115,8 @@ def rewrite_standalone_query(
 
 Schreibe die aktuelle Nachricht in eine eigenständige Suchanfrage um, die alle nötigen Informationen enthält.
 Falls sie bereits eigenständig ist, gib sie unverändert zurück.
+Wenn Begriffe vorkommen, die im Kursmaterial evtl. anders heißen (z.B. "Trennkost"),
+ergänze passende Kurs-Begriffe als Synonyme, z.B. "Lebensmittelkombinationen", "Kohlenhydrate", "Protein", "Milieu", "Verdauung".
 Antworte NUR mit der umgeschriebenen Anfrage, ohne Erklärung.
 
 STANDALONE QUERY:"""
@@ -117,6 +129,16 @@ STANDALONE QUERY:"""
     )
 
     return response.choices[0].message.content.strip()
+
+def expand_alias_terms(query: str) -> str:
+    """
+    Deterministically expand query with course-specific alias terms.
+    No LLM call - just adds search keywords for concepts that may use different terminology.
+    """
+    query_lower = query.lower()
+    if "trennkost" in query_lower:
+        return query + " | Lebensmittelkombinationen | Kohlenhydrate | Protein | nicht kombinieren | Verdauung | Milieu"
+    return query
 
 def retrieve_course_snippets(query: str) -> Tuple[List[str], List[Dict], List[float]]:
     """Retrieve relevant course snippets using vector search."""
@@ -274,9 +296,39 @@ def handle_chat(
         # Standard query rewriting
         standalone_query = rewrite_standalone_query(summary, last_messages[:-1], user_message)  # Exclude current user msg
 
+    # Expand alias terms for better matching
+    standalone_query = expand_alias_terms(standalone_query)
+
     # 9. Retrieve course snippets
     docs, metas, dists = retrieve_course_snippets(standalone_query)
     course_context = build_context(docs, metas)
+
+    # Check relevance threshold - if best match is too distant, treat as no material
+    best_dist = min(dists) if dists else 999.0
+    if best_dist > DISTANCE_THRESHOLD:
+        assistant_message = FALLBACK_SENTENCE
+        create_message(conversation_id, "assistant", assistant_message)
+        conv_data_updated = get_conversation(conversation_id)
+        if should_update_summary(conversation_id, conv_data_updated):
+            update_conversation_summary(conversation_id, conv_data_updated)
+        return {
+            "conversationId": conversation_id,
+            "answer": assistant_message,
+            "sources": []
+        }
+
+    # Hard fallback only if we truly have no material at all
+    if not course_context.strip():
+        assistant_message = FALLBACK_SENTENCE
+        create_message(conversation_id, "assistant", assistant_message)
+        conv_data_updated = get_conversation(conversation_id)
+        if should_update_summary(conversation_id, conv_data_updated):
+            update_conversation_summary(conversation_id, conv_data_updated)
+        return {
+            "conversationId": conversation_id,
+            "answer": assistant_message,
+            "sources": []
+        }
 
     # 10. Build LLM input
     input_parts = []
@@ -320,10 +372,22 @@ def handle_chat(
     input_parts.append(f"KURS-SNIPPETS (FAKTENBASIS):\n{course_context}\n")
     input_parts.append(f"AKTUELLE FRAGE:\n{user_message}\n")
 
+    # Answer instructions with concept alias handling
     if vision_analysis:
-        input_parts.append("ANTWORT (deutsch, präzise, materialgebunden - bewerte die Mahlzeit nach Trennkost-Regeln):")
+        input_parts.append(
+            "ANTWORT (deutsch, präzise, materialgebunden):\n"
+            "- Bewerte die Mahlzeit nach den im Kursmaterial beschriebenen Regeln.\n"
+            "- Wenn ein Begriff der Frage nicht wörtlich vorkommt, aber das Konzept beschrieben ist, "
+            "erkläre das Konzept aus den Snippets und erwähne das einmal kurz.\n"
+        )
     else:
-        input_parts.append("ANTWORT (deutsch, präzise, materialgebunden):")
+        input_parts.append(
+            "ANTWORT (deutsch, präzise, materialgebunden):\n"
+            "- Beantworte die Frage aus den Snippets.\n"
+            "- Wenn der Begriff (z.B. Trennkost) nicht wörtlich definiert ist, aber die Regeln/Prinzipien "
+            "im Material beschrieben sind, erkläre diese Prinzipien aus den Snippets und erwähne das einmal kurz.\n"
+            f"- Nur wenn wirklich kein passender Inhalt in den Snippets ist, schreibe exakt: \"{FALLBACK_SENTENCE}\"\n"
+        )
 
     llm_input = "\n".join(input_parts)
 
@@ -347,7 +411,7 @@ def handle_chat(
     if should_update_summary(conversation_id, conv_data_updated):
         update_conversation_summary(conversation_id, conv_data_updated)
 
-    # 14. Prepare sources
+    # 14. Prepare sources with module metadata
     sources = []
     for m, d in zip(metas, dists):
         sources.append({
@@ -355,7 +419,12 @@ def handle_chat(
             "source": m.get("source"),
             "page": m.get("page"),
             "chunk": m.get("chunk"),
-            "distance": d
+            "distance": d,
+            # Module metadata for professional display
+            "module_id": m.get("module_id"),
+            "module_label": m.get("module_label"),
+            "submodule_id": m.get("submodule_id"),
+            "submodule_label": m.get("submodule_label"),
         })
 
     return {
