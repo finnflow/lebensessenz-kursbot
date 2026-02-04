@@ -206,6 +206,93 @@ def deduplicate_by_source(docs: List[str], metas: List[Dict], dists: List[float]
 
     return deduped_docs, deduped_metas, deduped_dists
 
+
+def generalize_query(query: str) -> str:
+    """
+    Generalize query when specific terms aren't found.
+    E.g., "Burger und Pommes" → "Kohlenhydrate und Protein Kombination"
+    """
+    # Extract main food words and map to course concepts
+    generalization_map = {
+        r"\bburger\b": "Fleisch und Kohlenhydrate",
+        r"\bpommes\b": "Kohlenhydrate",
+        r"\bfisch\b": "Protein",
+        r"\bhähnchen\b": "Protein",
+        r"\bsalat\b": "Gemüse",
+        r"\bbrot\b": "Kohlenhydrate",
+        r"\breis\b": "Kohlenhydrate",
+        r"\bnudeln\b": "Kohlenhydrate",
+        r"\beier?\b": "Protein",
+        r"\bkäse\b": "Protein",
+    }
+
+    import re
+    generalized = query.lower()
+
+    for pattern, replacement in generalization_map.items():
+        if re.search(pattern, generalized):
+            generalized = re.sub(pattern, replacement, generalized)
+
+    # Only return if actually generalized
+    if generalized != query.lower():
+        return generalized
+    return None
+
+
+def retrieve_with_fallback(query: str, user_message: str) -> Tuple[List[str], List[Dict], List[float], bool]:
+    """
+    Multi-step retrieval with fallback strategies.
+
+    Returns: (docs, metas, dists, is_partial)
+    is_partial=True means results came from fallback, answer should note this
+    """
+    # Step 1: Primary retrieval
+    docs, metas, dists = retrieve_course_snippets(query)
+    docs, metas, dists = deduplicate_by_source(docs, metas, dists, max_per_source=2)
+
+    best_dist = min(dists) if dists else 999.0
+
+    # If excellent matches, return immediately
+    if len(docs) >= 2 and best_dist <= DISTANCE_THRESHOLD:
+        if DEBUG_RAG:
+            print(f"[RAG] Primary retrieval successful (distance: {best_dist:.3f})")
+        return docs, metas, dists, False
+
+    # Step 2: Try generalized query
+    if best_dist > DISTANCE_THRESHOLD or len(docs) < 2:
+        generalized = generalize_query(user_message)
+        if generalized and generalized != query.lower():
+            if DEBUG_RAG:
+                print(f"[RAG] Trying generalized query: {generalized}")
+            docs_gen, metas_gen, dists_gen = retrieve_course_snippets(generalized)
+            docs_gen, metas_gen, dists_gen = deduplicate_by_source(docs_gen, metas_gen, dists_gen, max_per_source=2)
+
+            best_dist_gen = min(dists_gen) if dists_gen else 999.0
+            if len(docs_gen) >= 1 and best_dist_gen <= (DISTANCE_THRESHOLD + 0.3):  # Slightly more lenient
+                if DEBUG_RAG:
+                    print(f"[RAG] Fallback retrieval successful (distance: {best_dist_gen:.3f})")
+                return docs_gen, metas_gen, dists_gen, True  # Mark as partial
+
+    # Step 3: Try alias expansion again (already done in primary, but as fallback)
+    if best_dist > DISTANCE_THRESHOLD or len(docs) < 1:
+        expanded_query = expand_alias_terms(query)
+        if expanded_query != query and expanded_query not in [q for q, _, _ in [(query, None, None)]]:
+            if DEBUG_RAG:
+                print(f"[RAG] Trying alias-expanded query")
+            docs_exp, metas_exp, dists_exp = retrieve_course_snippets(expanded_query)
+            docs_exp, metas_exp, dists_exp = deduplicate_by_source(docs_exp, metas_exp, dists_exp, max_per_source=2)
+
+            best_dist_exp = min(dists_exp) if dists_exp else 999.0
+            if len(docs_exp) >= 1 and best_dist_exp <= (DISTANCE_THRESHOLD + 0.2):
+                if DEBUG_RAG:
+                    print(f"[RAG] Alias fallback successful (distance: {best_dist_exp:.3f})")
+                return docs_exp, metas_exp, dists_exp, True
+
+    # All fallbacks exhausted
+    if DEBUG_RAG:
+        print(f"[RAG] All retrieval strategies exhausted (best distance: {best_dist:.3f})")
+    return docs, metas, dists, False
+
 def generate_summary(old_summary: Optional[str], new_messages: List[Dict[str, Any]]) -> str:
     """
     Generate or update rolling summary.
@@ -350,16 +437,15 @@ def handle_chat(
     # Expand alias terms for better matching
     standalone_query = expand_alias_terms(standalone_query)
 
-    # 9. Retrieve course snippets
-    docs, metas, dists = retrieve_course_snippets(standalone_query)
+    # 9. Retrieve course snippets with multi-step fallback strategy
+    if DEBUG_RAG:
+        print(f"\n[RAG] Primary query: {standalone_query}")
 
-    # Deduplicate by source to ensure diverse retrieval (max 2 chunks per page)
-    docs, metas, dists = deduplicate_by_source(docs, metas, dists, max_per_source=2)
+    docs, metas, dists, is_partial = retrieve_with_fallback(standalone_query, user_message)
 
     # Debug logging
     if DEBUG_RAG:
-        print(f"\n[RAG] Query: {standalone_query}")
-        print(f"[RAG] Retrieved {len(docs)} chunk(s) after dedup")
+        print(f"[RAG] Retrieved {len(docs)} chunk(s) | partial={is_partial}")
         for i, (doc, meta, dist) in enumerate(list(zip(docs, metas, dists))[:3], 1):
             print(f"  {i}. path={meta.get('path', '?')} | page={meta.get('page', '?')} | chunk={meta.get('chunk', '?')} | dist={dist:.3f}")
 
@@ -367,7 +453,7 @@ def handle_chat(
 
     # Check relevance threshold - if best match is too distant, treat as no material
     best_dist = min(dists) if dists else 999.0
-    if best_dist > DISTANCE_THRESHOLD:
+    if best_dist > DISTANCE_THRESHOLD and not is_partial:
         assistant_message = FALLBACK_SENTENCE
         create_message(conversation_id, "assistant", assistant_message)
         conv_data_updated = get_conversation(conversation_id)
