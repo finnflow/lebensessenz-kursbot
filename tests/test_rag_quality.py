@@ -91,7 +91,7 @@ def test_rag_quality():
             response = requests.post(
                 f"{BASE_URL}/chat",
                 json={"message": question},
-                timeout=10
+                timeout=30  # Increased: LLM calls can take time
             )
 
             if response.status_code != 200:
