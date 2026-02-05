@@ -1,0 +1,32 @@
+INFO:     Will watch for changes in these directories: ['/Users/finn/Documents/lebensessenz-kursbot']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [43061] using WatchFiles
+INFO:     Started server process [43064]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     192.168.0.102:56991 - "GET / HTTP/1.1" 200 OK
+INFO:     192.168.0.102:56991 - "GET /conversations?guest_id=b7259a9e-c8fe-423f-90f2-e633654e6c0b HTTP/1.1" 200 OK
+INFO:     192.168.0.102:56991 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57038 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57038 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57056 - "GET /conversations/10705238-96d0-4f3e-b701-47330f94a682/messages?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57058 - "GET /conversations/8d394cb3-65f9-4e39-bea4-c91a1ecd710f/messages?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57058 - "GET /conversations/67d9f7d7-6656-44a9-90af-51f027054224/messages?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57058 - "GET /conversations/86560b11-43fc-41e1-ba51-453de107b1ad/messages?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57061 - "GET /conversations/a97ed0cc-ca3d-4ce8-9307-3e4bbbaa65f5/messages?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57066 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57066 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57066 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57069 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57069 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57076 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57076 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57095 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57095 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57100 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57100 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57104 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57104 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57108 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57108 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57111 - "GET /conversations/76257c22-593a-46da-b64d-281089e2ffa3/messages?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
