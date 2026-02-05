@@ -105,6 +105,25 @@
       transition: transform 0.3s ease;
     }
 
+    .sidebar-toggle-btn:hover::after {
+      content: attr(title);
+      position: absolute;
+      left: calc(100% + 12px);
+      top: 50%;
+      transform: translateY(-50%);
+      background: #1a1a1a;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      pointer-events: none;
+      animation: tooltipFadeIn 0.2s ease-out;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+    }
+
     .new-chat-btn {
       width: 100%;
       padding: 14px 16px;
@@ -130,6 +149,75 @@
 
     .new-chat-btn:active {
       transform: translateY(0);
+    }
+
+    .new-chat-btn-collapsed {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      background: #c9a897;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 8px rgba(201, 168, 151, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: visible;
+    }
+
+    .new-chat-btn-collapsed:hover {
+      background: #b89786;
+      transform: scale(1.15) rotate(90deg);
+      box-shadow: 0 6px 20px rgba(201, 168, 151, 0.5);
+    }
+
+    .new-chat-btn-collapsed:hover::after {
+      content: 'Neuer Chat';
+      position: absolute;
+      left: calc(100% + 12px);
+      background: #1a1a1a;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      pointer-events: none;
+      animation: tooltipFadeIn 0.2s ease-out;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+    }
+
+    .new-chat-btn-collapsed:hover::before {
+      content: '';
+      position: absolute;
+      left: calc(100% + 4px);
+      width: 0;
+      height: 0;
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+      border-right: 8px solid #1a1a1a;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    @keyframes tooltipFadeIn {
+      from {
+        opacity: 0;
+        transform: translateX(-8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .new-chat-btn-collapsed:active {
+      transform: scale(1.05) rotate(90deg);
     }
 
     .conversation-list {
@@ -176,11 +264,18 @@
 
     .conversation-item:hover {
       background: #f5f1ed;
+      transform: translateX(4px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
 
     .conversation-item.active {
       background: #f5f1ed;
       border-color: #c9a897;
+      box-shadow: 0 2px 12px rgba(201, 168, 151, 0.2);
+    }
+
+    .conversation-item.active:hover {
+      transform: translateX(2px);
     }
 
     .conversation-content {
@@ -241,6 +336,25 @@
 
     .conversation-delete-btn:active {
       transform: scale(0.95);
+    }
+
+    .conversation-delete-btn:hover::after {
+      content: attr(title);
+      position: absolute;
+      left: calc(100% + 10px);
+      top: 50%;
+      transform: translateY(-50%);
+      background: #1a1a1a;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      pointer-events: none;
+      animation: tooltipFadeIn 0.2s ease-out;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
     }
 
     .sidebar.collapsed .conversation-delete-btn {
@@ -524,6 +638,25 @@
       height: 30px;
     }
 
+    .upload-btn:hover::after {
+      content: attr(title);
+      position: absolute;
+      bottom: calc(100% + 10px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1a1a;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      pointer-events: none;
+      animation: tooltipFadeIn 0.2s ease-out;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+    }
+
     .image-preview {
       display: none;
       position: relative;
@@ -803,6 +936,25 @@
       height: 30px;
     }
 
+    .send-btn:hover:not(:disabled)::after {
+      content: attr(title);
+      position: absolute;
+      bottom: calc(100% + 10px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1a1a;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      pointer-events: none;
+      animation: tooltipFadeIn 0.2s ease-out;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+    }
+
     .loading {
       display: flex;
       align-items: center;
@@ -912,11 +1064,10 @@
         </button>
       </div>
       <div style="padding: 8px; display: none;" id="collapsedNewChat" class="sidebar.collapsed">
-        <button class="new-chat-btn" onclick="newChat()" style="padding: 8px; width: 100%; font-size: 0;" title="Neuer Chat">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-            <rect x="9" y="3" width="0" height="18"/>
-            <rect x="3" y="9" width="18" height="0"/>
+        <button class="new-chat-btn-collapsed" onclick="newChat()" title="Neuer Chat">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
         </button>
       </div>
