@@ -324,28 +324,6 @@
       transform: scale(0.95);
     }
 
-    .conversation-delete-btn:hover::after {
-      content: attr(title);
-      position: absolute;
-      left: calc(100% + 10px);
-      top: 50%;
-      transform: translateY(-50%);
-      background: rgba(26, 26, 26, 0.95);
-      backdrop-filter: blur(10px) saturate(150%);
-      -webkit-backdrop-filter: blur(10px) saturate(150%);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: white;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      white-space: nowrap;
-      pointer-events: none;
-      animation: tooltipFadeInFromLeft 0.2s ease-out;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-      z-index: 10001;
-    }
-
     .sidebar.collapsed .conversation-delete-btn {
       opacity: 1;
     }
