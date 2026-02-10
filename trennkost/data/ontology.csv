@@ -1,0 +1,232 @@
+canonical,synonyms,group,subgroup,ambiguity_flag,ambiguity_note,notes
+# ═══════════════════════════════════════════════════════════════════════
+# OBST (Fresh Fruit) — eat alone or with BLATTGRUEN/TROCKENOBST
+# ═══════════════════════════════════════════════════════════════════════
+Apfel,"Äpfel,Apple",OBST,FRISCH,false,,
+Birne,"Birnen",OBST,FRISCH,false,,
+Banane,"Bananen",OBST,FRISCH,false,,"längere Verdauung: 45-60 Min"
+Orange,"Orangen,Apfelsine,Apfelsinen",OBST,FRISCH,false,,
+Zitrone,"Zitronen,Limette,Limetten,Lime",OBST,FRISCH,false,,"wird basisch verstoffwechselt trotz saurem Geschmack. ABER: paar Tropfen Saft als Würzmittel gelten als neutral (wie Essig)"
+Grapefruit,"Grapefruits",OBST,FRISCH,false,,
+Mandarine,"Mandarinen,Clementine,Clementinen",OBST,FRISCH,false,,
+Mango,"Mangos",OBST,FRISCH,false,,
+Ananas,"Ananas",OBST,FRISCH,false,,
+Kiwi,"Kiwis",OBST,FRISCH,false,,"reich an Vitamin C"
+Wassermelone,"Melone,Honigmelone",OBST,FRISCH,false,,
+Weintraube,"Weintrauben,Trauben",OBST,FRISCH,false,,
+Pflaume,"Pflaumen,Zwetschge,Zwetschgen",OBST,FRISCH,false,,
+Pfirsich,"Pfirsiche,Nektarine,Nektarinen",OBST,FRISCH,false,,
+Kirsche,"Kirschen",OBST,FRISCH,false,,"reich an Vitamin C"
+Erdbeere,"Erdbeeren,Strawberry",OBST,BEEREN,false,,"reich an Antioxidantien"
+Himbeere,"Himbeeren",OBST,BEEREN,false,,"reich an Antioxidantien"
+Blaubeere,"Blaubeeren,Heidelbeere,Heidelbeeren",OBST,BEEREN,false,,"reich an Antioxidantien"
+Brombeere,"Brombeeren",OBST,BEEREN,false,,
+Johannisbeere,"Johannisbeeren",OBST,BEEREN,false,,
+Granatapfel,"Granatäpfel",OBST,FRISCH,false,,
+# ═══════════════════════════════════════════════════════════════════════
+# TROCKENOBST — combinable with OBST, longer digestion (45-60 min)
+# ═══════════════════════════════════════════════════════════════════════
+Dattel,"Datteln,Dates",TROCKENOBST,TROCKEN,false,,"45-60 Min Verdauung"
+Feige,"Feigen,getrocknete Feigen",TROCKENOBST,TROCKEN,false,,
+Rosine,"Rosinen,Sultanine,Sultaninen",TROCKENOBST,TROCKEN,false,,
+Aprikose getrocknet,"getrocknete Aprikosen,Trockenaprikosen",TROCKENOBST,TROCKEN,false,,
+Cranberry getrocknet,"getrocknete Cranberries",TROCKENOBST,TROCKEN,false,,
+# ═══════════════════════════════════════════════════════════════════════
+# NEUTRAL — Stärkearmes Gemüse, Salat, Kräuter, Sprossen
+# Kombinierbar mit ALLEM
+# ═══════════════════════════════════════════════════════════════════════
+# Kreuzblütler
+Blumenkohl,"Karfiol",NEUTRAL,KREUZBLUETLER,false,,
+Brokkoli,"Broccoli",NEUTRAL,KREUZBLUETLER,false,,
+Rosenkohl,"",NEUTRAL,KREUZBLUETLER,false,,
+Grünkohl,"Kale",NEUTRAL,KREUZBLUETLER,false,,
+Weißkohl,"Weißkraut",NEUTRAL,KREUZBLUETLER,false,,
+Rotkohl,"Rotkraut,Blaukraut",NEUTRAL,KREUZBLUETLER,false,,
+Spitzkohl,"",NEUTRAL,KREUZBLUETLER,false,,
+Wirsing,"",NEUTRAL,KREUZBLUETLER,false,,
+Chinakohl,"",NEUTRAL,KREUZBLUETLER,false,,
+Pak Choi,"Bok Choy,Pak Choy",NEUTRAL,KREUZBLUETLER,false,,
+Radieschen,"Rettich",NEUTRAL,KREUZBLUETLER,false,,
+Kohlrabi,"",NEUTRAL,KREUZBLUETLER,false,,
+# Zwiebel & Lauch
+Knoblauch,"Knoblauchzehe,Knoblauchzehen",NEUTRAL,ZWIEBEL_LAUCH,false,,
+Zwiebel,"Zwiebeln,Schalotte,Schalotten",NEUTRAL,ZWIEBEL_LAUCH,false,,
+Frühlingszwiebel,"Frühlingszwiebeln,Lauchzwiebel",NEUTRAL,ZWIEBEL_LAUCH,false,,
+Lauch,"Porree",NEUTRAL,ZWIEBEL_LAUCH,false,,
+Schnittlauch,"",NEUTRAL,ZWIEBEL_LAUCH,false,,
+Bärlauch,"",NEUTRAL,ZWIEBEL_LAUCH,false,,
+# Blattgrün & Salate (SPECIAL: can combine with OBST in smoothies)
+Spinat,"Blattspinat,Baby-Spinat",NEUTRAL,BLATTGRUEN,false,,
+Rucola,"Rauke",NEUTRAL,BLATTGRUEN,false,,
+Feldsalat,"Rapunzel,Nüsslisalat",NEUTRAL,BLATTGRUEN,false,,
+Kopfsalat,"Blattsalat,Pflücksalat,Eisbergsalat",NEUTRAL,SALAT,false,,
+Endiviensalat,"Endivie",NEUTRAL,SALAT,false,,
+Radicchio,"",NEUTRAL,SALAT,false,,
+Chicoree,"Chicorée",NEUTRAL,SALAT,false,,
+Mangold,"",NEUTRAL,BLATTGRUEN,false,,
+Wildkräuter,"",NEUTRAL,BLATTGRUEN,false,,
+Löwenzahn,"Löwenzahnblätter",NEUTRAL,BLATTGRUEN,false,,
+Brennnessel,"Brennnesselblätter",NEUTRAL,BLATTGRUEN,false,,
+# Sprossen
+Brokkolisprossen,"",NEUTRAL,SPROSSEN,false,,
+Alfalfasprossen,"Alfalfa",NEUTRAL,SPROSSEN,false,,
+Mungobohnensprossen,"",NEUTRAL,SPROSSEN,false,,
+Sojasprossen,"Sojabohnensprossen",NEUTRAL,SPROSSEN,false,,"Nicht verwechseln mit Sojabohnen (Hülsenfrüchte)"
+Radieschensprossen,"",NEUTRAL,SPROSSEN,false,,
+Linsensprossen,"",NEUTRAL,SPROSSEN,false,,
+Kresse,"",NEUTRAL,SPROSSEN,false,,
+# Sonstiges stärkearmes Gemüse
+Gurke,"Gurken,Salatgurke",NEUTRAL,STAERKEARMES_GEMUESE,false,,
+Tomate,"Tomaten,Tomatenmark,Tomatensauce",NEUTRAL,STAERKEARMES_GEMUESE,false,,
+Spargel,"grüner Spargel,weißer Spargel",NEUTRAL,STAERKEARMES_GEMUESE,false,,
+Sellerie,"Staudensellerie,Knollensellerie",NEUTRAL,STAERKEARMES_GEMUESE,false,,
+Fenchel,"",NEUTRAL,STAERKEARMES_GEMUESE,false,,
+Artischocke,"Artischocken",NEUTRAL,STAERKEARMES_GEMUESE,false,,
+Zucchini,"",NEUTRAL,STAERKEARMES_GEMUESE,false,,
+Paprika,"Paprikaschote,rote Paprika,gelbe Paprika",NEUTRAL,STAERKEARMES_GEMUESE,false,,
+Pilze,"Champignons,Steinpilze,Shiitake,Pfifferlinge,Austernpilze",NEUTRAL,STAERKEARMES_GEMUESE,false,,
+Aubergine,"Eggplant",NEUTRAL,STAERKEARMES_GEMUESE,false,,
+Oliven,"schwarze Oliven,grüne Oliven",NEUTRAL,STAERKEARMES_GEMUESE,false,,
+Grüne Bohnen,"grüne Bohne,Stangenbohne,Stangenbohnen,Buschbohne",NEUTRAL,STAERKEARMES_GEMUESE,false,,"NICHT verwechseln mit getrockneten Bohnen (HUELSENFRUECHTE)"
+Grüne Erbsen,"frische Erbsen,Zuckererbsen",NEUTRAL,STAERKEARMES_GEMUESE,false,,"NICHT verwechseln mit getrockneten Erbsen (HUELSENFRUECHTE)"
+# Kräuter
+Petersilie,"",NEUTRAL,KRAEUTER,false,,
+Basilikum,"",NEUTRAL,KRAEUTER,false,,
+Dill,"",NEUTRAL,KRAEUTER,false,,
+Koriander,"",NEUTRAL,KRAEUTER,false,,
+Thymian,"",NEUTRAL,KRAEUTER,false,,
+Rosmarin,"",NEUTRAL,KRAEUTER,false,,
+Oregano,"",NEUTRAL,KRAEUTER,false,,
+Minze,"Pfefferminze",NEUTRAL,KRAEUTER,false,,
+# Gewürze & Würzmittel (für Trennkost irrelevant)
+Pfeffer,"schwarzer Pfeffer,weißer Pfeffer,Pfefferkörner",NEUTRAL,KRAEUTER,false,,Gewürz
+Salz,"Meersalz,Himalayasalz,Steinsalz",NEUTRAL,KRAEUTER,false,,Gewürz
+Paprikapulver,"Paprikagewürz",NEUTRAL,KRAEUTER,false,,Gewürz
+Kurkuma,"Gelbwurz",NEUTRAL,KRAEUTER,false,,Gewürz
+Zimt,"",NEUTRAL,KRAEUTER,false,,Gewürz
+Ingwer,"frischer Ingwer,Ingwerpulver",NEUTRAL,KRAEUTER,false,,Gewürz
+Muskatnuss,"Muskat",NEUTRAL,KRAEUTER,false,,Gewürz
+Kreuzkümmel,"Cumin",NEUTRAL,KRAEUTER,false,,Gewürz
+Knoblauchpulver,"",NEUTRAL,KRAEUTER,false,,Gewürz
+Chili,"Chilipulver,Chiliflocken,Cayennepfeffer",NEUTRAL,KRAEUTER,false,,Gewürz
+Senf,"Senfpulver,Dijon-Senf",NEUTRAL,KRAEUTER,false,,Gewürz
+Essig,"Apfelessig,Balsamico,Weißweinessig",NEUTRAL,KRAEUTER,false,,Würzmittel
+Sojasauce,"Sojasoße,Tamari",NEUTRAL,KRAEUTER,false,,Würzsauce
+Vanille,"Vanilleextrakt,Vanilleschote",NEUTRAL,KRAEUTER,false,,Gewürz
+# ═══════════════════════════════════════════════════════════════════════
+# KOMPLEXE KOHLENHYDRATE (KH) — nur mit NEUTRAL + kleine Menge Fett
+# NICHT mit Protein oder Milch kombinieren
+# ═══════════════════════════════════════════════════════════════════════
+# Getreide
+Hafer,"Haferflocken,Haferbrei,Porridge,Overnight Oats,Rolled Oats",KH,GETREIDE,false,,"glutenfrei"
+Hirse,"Hirsebrei",KH,GETREIDE,false,,"glutenfrei"
+Reis,"Naturreis,Vollkornreis,Basmati,Jasminreis,Basmatireis,Risotto,Reisbeilage",KH,GETREIDE,false,,"glutenfrei"
+Weizen,"Weizenmehl,Weizenbrötchen,Weißbrot,Baguette",KH,GETREIDE,false,,"möglichst reduzieren; enthält Gluten"
+Dinkel,"Dinkelmehl,Dinkelbrot",KH,GETREIDE,false,,"enthält Gluten"
+Roggen,"Roggenmehl,Roggenbrot",KH,GETREIDE,false,,"enthält Gluten"
+Gerste,"",KH,GETREIDE,false,,"enthält Gluten"
+# Pseudogetreide
+Quinoa,"",KH,PSEUDOGETREIDE,false,,"gute pflanzliche Proteinquelle, aber als KH behandeln"
+Buchweizen,"Buchweizenmehl",KH,PSEUDOGETREIDE,false,,
+Amaranth,"",KH,PSEUDOGETREIDE,false,,
+Wildreis,"",KH,PSEUDOGETREIDE,false,,
+# Stärkehaltiges Gemüse
+Kartoffel,"Kartoffeln,Pommes,Pommes Frites,Bratkartoffeln,Kartoffelpüree,Kartoffelsalat,Ofenkartoffel,Pellkartoffel",KH,STAERKEHALTIGES_GEMUESE,false,,
+Süßkartoffel,"Süßkartoffeln,Süsskartoffel,Batate",KH,STAERKEHALTIGES_GEMUESE,false,,
+Möhre,"Möhren,Karotte,Karotten,Mohrrübe,Mohrrüben",KH,STAERKEHALTIGES_GEMUESE,false,,
+Kürbis,"Hokkaido,Butternut,Muskatkürbis",KH,STAERKEHALTIGES_GEMUESE,false,,
+Rote Beete,"Rote Bete",KH,STAERKEHALTIGES_GEMUESE,false,,
+Pastinake,"Pastinaken",KH,STAERKEHALTIGES_GEMUESE,false,,
+Mais,"Maiskolben,Polenta",KH,STAERKEHALTIGES_GEMUESE,false,,
+# Getreideprodukte (verarbeitet)
+Brot,"Vollkornbrot,Toastbrot,Brotscheibe,Brötchen,Semmel",KH,GETREIDE,false,,"wenn möglich Vollkorn"
+Pasta,"Nudeln,Spaghetti,Penne,Fusilli,Tagliatelle,Makkaroni,Rigatoni,Farfalle,Lasagne-Platten",KH,GETREIDE,false,,"wenn möglich Vollkorn"
+Reisnudeln,"Glasnudeln",KH,GETREIDE,false,,"Asiatische Nudeln aus Reis, zählen zu KH"
+Couscous,"",KH,GETREIDE,false,,
+Bulgur,"",KH,GETREIDE,false,,
+Müsli,"Granola,Hafermüsli",KH,GETREIDE,false,,"auf Zuckerzusatz achten"
+Tortilla,"Wrap,Tortilla-Wrap,Fladenbrot,Pita,Pitabrot",KH,GETREIDE,false,,
+# ═══════════════════════════════════════════════════════════════════════
+# HÜLSENFRÜCHTE — Sonderregeln: NUR mit NEUTRAL + kleiner Menge Fett
+# NICHT mit anderen KH oder Protein kombinieren
+# ═══════════════════════════════════════════════════════════════════════
+Linsen,"rote Linsen,braune Linsen,Beluga-Linsen,Berglinsen,Linseneintopf",HUELSENFRUECHTE,HUELSE,false,,
+Kichererbsen,"Hummus,Falafel",HUELSENFRUECHTE,HUELSE,false,,
+Kidneybohnen,"Kidney-Bohnen",HUELSENFRUECHTE,HUELSE,false,,
+Schwarze Bohnen,"Black Beans",HUELSENFRUECHTE,HUELSE,false,,
+Weiße Bohnen,"Cannellini,Navy Beans",HUELSENFRUECHTE,HUELSE,false,,
+Mungobohnen,"Mung Dal",HUELSENFRUECHTE,HUELSE,false,,
+Tempeh,"",HUELSENFRUECHTE,HUELSE,false,,"fermentiertes Soja"
+Tofu,"",HUELSENFRUECHTE,HUELSE,false,,"aus Soja; Kurs warnt vor Soja generell"
+Edamame,"",HUELSENFRUECHTE,HUELSE,false,,"Sojabohne; Kurs warnt vor Soja"
+Bohnen,"",HUELSENFRUECHTE,HUELSE,true,"Können grüne Bohnen (NEUTRAL) oder getrocknete Bohnen (HUELSENFRUECHTE) sein. Grüne Bohnen = NEUTRAL.",
+Erbsen,"",HUELSENFRUECHTE,HUELSE,true,"Können frische grüne Erbsen (NEUTRAL) oder getrocknete Erbsen (HUELSENFRUECHTE) sein.",
+# ═══════════════════════════════════════════════════════════════════════
+# PROTEIN — Tierisches Eiweiß: Fisch, Fleisch, Eier
+# NUR mit NEUTRAL + kleiner Menge Fett, NICHT mit KH oder Milch
+# ═══════════════════════════════════════════════════════════════════════
+# Fleisch
+Hähnchen,"Hühnchen,Huhn,Chicken,Hähnchenbrust,Hühnerfilet,Geflügel,Pute,Putenbrust,Truthahn",PROTEIN,FLEISCH,false,,
+Rind,"Rindfleisch,Steak,Rinderfilet,Rinderhack,Hackfleisch,Beef",PROTEIN,FLEISCH,false,,
+Schwein,"Schweinefleisch,Schnitzel,Schweineschnitzel",PROTEIN,FLEISCH,false,,"Kurs: enthält viel Arachidonsäure, entzündungsfördernd"
+Lamm,"Lammfleisch,Lammkeule,Lammkotelett",PROTEIN,FLEISCH,false,,
+Wild,"Wildfleisch,Reh,Hirsch,Wildschwein",PROTEIN,FLEISCH,false,,
+Speck,"Bacon,Schinken,Pancetta",PROTEIN,FLEISCH,false,,
+Wurst,"Salami,Bratwurst,Wiener,Bockwurst,Currywurst,Mortadella",PROTEIN,FLEISCH,false,,"Kurs warnt vor verarbeiteten Fleischprodukten"
+# Fisch
+Lachs,"Salmon,Räucherlachs,Lachsfilet",PROTEIN,FISCH,false,,"Wildfang bevorzugt; reich an Omega-3"
+Thunfisch,"Tuna",PROTEIN,FISCH,false,,
+Forelle,"",PROTEIN,FISCH,false,,
+Makrele,"",PROTEIN,FISCH,false,,"reich an Omega-3"
+Hering,"Matjes",PROTEIN,FISCH,false,,"reich an Omega-3"
+Kabeljau,"Dorsch,Cod",PROTEIN,FISCH,false,,
+Garnele,"Garnelen,Shrimp,Shrimps,Krabben,Scampi",PROTEIN,FISCH,false,,
+# Eier
+Ei,"Eier,Spiegelei,Rührei,Omelette,pochiertes Ei,gekochtes Ei,Eierspeise",PROTEIN,EIER,false,,"möglichst Bio"
+# ═══════════════════════════════════════════════════════════════════════
+# MILCH — Milchprodukte (sauer verstoffwechselt)
+# NUR mit NEUTRAL + kleiner Menge Fett
+# Bevorzugt von Schaf, Ziege, Büffel; Rohmilch bevorzugt
+# ═══════════════════════════════════════════════════════════════════════
+Käse,"Gouda,Emmentaler,Cheddar,Gruyère,Mozzarella,Feta,Parmesan,Parmigiano,Bergkäse,Frischkäse,Ziegenkäse,Schafskäse,Pecorino,Ricotta,Halloumi,Burrata",MILCH,MILCHPRODUKT,false,,
+Joghurt,"Naturjoghurt,griechischer Joghurt,Skyr",MILCH,MILCHPRODUKT,false,,
+Quark,"Magerquark,Speisequark",MILCH,MILCHPRODUKT,false,,
+Milch,"Kuhmilch,Vollmilch,H-Milch,Ziegenmilch,Schafmilch",MILCH,MILCHPRODUKT,false,,
+Sahne,"Schlagsahne,Rahm,Obers,Schmand,Sauerrahm,Crème fraîche,Creme fraiche",MILCH,MILCHPRODUKT,false,,
+# ═══════════════════════════════════════════════════════════════════════
+# FETT — Gesunde Fette
+# 1-2 TL: OK mit allem. Größere Mengen: nur mit NEUTRAL
+# ═══════════════════════════════════════════════════════════════════════
+# Öle
+Olivenöl,"Olivenöl extra vergine",FETT,OEL,false,,
+Kokosöl,"Kokosfett",FETT,OEL,false,,"zum Braten bei mittlerer Hitze"
+Avocadoöl,"",FETT,OEL,false,,"zum Braten bei hoher Hitze"
+Leinöl,"Leinsamenöl",FETT,OEL,false,,"nicht erhitzen"
+# Nüsse & Samen (kleine Mengen = neutral, große Mengen = FETT)
+Mandeln,"Mandel,Mandelmus",FETT,NUSS_SAMEN,false,,"1-2 TL OK mit allem"
+Walnüsse,"Walnuss",FETT,NUSS_SAMEN,false,,
+Haselnüsse,"Haselnuss",FETT,NUSS_SAMEN,false,,
+Paranüsse,"Paranuss",FETT,NUSS_SAMEN,false,,
+Pekannüsse,"Pekannuss",FETT,NUSS_SAMEN,false,,
+Cashewnüsse,"Cashew,Cashewkerne",FETT,NUSS_SAMEN,false,,
+Sonnenblumenkerne,"",FETT,NUSS_SAMEN,false,,
+Kürbiskerne,"",FETT,NUSS_SAMEN,false,,
+Hanfsamen,"Hanf",FETT,NUSS_SAMEN,false,,
+Chiasamen,"Chia",FETT,NUSS_SAMEN,false,,
+Leinsamen,"Leinsaat",FETT,NUSS_SAMEN,false,,
+Sesam,"Sesammus,Tahini,Tahin",FETT,NUSS_SAMEN,false,,
+Erdnüsse,"Erdnuss,Erdnussbutter,Erdnussmus",FETT,NUSS_SAMEN,false,,"botanisch Hülsenfrucht, ernährungstechnisch Fett/Nuss"
+Nussmus,"Mandelmus,Cashewmus",FETT,NUSS_SAMEN,false,,
+Avocado,"Guacamole",FETT,NUSS_SAMEN,false,,
+# Tierische Fette
+Butter,"",FETT,TIERISCHES_FETT,false,,"im Kurs bevorzugt gegenüber anderen Milchprodukten wg. weniger tierischem Eiweiß"
+Ghee,"Butterschmalz,geklärte Butter",FETT,TIERISCHES_FETT,false,,"zum Braten geeignet"
+# ═══════════════════════════════════════════════════════════════════════
+# AMBIGUOUS / COMPOUND — items needing clarification
+# ═══════════════════════════════════════════════════════════════════════
+Pflanzenmilch,"Hafermilch,Mandelmilch,Sojamilch,Kokosmilch,Reismilch,Cashewmilch",KH,GETREIDE,true,"Hängt von der Basis ab: Hafermilch=KH, Mandelmilch=FETT, Sojamilch=HUELSENFRUECHTE, Kokosmilch=FETT",
+Sojasoße,"Sojasauce,Tamari",HUELSENFRUECHTE,HUELSE,false,,"kleine Menge als Würze; Kurs warnt vor Soja"
+Zucker,"Haushaltszucker,weißer Zucker,brauner Zucker,Rohrzucker",UNKNOWN,,false,,"im Kursmaterial als schädlich beschrieben; keine Trennkost-Gruppe"
+Ahornsirup,"Maple Syrup",KH,GETREIDE,false,,"im Kurs als Alternative zu Zucker erwähnt"
+Honig,"",KH,GETREIDE,false,,"im Kurs als Alternative zu Zucker erwähnt"
+Kokosblütenzucker,"",KH,GETREIDE,false,,"im Kurs als Alternative zu Zucker erwähnt"

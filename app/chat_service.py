@@ -27,9 +27,18 @@ from app.vision_service import (
     analyze_meal_image,
     categorize_food_groups,
     generate_trennkost_query,
-    VisionAnalysisError
+    extract_food_from_image,
+    VisionAnalysisError,
 )
 from app.image_handler import ImageValidationError
+from trennkost.analyzer import (
+    detect_food_query,
+    analyze_text as trennkost_analyze_text,
+    analyze_vision as trennkost_analyze_vision,
+    format_results_for_llm,
+    build_rag_query,
+)
+from trennkost.models import TrennkostResult
 
 # Config
 CHROMA_DIR = os.getenv("CHROMA_DIR", "storage/chroma")
@@ -72,6 +81,11 @@ WICHTIGE REGELN:
    - Beispiel: "vor dem Obstverzehr 3h Abstand" = ERST 3h nach einer Mahlzeit warten, DANN Obst essen.
    - Die Tabelle zeigt wie lange man NACH verschiedenen Mahlzeiten warten muss, BEVOR man Obst isst.
    - Nach dem Obst selbst ist die Wartezeit kurz (20-30 Min für normales Obst).
+10. REZEPT-VORSCHLÄGE: Wenn der User nach einem konkreten Rezept fragt, basierend auf einer zuvor
+    besprochenen konformen Kombination, darfst du ein einfaches Rezept vorschlagen.
+    Die REGELN kommen aus dem Kursmaterial, die Rezeptidee darf aus deinem allgemeinen Kochwissen kommen.
+    Stelle sicher, dass das Rezept die Trennkost-Regeln einhält (keine verbotenen Kombinationen).
+    Markiere dies am Ende kurz: "Dieses Rezept basiert auf den Kombinationsregeln aus dem Kurs."
 
 Du darfst auf frühere Nachrichten referenzieren, aber neue Fakten müssen aus den Kurs-Snippets kommen.
 """
@@ -80,6 +94,23 @@ def embed_one(text: str) -> List[float]:
     """Generate embedding for text."""
     resp = client.embeddings.create(model=EMBED_MODEL, input=[text])
     return resp.data[0].embedding
+
+
+def _llm_call(system_prompt: str, user_msg: str) -> str:
+    """
+    Thin LLM wrapper passed to normalizer for extraction/classification.
+    Used ONLY for unknown item classification, never for verdicts.
+    """
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_msg},
+        ],
+        temperature=0.1,
+        max_tokens=500,
+    )
+    return response.choices[0].message.content.strip()
 
 def build_context(docs: List[str], metas: List[Dict]) -> str:
     """Build context string from retrieved documents."""
@@ -497,44 +528,87 @@ def handle_chat(
     # 6. Analyze image if provided
     vision_analysis = None
     food_groups = None
+    vision_extraction = None  # New: structured extraction for engine
     if image_path:
         try:
+            # New structured extraction for Trennkost engine
+            vision_extraction = extract_food_from_image(image_path, user_message)
+            # Legacy analysis for backward compat
             vision_analysis = analyze_meal_image(image_path, user_message)
             if vision_analysis.get("items"):
                 food_groups = categorize_food_groups(vision_analysis["items"])
         except VisionAnalysisError as e:
-            # Log error but continue with text-only response
             print(f"Vision analysis failed: {e}")
+
+    # ── 6b. Trennkost Rule Engine Analysis ─────────────────────────
+    trennkost_results: Optional[List[TrennkostResult]] = None
+    is_food_query = bool(image_path) or detect_food_query(user_message)
+
+    # In follow-up messages, only re-run engine if actual food items found (2+),
+    # not just generic keywords like "gericht" or "mahlzeit"
+    _recent = get_last_n_messages(conversation_id, 4)
+    is_followup = not is_new_conversation and len(_recent) >= 2
+    if is_food_query and is_followup and not image_path:
+        from trennkost.ontology import get_ontology as _get_ontology
+        _ont = _get_ontology()
+        import re as _re
+        _words = _re.split(r'[,;\s]+', user_message.strip())
+        _food_count = sum(1 for w in _words if w.strip() and len(w.strip()) >= 3 and _ont.lookup(w.strip()))
+        if _food_count < 2:
+            is_food_query = False
+
+    if is_food_query:
+        try:
+            if vision_extraction and vision_extraction.get("dishes"):
+                trennkost_results = trennkost_analyze_vision(
+                    vision_extraction["dishes"],
+                    llm_fn=_llm_call,
+                    mode="strict",
+                )
+            else:
+                trennkost_results = trennkost_analyze_text(
+                    user_message,
+                    llm_fn=_llm_call,
+                    mode="strict",
+                )
+            if DEBUG_RAG:
+                for r in (trennkost_results or []):
+                    print(f"[TRENNKOST] {r.dish_name}: {r.verdict.value} | "
+                          f"problems={len(r.problems)} | questions={len(r.required_questions)}")
+        except Exception as e:
+            print(f"Trennkost analysis failed (non-fatal): {e}")
+            import traceback
+            traceback.print_exc()
 
     # 7. Load context
     summary = conv_data.get("summary_text")
     last_messages = get_last_n_messages(conversation_id, LAST_N)
 
     # 8. Rewrite query for better retrieval
-    if image_path and food_groups:
-        # Use vision-based query for RAG retrieval
+    if trennkost_results:
+        # Use engine-targeted RAG query for relevant course sections
+        standalone_query = build_rag_query(trennkost_results)
+    elif image_path and food_groups:
         standalone_query = generate_trennkost_query(food_groups)
     else:
-        # Standard query rewriting
-        standalone_query = rewrite_standalone_query(summary, last_messages[:-1], user_message)  # Exclude current user msg
+        standalone_query = rewrite_standalone_query(summary, last_messages[:-1], user_message)
 
     # Expand alias terms for better matching
     standalone_query = expand_alias_terms(standalone_query)
 
-    # LLM-based food classification for better retrieval
-    food_classification_result = classify_food_items(user_message, standalone_query)
+    # LLM-based food classification for better retrieval (skip if engine already ran)
     needs_clarification = None
-    if food_classification_result:
-        classification = food_classification_result.get("classification", "")
-        needs_clarification = food_classification_result.get("needs_clarification")
-
-        if classification:
-            standalone_query += f"\n{classification}"
-
-        if DEBUG_RAG:
-            print(f"[RAG] Food Classification: {classification}")
-            if needs_clarification:
-                print(f"[RAG] Needs Clarification: {needs_clarification}")
+    is_followup = not is_new_conversation and len(last_messages) >= 2
+    if not trennkost_results:
+        food_classification_result = classify_food_items(user_message, standalone_query)
+        if food_classification_result:
+            classification = food_classification_result.get("classification", "")
+            # Don't inject needs_clarification for short follow-up messages —
+            # it causes infinite clarification loops when user answers a question
+            if not is_followup or len(user_message) > 80:
+                needs_clarification = food_classification_result.get("needs_clarification")
+            if classification:
+                standalone_query += f"\n{classification}"
 
     # 9. Retrieve course snippets with multi-step fallback strategy
     if DEBUG_RAG:
@@ -542,7 +616,6 @@ def handle_chat(
 
     docs, metas, dists, is_partial = retrieve_with_fallback(standalone_query, user_message)
 
-    # Debug logging
     if DEBUG_RAG:
         print(f"[RAG] Retrieved {len(docs)} chunk(s) | partial={is_partial}")
         for i, (doc, meta, dist) in enumerate(list(zip(docs, metas, dists))[:3], 1):
@@ -550,32 +623,32 @@ def handle_chat(
 
     course_context = build_context(docs, metas)
 
-    # Check relevance threshold - if best match is too distant, treat as no material
+    # Check relevance — but if we have engine results, always proceed
     best_dist = min(dists) if dists else 999.0
-    if best_dist > DISTANCE_THRESHOLD and not is_partial:
-        assistant_message = FALLBACK_SENTENCE
-        create_message(conversation_id, "assistant", assistant_message)
-        conv_data_updated = get_conversation(conversation_id)
-        if should_update_summary(conversation_id, conv_data_updated):
-            update_conversation_summary(conversation_id, conv_data_updated)
-        return {
-            "conversationId": conversation_id,
-            "answer": assistant_message,
-            "sources": []
-        }
+    if not trennkost_results:
+        if best_dist > DISTANCE_THRESHOLD and not is_partial:
+            assistant_message = FALLBACK_SENTENCE
+            create_message(conversation_id, "assistant", assistant_message)
+            conv_data_updated = get_conversation(conversation_id)
+            if should_update_summary(conversation_id, conv_data_updated):
+                update_conversation_summary(conversation_id, conv_data_updated)
+            return {
+                "conversationId": conversation_id,
+                "answer": assistant_message,
+                "sources": []
+            }
 
-    # Hard fallback only if we truly have no material at all
-    if not course_context.strip():
-        assistant_message = FALLBACK_SENTENCE
-        create_message(conversation_id, "assistant", assistant_message)
-        conv_data_updated = get_conversation(conversation_id)
-        if should_update_summary(conversation_id, conv_data_updated):
-            update_conversation_summary(conversation_id, conv_data_updated)
-        return {
-            "conversationId": conversation_id,
-            "answer": assistant_message,
-            "sources": []
-        }
+        if not course_context.strip():
+            assistant_message = FALLBACK_SENTENCE
+            create_message(conversation_id, "assistant", assistant_message)
+            conv_data_updated = get_conversation(conversation_id)
+            if should_update_summary(conversation_id, conv_data_updated):
+                update_conversation_summary(conversation_id, conv_data_updated)
+            return {
+                "conversationId": conversation_id,
+                "answer": assistant_message,
+                "sources": []
+            }
 
     # 10. Build LLM input
     input_parts = []
@@ -583,18 +656,23 @@ def handle_chat(
     if summary:
         input_parts.append(f"KONVERSATIONS-ZUSAMMENFASSUNG:\n{summary}\n")
 
-    if last_messages[:-1]:  # Exclude current user message
+    if last_messages[:-1]:
         input_parts.append("LETZTE NACHRICHTEN:")
         for msg in last_messages[:-1]:
             role = "User" if msg["role"] == "user" else "Assistant"
             input_parts.append(f"{role}: {msg['content']}")
         input_parts.append("")
 
-    # Include vision analysis if available
-    if vision_analysis:
+    # ── Inject Trennkost engine results ────────────────────────────
+    if trennkost_results:
+        engine_context = format_results_for_llm(trennkost_results)
+        input_parts.append(engine_context)
+        input_parts.append("")
+
+    # Include vision summary if available (not the old categorization)
+    if vision_analysis and not trennkost_results:
         input_parts.append("BILD-ANALYSE (Mahlzeit):")
         input_parts.append(f"Zusammenfassung: {vision_analysis.get('summary', 'Keine Beschreibung')}")
-
         if vision_analysis.get("items"):
             input_parts.append("\nIdentifizierte Lebensmittel:")
             for item in vision_analysis["items"]:
@@ -602,49 +680,73 @@ def handle_chat(
                 category = item.get("category", "?")
                 amount = item.get("amount", "?")
                 input_parts.append(f"  - {name} ({category}, Menge: {amount})")
-
-        if food_groups:
-            input_parts.append("\nLebensmittelgruppen:")
-            if food_groups.get("carbs"):
-                input_parts.append(f"  Kohlenhydrate: {', '.join(food_groups['carbs'])}")
-            if food_groups.get("proteins"):
-                input_parts.append(f"  Proteine: {', '.join(food_groups['proteins'])}")
-            if food_groups.get("fats"):
-                input_parts.append(f"  Fette: {', '.join(food_groups['fats'])}")
-            if food_groups.get("vegetables"):
-                input_parts.append(f"  Gemüse: {', '.join(food_groups['vegetables'])}")
-
         input_parts.append("")
 
     input_parts.append(f"KURS-SNIPPETS (FAKTENBASIS):\n{course_context}\n")
     input_parts.append(f"AKTUELLE FRAGE:\n{user_message}\n")
 
-    # Add clarification note if needed
+    # Add clarification note if needed (legacy path)
     if needs_clarification:
         input_parts.append(f"WICHTIG - MEHRDEUTIGES LEBENSMITTEL:\n{needs_clarification}\n")
         input_parts.append(
             "Bitte stelle diese Rückfrage ZUERST, bevor du die Hauptfrage beantwortest. "
-            "Erkläre kurz, warum die Info wichtig ist (z.B. 'Ein veganer Burger hat eine andere "
-            "Lebensmittelkombination als ein Fleisch-Burger').\n"
+            "Erkläre kurz, warum die Info wichtig ist.\n"
         )
 
-    # Answer instructions with concept alias handling
-    if vision_analysis:
+    # Answer instructions — different when engine results are present
+    if trennkost_results:
+        # Extract actual verdict for explicit instruction
+        verdict_str = trennkost_results[0].verdict.value if trennkost_results else "UNKNOWN"
+        verdict_display = {
+            "OK": "OK",
+            "NOT_OK": "NICHT OK",
+            "CONDITIONAL": "BEDINGT OK",
+            "UNKNOWN": "UNKLAR"
+        }.get(verdict_str, verdict_str)
+
+        input_parts.append(
+            "ANTWORT-ANWEISUNGEN:\n"
+            f"KRITISCH: Das Verdict lautet '{verdict_display}'. Gib dies EXAKT so wieder.\n"
+            "- Offene Fragen bedeuten NICHT, dass das Verdict 'bedingt' ist.\n"
+            "- Bei 'NICHT OK': Auch wenn Rückfragen bestehen, bleibt es NICHT OK.\n"
+            "- Bei 'BEDINGT OK': Nur dann 'bedingt' sagen, wenn oben CONDITIONAL steht.\n"
+            "- Das Verdict wurde DETERMINISTISCH ermittelt und darf NICHT interpretiert werden.\n"
+            "\nSTIL & FORMAT:\n"
+            "- Schreibe natürlich und freundlich, wie ein Ernährungsberater — KEIN Bericht-Format.\n"
+            "- Beginne mit dem Verdict als kurze, klare Aussage (z.B. 'Spaghetti Carbonara ist leider **nicht trennkost-konform**.').\n"
+            "- Erkläre die Probleme kurz und verständlich (keine nummerierten Listen, kein Fachjargon).\n"
+            "- Belege mit Kurs-Snippets, aber baue es natürlich in den Text ein.\n"
+            "- Bei NOT_OK mit ALTERNATIVEN-Block:\n"
+            "  Frage den User: 'Was möchtest du behalten — [Gruppe A] oder [Gruppe B]?'\n"
+            "  WICHTIG: Die Richtungen sind EXKLUSIV. 'Behalte KH' heißt: NUR KH + Gemüse, KEIN Protein!\n"
+            "  'Behalte Protein' heißt: NUR Protein + Gemüse, KEINE Kohlenhydrate!\n"
+            "- Verwende AUSSCHLIESSLICH Begriffe aus den Kurs-Snippets.\n"
+        )
+    elif vision_analysis:
         input_parts.append(
             "ANTWORT (deutsch, präzise, materialgebunden):\n"
             "- Bewerte die Mahlzeit nach den im Kursmaterial beschriebenen Regeln.\n"
-            "- NUR wenn die USER-Frage einen Begriff verwendet, der nicht wörtlich in den Snippets vorkommt, "
-            "aber das Konzept beschrieben ist: erkläre das Konzept und erwähne einmal kurz, dass der Begriff selbst nicht definiert ist.\n"
-            "- Verwende AUSSCHLIESSLICH Begriffe aus den Kurs-Snippets. Führe keine eigenen Fachbegriffe ein.\n"
+            "- Verwende AUSSCHLIESSLICH Begriffe aus den Kurs-Snippets.\n"
         )
     else:
         input_parts.append(
-            "ANTWORT (deutsch, präzise, materialgebunden):\n"
+            "ANTWORT (deutsch, natürlich, materialgebunden):\n"
             "- Beantworte die Frage aus den Snippets.\n"
-            "- NUR wenn die USER-Frage einen Begriff verwendet, der nicht wörtlich in den Snippets steht, "
-            "aber das Konzept beschrieben ist: erkläre das Konzept und erwähne einmal kurz, dass der Begriff selbst nicht definiert ist.\n"
-            "- Verwende AUSSCHLIESSLICH Begriffe aus den Kurs-Snippets. Führe keine eigenen Fachbegriffe ein.\n"
-            f"- Nur wenn wirklich kein passender Inhalt in den Snippets ist, schreibe exakt: \"{FALLBACK_SENTENCE}\"\n"
+            "- Schreibe natürlich und freundlich, nicht wie ein Bericht.\n"
+            "- PROAKTIV HANDELN: Lieber einen konkreten Vorschlag machen als weitere Fragen stellen.\n"
+            "- Wenn der User auf eine Trennkost-Rückfrage antwortet (z.B. 'lieber den Reis'):\n"
+            "  1. Schlage SOFORT ein konkretes Gericht vor, z.B. 'Reis mit Brokkoli-Kokos-Sauce'\n"
+            "  2. Das Gericht darf NUR die gewählte Gruppe + stärkearmes Gemüse/Salat enthalten\n"
+            "  3. KEINE Proteine wenn User KH gewählt hat! KEINE KH wenn User Protein gewählt hat!\n"
+            "  4. NICHT nochmal rückfragen — direkt vorschlagen\n"
+            "- Wenn der User ein Rezept will ('ja gib aus', 'Rezept bitte', 'ja'):\n"
+            "  Gib SOFORT ein vollständiges Rezept mit Zutaten und Zubereitung.\n"
+            "  Wiederhole NICHT den vorherigen Vorschlag als Frage.\n"
+            "- Wenn der User sagt 'soll X nahe kommen' oder 'ähnlich wie X':\n"
+            "  Analysiere welche Komponenten von X konform sind (z.B. Reisnudeln, Gemüse)\n"
+            "  und welche nicht (z.B. Ei/Tofu). Schlage eine Variante VOR die die konformen\n"
+            "  Komponenten nutzt. Wiederhole NICHT das vorherige Rezept.\n"
+            f"- Nur wenn wirklich kein passender Inhalt ist: \"{FALLBACK_SENTENCE}\"\n"
         )
 
     llm_input = "\n".join(input_parts)

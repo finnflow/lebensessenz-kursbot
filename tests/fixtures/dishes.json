@@ -1,0 +1,166 @@
+{
+  "_doc": "Test fixtures: 20 dishes covering common cases, sauces, dough, ambiguity, and edge cases.",
+
+  "dishes": [
+    {
+      "id": "D01",
+      "name": "Quinoa-Bowl mit Brokkoli und Avocado",
+      "items": ["Quinoa", "Brokkoli", "Avocado", "Olivenöl"],
+      "expected_verdict": "CONDITIONAL",
+      "expected_groups": ["KH", "NEUTRAL", "FETT"],
+      "note": "KH + NEUTRAL + FETT. CONDITIONAL wegen Fettmenge (Avocado ist keine 1-2 TL)."
+    },
+    {
+      "id": "D02",
+      "name": "Spaghetti Carbonara",
+      "items": ["Pasta", "Ei", "Speck", "Parmesan", "Sahne"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["KH", "PROTEIN", "MILCH"],
+      "note": "Triple violation: KH+PROTEIN, KH+MILCH, PROTEIN+MILCH"
+    },
+    {
+      "id": "D03",
+      "name": "Grüner Smoothie",
+      "items": ["Banane", "Spinat", "Apfel"],
+      "expected_verdict": "OK",
+      "expected_groups": ["OBST", "NEUTRAL"],
+      "note": "Smoothie-Ausnahme: OBST + BLATTGRUEN ist OK"
+    },
+    {
+      "id": "D04",
+      "name": "Steak mit Pommes",
+      "items": ["Rind", "Kartoffel"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["PROTEIN", "KH"],
+      "note": "Classic Trennkost violation: PROTEIN + KH"
+    },
+    {
+      "id": "D05",
+      "name": "Salat mit gegrilltem Hähnchen",
+      "items": ["Kopfsalat", "Hähnchen", "Tomate", "Gurke", "Olivenöl"],
+      "expected_verdict": "CONDITIONAL",
+      "expected_groups": ["NEUTRAL", "PROTEIN", "FETT"],
+      "note": "PROTEIN + NEUTRAL = OK. CONDITIONAL nur wegen FETT-Menge."
+    },
+    {
+      "id": "D06",
+      "name": "Pizza Margherita",
+      "items": ["Weizenmehl", "Tomatensauce", "Mozzarella", "Basilikum", "Olivenöl"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["KH", "NEUTRAL", "MILCH", "FETT"],
+      "note": "KH (Teig) + MILCH (Mozzarella) → NOT_OK"
+    },
+    {
+      "id": "D07",
+      "name": "Linsensuppe mit Brot",
+      "items": ["Linsen", "Möhre", "Zwiebel", "Sellerie", "Brot"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["HUELSENFRUECHTE", "KH", "NEUTRAL"],
+      "note": "HUELSENFRUECHTE + KH (Brot + Möhre) → NOT_OK"
+    },
+    {
+      "id": "D08",
+      "name": "Obstsalat pur",
+      "items": ["Apfel", "Banane", "Erdbeere", "Kiwi"],
+      "expected_verdict": "OK",
+      "expected_groups": ["OBST"],
+      "note": "Only OBST → OK"
+    },
+    {
+      "id": "D09",
+      "name": "Kartoffel-Gemüse-Pfanne",
+      "items": ["Kartoffel", "Zucchini", "Paprika", "Zwiebel", "Olivenöl"],
+      "expected_verdict": "CONDITIONAL",
+      "expected_groups": ["KH", "NEUTRAL", "FETT"],
+      "note": "KH + NEUTRAL = OK. CONDITIONAL wegen FETT-Menge."
+    },
+    {
+      "id": "D10",
+      "name": "Käsebrot",
+      "items": ["Brot", "Käse"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["KH", "MILCH"],
+      "note": "KH + MILCH → NOT_OK"
+    },
+    {
+      "id": "D11",
+      "name": "Fisch mit Reis",
+      "items": ["Lachs", "Reis"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["PROTEIN", "KH"],
+      "note": "PROTEIN + KH → NOT_OK"
+    },
+    {
+      "id": "D12",
+      "name": "Cheeseburger mit Pommes",
+      "items": ["Brötchen", "Hackfleisch", "Käse", "Salat", "Tomate", "Kartoffel"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["KH", "PROTEIN", "MILCH", "NEUTRAL"],
+      "note": "KH + PROTEIN + MILCH → multiple violations"
+    },
+    {
+      "id": "D13",
+      "name": "Caesar Salad mit Hähnchen und Croutons",
+      "items": ["Kopfsalat", "Hähnchen", "Brot", "Parmesan", "Olivenöl"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["NEUTRAL", "PROTEIN", "KH", "MILCH", "FETT"],
+      "note": "Croutons=KH + Hähnchen=PROTEIN + Parmesan=MILCH → NOT_OK"
+    },
+    {
+      "id": "D14",
+      "name": "Gemüsesuppe mit Kartoffeln",
+      "items": ["Kartoffel", "Zucchini", "Möhre", "Zwiebel", "Sellerie"],
+      "expected_verdict": "OK",
+      "expected_groups": ["KH", "NEUTRAL"],
+      "note": "KH (Kartoffel, Möhre) + NEUTRAL (Rest) → OK. Kein FETT = kein CONDITIONAL."
+    },
+    {
+      "id": "D15",
+      "name": "Rührei mit Toast",
+      "items": ["Ei", "Brot", "Butter"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["PROTEIN", "KH", "FETT"],
+      "note": "PROTEIN (Ei) + KH (Toast) → NOT_OK"
+    },
+    {
+      "id": "D16",
+      "name": "Sushi (Lachs-Nigiri)",
+      "items": ["Reis", "Lachs"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["KH", "PROTEIN"],
+      "note": "KH (Reis) + PROTEIN (Lachs) → NOT_OK"
+    },
+    {
+      "id": "D17",
+      "name": "Hummus mit Gemüsesticks",
+      "items": ["Kichererbsen", "Sesam", "Gurke", "Paprika", "Olivenöl"],
+      "expected_verdict": "CONDITIONAL",
+      "expected_groups": ["HUELSENFRUECHTE", "FETT", "NEUTRAL"],
+      "note": "HUELSENFRUECHTE + NEUTRAL + FETT. CONDITIONAL wegen Fett-Menge (Tahini+Öl)."
+    },
+    {
+      "id": "D18",
+      "name": "Müsli mit Milch und Banane",
+      "items": ["Müsli", "Milch", "Banane"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["KH", "MILCH", "OBST"],
+      "note": "KH + MILCH + OBST → multiple violations"
+    },
+    {
+      "id": "D19",
+      "name": "Döner Kebab",
+      "items": ["Fladenbrot", "Hähnchen", "Salat", "Tomate", "Zwiebel", "Joghurt"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["KH", "PROTEIN", "NEUTRAL", "MILCH"],
+      "note": "KH (Fladenbrot) + PROTEIN (Hähnchen) + MILCH (Joghurtsauce) → NOT_OK"
+    },
+    {
+      "id": "D20",
+      "name": "Overnight Oats (Kurs-konform)",
+      "items": ["Hafer", "Ahornsirup"],
+      "expected_verdict": "OK",
+      "expected_groups": ["KH"],
+      "note": "Hafer + Ahornsirup = beides KH → OK. Kurs empfiehlt dieses Frühstück."
+    }
+  ]
+}

@@ -3,6 +3,7 @@ Vision API integration for meal analysis.
 Uses GPT-4 Vision to identify food items and categorize them.
 """
 import os
+import json as _json
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -15,7 +16,7 @@ load_dotenv()
 VISION_MODEL = os.getenv("VISION_MODEL", "gpt-4o-mini")  # gpt-4o-mini supports vision
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# System prompt for food identification
+# System prompt for food identification (legacy, kept for backward compat)
 FOOD_IDENTIFICATION_PROMPT = """Du bist ein Experte für Lebensmittelanalyse im Kontext der Trennkost-Ernährung.
 
 Deine Aufgabe ist es, ein Mahlzeiten-Foto zu analysieren und folgendes zu identifizieren:
@@ -44,6 +45,53 @@ Beispiel-Ausgabe:
   ],
   "summary": "Eine Quinoa-Bowl mit gedämpftem Brokkoli und Avocado-Scheiben.",
   "confidence": "high"
+}
+"""
+
+# ── New unified extraction prompt for Trennkost engine ─────────────────
+
+FOOD_EXTRACTION_PROMPT = """Du bist ein Lebensmittel-Extraktor für ein Trennkost-Analysesystem.
+
+Analysiere das Bild und bestimme, ob es zeigt:
+A) Eine SPEISEKARTE / ein MENÜ → Extrahiere alle Gerichte mit erkennbaren Zutaten
+B) Eine MAHLZEIT / ein TELLER → Identifiziere alle sichtbaren Zutaten
+
+REGELN:
+- Extrahiere NUR was du SICHER erkennen kannst
+- Zutaten die du nur vermutest → in "uncertain_items"
+- KEINE Bewertung, KEINE Kategorisierung — nur Extraktion
+- Bei Speisekarten: Gib Gerichtnamen und sichtbare Beschreibungen wieder
+- Zerlege zusammengesetzte Gerichte NICHT selbst (das macht unser System)
+- IGNORIERE reine Gewürze und Würzmittel (Salz, Pfeffer, Paprikapulver, Kräuter etc.) — diese sind für die Analyse irrelevant
+
+Antworte NUR als JSON:
+{
+  "type": "menu" oder "meal",
+  "dishes": [
+    {
+      "name": "Name des Gerichts oder 'Mahlzeit'",
+      "description": "Beschreibung von der Karte (wenn Speisekarte)",
+      "items": ["sicher erkannte Zutat 1", "sicher erkannte Zutat 2"],
+      "uncertain_items": ["möglicherweise Zutat 3"]
+    }
+  ]
+}
+
+Beispiel Speisekarte:
+{
+  "type": "menu",
+  "dishes": [
+    {"name": "Spaghetti Carbonara", "description": "mit Speck und Parmesan", "items": ["Spaghetti", "Speck", "Parmesan"], "uncertain_items": ["Sahne"]},
+    {"name": "Caesar Salad", "description": "mit gegrilltem Hähnchen", "items": ["Salat", "Hähnchen", "Croutons", "Parmesan"], "uncertain_items": []}
+  ]
+}
+
+Beispiel Mahlzeit:
+{
+  "type": "meal",
+  "dishes": [
+    {"name": "Mahlzeit", "description": "", "items": ["Reis", "Hähnchen", "Brokkoli"], "uncertain_items": ["Sojasoße"]}
+  ]
 }
 """
 
@@ -199,3 +247,95 @@ def generate_trennkost_query(food_groups: Dict[str, List[str]]) -> str:
     query = "Trennkost-Regeln für Kombination von: " + ", ".join(components)
 
     return query
+
+
+# ── New: Structured food extraction for Trennkost engine ──────────────
+
+def extract_food_from_image(
+    image_path: str,
+    user_message: Optional[str] = None,
+) -> Dict:
+    """
+    Extract dishes and ingredients from an image for the Trennkost engine.
+
+    Handles both meal photos and menu/Speisekarte images.
+
+    Returns:
+        {
+            "type": "menu" | "meal",
+            "dishes": [
+                {
+                    "name": str,
+                    "description": str,
+                    "items": [str],          # confirmed ingredients
+                    "uncertain_items": [str]  # uncertain ingredients
+                }
+            ]
+        }
+
+    Raises:
+        VisionAnalysisError: If extraction fails
+    """
+    try:
+        base64_image = encode_image_base64(image_path)
+        mime_type = get_image_mime_type(image_path)
+
+        messages = [
+            {"role": "system", "content": FOOD_EXTRACTION_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime_type};base64,{base64_image}",
+                            "detail": "high",
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": user_message or "Analysiere dieses Bild und extrahiere alle Gerichte/Zutaten.",
+                    },
+                ],
+            },
+        ]
+
+        response = client.chat.completions.create(
+            model=VISION_MODEL,
+            messages=messages,
+            temperature=0.1,
+            max_tokens=2000,
+        )
+
+        raw = response.choices[0].message.content
+
+        # Strip markdown code fences if present
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+
+        try:
+            parsed = _json.loads(cleaned)
+            return {
+                "type": parsed.get("type", "meal"),
+                "dishes": parsed.get("dishes", []),
+            }
+        except _json.JSONDecodeError:
+            # Fallback: wrap raw text as a single meal
+            return {
+                "type": "meal",
+                "dishes": [
+                    {
+                        "name": "Mahlzeit",
+                        "description": raw,
+                        "items": [],
+                        "uncertain_items": [],
+                    }
+                ],
+            }
+
+    except Exception as e:
+        raise VisionAnalysisError(f"Food extraction failed: {str(e)}")

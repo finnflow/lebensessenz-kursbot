@@ -14,6 +14,7 @@ from app.database import (
 )
 from app.chat_service import handle_chat
 from app.image_handler import save_image, ImageValidationError
+from trennkost.analyzer import analyze_text as trennkost_analyze_text, format_results_for_llm
 
 load_dotenv()
 
@@ -108,6 +109,45 @@ async def chat_with_image(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+class AnalyzeRequest(BaseModel):
+    text: str
+    mode: str = "strict"  # "strict" or "assumption"
+
+@app.post("/analyze")
+def analyze_food(request: AnalyzeRequest):
+    """
+    Standalone Trennkost analysis endpoint (no chat context needed).
+
+    POST /analyze {"text": "Reis, Hähnchen, Brokkoli"}
+    Returns deterministic engine verdict + formatted explanation.
+    """
+    text = request.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+    try:
+        results = trennkost_analyze_text(text, mode=request.mode)
+        return {
+            "results": [
+                {
+                    "dish_name": r.dish_name,
+                    "verdict": r.verdict.value,
+                    "summary": r.summary,
+                    "groups": dict(r.groups_found),
+                    "problems": [
+                        {"rule_id": p.rule_id, "description": p.description, "explanation": p.explanation}
+                        for p in r.problems
+                    ],
+                    "questions": [q.question for q in r.required_questions],
+                    "ok_combinations": r.ok_combinations,
+                }
+                for r in results
+            ],
+            "formatted": format_results_for_llm(results),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis error: {str(e)}")
 
 @app.get("/conversations")
 def get_conversations(guest_id: Optional[str] = None):

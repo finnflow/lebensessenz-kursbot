@@ -1,0 +1,156 @@
+{
+  "_doc": "Common compound dishes with known base ingredients. Used to quickly decompose dishes without LLM when possible. The normalizer checks here FIRST before calling LLM.",
+
+  "compounds": {
+    "Pizza": {
+      "base_items": ["Weizenteig", "Tomatensauce", "Käse"],
+      "optional_items": ["Olivenöl"],
+      "needs_clarification": "Welcher Belag? (z.B. Salami, Gemüse, Schinken)",
+      "note": "Basis allein schon NOT_OK: KH (Teig) + MILCH (Käse)"
+    },
+    "Pizza Margherita": {
+      "base_items": ["Weizenteig", "Tomatensauce", "Mozzarella", "Basilikum", "Olivenöl"],
+      "optional_items": [],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Teig) + MILCH (Mozzarella)"
+    },
+    "Spaghetti Carbonara": {
+      "base_items": ["Pasta", "Ei", "Speck", "Parmesan"],
+      "optional_items": ["Sahne"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Pasta) + PROTEIN (Ei, Speck) + MILCH (Parmesan, evtl. Sahne)"
+    },
+    "Spaghetti Bolognese": {
+      "base_items": ["Pasta", "Hackfleisch", "Tomatensauce", "Zwiebel"],
+      "optional_items": ["Parmesan", "Olivenöl", "Möhre", "Sellerie"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Pasta) + PROTEIN (Hackfleisch)"
+    },
+    "Spaghetti Aglio e Olio": {
+      "base_items": ["Pasta", "Knoblauch", "Olivenöl", "Chili"],
+      "optional_items": ["Petersilie"],
+      "needs_clarification": null,
+      "note": "OK wenn Fett-Menge klein (1-2 TL Olivenöl): KH + NEUTRAL + kleine Menge FETT"
+    },
+    "Burger": {
+      "base_items": ["Brötchen"],
+      "optional_items": ["Salat", "Tomate", "Zwiebel", "Gurke"],
+      "needs_clarification": "Fleisch-Burger (Hackfleisch = PROTEIN) oder veganer Burger (z.B. Bohnen-Patty = HUELSENFRUECHTE)?",
+      "note": "Klärung nötig: Patty-Art bestimmt Gruppen"
+    },
+    "Cheeseburger": {
+      "base_items": ["Brötchen", "Hackfleisch", "Käse", "Salat", "Tomate"],
+      "optional_items": ["Ketchup", "Senf", "Zwiebel", "Gurke"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Brötchen) + PROTEIN (Hackfleisch) + MILCH (Käse)"
+    },
+    "Döner Kebab": {
+      "base_items": ["Fladenbrot", "Hähnchen", "Salat", "Tomate", "Zwiebel"],
+      "optional_items": ["Joghurtsauce", "Rotkohl"],
+      "needs_clarification": "Welches Fleisch? Mit Joghurtsauce (MILCH)?",
+      "note": "NOT_OK: KH (Fladenbrot) + PROTEIN (Fleisch), evtl. + MILCH (Joghurtsauce)"
+    },
+    "Caesar Salad": {
+      "base_items": ["Kopfsalat", "Parmesan", "Croutons"],
+      "optional_items": ["Hähnchen", "Ei", "Olivenöl"],
+      "needs_clarification": "Mit Hähnchen oder ohne?",
+      "note": "Croutons = KH, Parmesan = MILCH → schon NOT_OK. Mit Hähnchen zusätzlich PROTEIN."
+    },
+    "Sushi": {
+      "base_items": ["Reis"],
+      "optional_items": ["Sojasoße", "Wasabi", "Ingwer"],
+      "needs_clarification": "Welche Sorte? Nigiri/Maki mit Fisch (PROTEIN) oder vegetarisch (z.B. Avocado, Gurke)?",
+      "note": "Fisch-Sushi = NOT_OK: KH (Reis) + PROTEIN (Fisch). Avocado-Maki = KH + FETT (CONDITIONAL auf Menge)"
+    },
+    "Müsli mit Milch": {
+      "base_items": ["Müsli", "Milch"],
+      "optional_items": ["Banane", "Honig"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Müsli) + MILCH. Mit Banane zusätzlich OBST."
+    },
+    "Overnight Oats": {
+      "base_items": ["Hafer"],
+      "optional_items": ["Ahornsirup", "Zimt", "Nussmus"],
+      "needs_clarification": "Mit Milch/Joghurt (NOT_OK) oder mit Wasser/Pflanzenmilch?",
+      "note": "Kurs empfiehlt: Hafer + Wasser + Ahornsirup + max 1-2 TL Nussmus = OK"
+    },
+    "Porridge": {
+      "base_items": ["Hafer"],
+      "optional_items": ["Ahornsirup", "Zimt"],
+      "needs_clarification": "Mit Milch oder mit Wasser gekocht?",
+      "note": "Mit Wasser = OK (KH). Mit Milch = NOT_OK (KH + MILCH)"
+    },
+    "Käsebrot": {
+      "base_items": ["Brot", "Käse"],
+      "optional_items": ["Butter"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Brot) + MILCH (Käse)"
+    },
+    "Rührei mit Toast": {
+      "base_items": ["Ei", "Brot"],
+      "optional_items": ["Butter"],
+      "needs_clarification": null,
+      "note": "NOT_OK: PROTEIN (Ei) + KH (Brot)"
+    },
+    "Hummus mit Gemüsesticks": {
+      "base_items": ["Kichererbsen", "Sesam", "Olivenöl", "Gurke", "Paprika", "Möhre"],
+      "optional_items": ["Knoblauch", "Zitrone"],
+      "needs_clarification": null,
+      "note": "Möhre = KH (stärkehaltig)! Prüfen: HUELSENFRUECHTE + KH (Möhre). Ohne Möhre: CONDITIONAL (HUELSENFRUECHTE + FETT Menge). Besser: Hummus nur mit stärkearmen Gemüsesticks (Gurke, Paprika, Sellerie)"
+    },
+    "Linsensuppe": {
+      "base_items": ["Linsen", "Möhre", "Zwiebel", "Sellerie"],
+      "optional_items": ["Kartoffel", "Olivenöl"],
+      "needs_clarification": "Mit Kartoffeln oder Brot dazu?",
+      "note": "Ohne KH-Beilagen: CONDITIONAL (HUELSENFRUECHTE + Möhre als stärkehaltiges Gemüse). Kurs: Hülsenfrüchte nur mit Gemüse/Salat + kleine Menge Fett."
+    },
+    "Grüner Smoothie": {
+      "base_items": ["Banane", "Spinat"],
+      "optional_items": ["Apfel", "Ingwer", "Wasser"],
+      "needs_clarification": null,
+      "note": "OK: OBST + BLATTGRUEN (Smoothie-Ausnahme)"
+    },
+    "Obstsalat": {
+      "base_items": [],
+      "optional_items": [],
+      "needs_clarification": "Welche Obstsorten? Purer Obstsalat oder mit Joghurt/Sahne?",
+      "note": "Pur = OK. Mit Joghurt/Sahne = NOT_OK (OBST + MILCH)"
+    },
+    "Schnitzel mit Pommes": {
+      "base_items": ["Schwein", "Weizenmehl", "Ei", "Kartoffel"],
+      "optional_items": ["Zitrone", "Salat"],
+      "needs_clarification": null,
+      "note": "NOT_OK: PROTEIN (Schnitzel) + KH (Panade + Pommes). Panade enthält Mehl (KH) + Ei (PROTEIN)."
+    },
+    "Wiener Schnitzel": {
+      "base_items": ["Schwein", "Weizenmehl", "Ei", "Kartoffel"],
+      "optional_items": ["Zitrone", "Preiselbeeren"],
+      "needs_clarification": null,
+      "note": "NOT_OK: wie Schnitzel mit Pommes"
+    },
+    "Currywurst mit Pommes": {
+      "base_items": ["Wurst", "Kartoffel", "Ketchup"],
+      "optional_items": ["Currypulver"],
+      "needs_clarification": null,
+      "note": "NOT_OK: PROTEIN (Wurst) + KH (Pommes). Ketchup enthält Zucker."
+    },
+    "Wrap": {
+      "base_items": ["Tortilla"],
+      "optional_items": ["Salat", "Tomate"],
+      "needs_clarification": "Welche Füllung? Fleisch, Falafel, Gemüse?",
+      "note": "Tortilla = KH. Je nach Füllung: Fleisch = NOT_OK (KH+PROTEIN), Falafel = NOT_OK (KH+HUELSENFRUECHTE), rein Gemüse = OK"
+    },
+    "Lasagne": {
+      "base_items": ["Pasta", "Hackfleisch", "Tomatensauce", "Käse", "Sahne"],
+      "optional_items": ["Zwiebel", "Möhre"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Pasta) + PROTEIN (Hackfleisch) + MILCH (Käse, Sahne)"
+    },
+    "Pad Thai": {
+      "base_items": ["Reisnudeln", "Ei", "Tofu"],
+      "optional_items": ["Erdnüsse", "Sojasprossen", "Frühlingszwiebel", "Limette", "Fischsauce", "Tamarinde"],
+      "needs_clarification": "Vegetarisch (mit Ei/Tofu) oder vegan (ohne Ei)?",
+      "note": "Standard: NOT_OK wegen KH (Reisnudeln) + PROTEIN (Ei/Tofu). Vegan ohne Ei/Tofu = OK (nur KH + Gemüse + Erdnüsse/Fett)"
+    }
+  }
+}

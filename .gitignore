@@ -14,6 +14,9 @@ chroma/
 .vscode/
 .idea/
 
+# Trennkost unknown log (iterative growth, local only)
+trennkost/data/unknown_items.log
+
 # Temporary / Scratch
 einmaliges
 EIne

@@ -1,0 +1,197 @@
+{
+  "_doc": "Trennkost combination rules. Derived from Modul 1.1 Optimale Lebensmittelkombinationen + Modul 1.2.",
+  "_principle": "LLM extracts+normalizes, these rules decide. NEVER let LLM override a verdict.",
+
+  "rules": [
+    {
+      "rule_id": "R001",
+      "description": "Kohlenhydrate + Proteine nicht kombinieren",
+      "condition": {"pair": ["KH", "PROTEIN"]},
+      "verdict": "NOT_OK",
+      "severity": "CRITICAL",
+      "source_ref": "modul-1.1/page-001,modul-1.1/page-004",
+      "explanation": "Proteinreiche Lebensmittel benötigen ein saures Verdauungsmilieu, kohlenhydratreiche ein basisches. Bei gleichzeitigem Verzehr neutralisieren sich die Verdauungssäfte gegenseitig und die Nahrung kann nicht richtig verdaut werden."
+    },
+    {
+      "rule_id": "R002",
+      "description": "Kohlenhydrate + Milchprodukte nicht kombinieren",
+      "condition": {"pair": ["KH", "MILCH"]},
+      "verdict": "NOT_OK",
+      "severity": "CRITICAL",
+      "source_ref": "modul-1.1/page-004",
+      "explanation": "Milchprodukte werden sauer verstoffwechselt und zählen zu den konzentrierten Lebensmitteln. Pro Mahlzeit sollte nur EIN konzentriertes Lebensmittel gewählt werden."
+    },
+    {
+      "rule_id": "R003",
+      "description": "Hülsenfrüchte + andere Kohlenhydrate nicht kombinieren",
+      "condition": {"pair": ["HUELSENFRUECHTE", "KH"]},
+      "verdict": "NOT_OK",
+      "severity": "CRITICAL",
+      "source_ref": "modul-1.1/page-004,modul-1.1/page-006",
+      "explanation": "Hülsenfrüchte sind schwer verdaulich und sollten nicht mit anderen kohlenhydratreichen Lebensmitteln kombiniert werden. Sie werden nur mit Gemüse/Salat und kleinen Mengen Fett (1-2 TL) kombiniert."
+    },
+    {
+      "rule_id": "R004",
+      "description": "Hülsenfrüchte + Proteine nicht kombinieren",
+      "condition": {"pair": ["HUELSENFRUECHTE", "PROTEIN"]},
+      "verdict": "NOT_OK",
+      "severity": "CRITICAL",
+      "source_ref": "modul-1.1/page-004,modul-1.1/page-006",
+      "explanation": "Hülsenfrüchte sind schwer verdaulich und sollten nicht mit proteinreichen Lebensmitteln kombiniert werden."
+    },
+    {
+      "rule_id": "R005",
+      "description": "Hülsenfrüchte + Milchprodukte nicht kombinieren",
+      "condition": {"pair": ["HUELSENFRUECHTE", "MILCH"]},
+      "verdict": "NOT_OK",
+      "severity": "CRITICAL",
+      "source_ref": "modul-1.1/page-004",
+      "explanation": "Hülsenfrüchte sollten nur mit Gemüse/Salat und kleinen Mengen Fett kombiniert werden, nicht mit anderen konzentrierten Lebensmitteln wie Milchprodukten."
+    },
+    {
+      "rule_id": "R006",
+      "description": "Verschiedene Proteinquellen nicht kombinieren (Tierisch + Milch)",
+      "condition": {"pair": ["PROTEIN", "MILCH"]},
+      "verdict": "NOT_OK",
+      "severity": "CRITICAL",
+      "source_ref": "modul-1.1/page-004",
+      "explanation": "Pro Mahlzeit sollte nur EINE Art von konzentriertem Lebensmittel gewählt werden. Fisch/Fleisch/Eier und Milchprodukte sind beide konzentrierte Proteinquellen und sollten nicht kombiniert werden."
+    },
+    {
+      "rule_id": "R007",
+      "description": "Obst nicht mit Kohlenhydraten kombinieren",
+      "condition": {"pair": ["OBST", "KH"]},
+      "verdict": "NOT_OK",
+      "severity": "CRITICAL",
+      "source_ref": "modul-1.2/page-003,modul-1.2/page-004",
+      "explanation": "Obst verdaut sehr schnell (20-30 Min) und sollte ALLEIN auf nüchternen Magen gegessen werden. In Kombination mit anderen Lebensmitteln kommt es zu Gärung und Fäulnisprozessen im Magen, was zu Säurebildung im Körper führt."
+    },
+    {
+      "rule_id": "R008",
+      "description": "Obst nicht mit Proteinen kombinieren",
+      "condition": {"pair": ["OBST", "PROTEIN"]},
+      "verdict": "NOT_OK",
+      "severity": "CRITICAL",
+      "source_ref": "modul-1.2/page-003,modul-1.2/page-004",
+      "explanation": "Obst sollte ALLEIN und auf nüchternen Magen gegessen werden. Kombination mit Proteinen führt zu Gärung und Fäulnisprozessen."
+    },
+    {
+      "rule_id": "R009",
+      "description": "Obst nicht mit Milchprodukten kombinieren",
+      "condition": {"pair": ["OBST", "MILCH"]},
+      "verdict": "NOT_OK",
+      "severity": "CRITICAL",
+      "source_ref": "modul-1.2/page-003",
+      "explanation": "Obst sollte ALLEIN und auf nüchternen Magen gegessen werden. Kombination mit Milchprodukten führt zu Gärung."
+    },
+    {
+      "rule_id": "R010",
+      "description": "Obst nicht mit Hülsenfrüchten kombinieren",
+      "condition": {"pair": ["OBST", "HUELSENFRUECHTE"]},
+      "verdict": "NOT_OK",
+      "severity": "CRITICAL",
+      "source_ref": "modul-1.2/page-003",
+      "explanation": "Obst sollte ALLEIN gegessen werden, nicht mit konzentrierten Lebensmitteln wie Hülsenfrüchten."
+    },
+    {
+      "rule_id": "R011",
+      "description": "Obst + Trockenobst ist OK",
+      "condition": {"pair": ["OBST", "TROCKENOBST"]},
+      "verdict": "OK",
+      "severity": "INFO",
+      "source_ref": "modul-1.1/page-004,modul-1.2/page-002",
+      "explanation": "Frisches Obst kann mit Trockenfrüchten kombiniert werden.",
+      "exception_note": "Verdauung dauert mit Trockenobst länger: 45-60 Minuten statt 20-30."
+    },
+    {
+      "rule_id": "R012",
+      "description": "Obst + Blattgrün ist OK (Smoothie-Ausnahme)",
+      "condition": {"pair": ["OBST", "NEUTRAL"], "except_subgroups": ["BLATTGRUEN"]},
+      "verdict": "OK",
+      "severity": "INFO",
+      "source_ref": "modul-1.1/page-004,modul-1.2/page-002",
+      "explanation": "Obst kann mit Blattgrün kombiniert werden, z.B. in einem grünen Smoothie (Obst + Blattgrün/Wildkräuter + Wasser).",
+      "exception_note": "Gilt NUR für Blattgrün (Spinat, Grünkohl, Wildkräuter etc.), NICHT für stärkearmes Gemüse wie Paprika oder Gurke."
+    },
+    {
+      "rule_id": "R013",
+      "description": "Obst + stärkearmes Gemüse (kein Blattgrün) vermeiden",
+      "condition": {"pair": ["OBST", "NEUTRAL"]},
+      "verdict": "NOT_OK",
+      "severity": "WARNING",
+      "source_ref": "modul-1.2/page-003",
+      "explanation": "Obst sollte möglichst allein gegessen werden. Die Kombination mit Blattgrün (Smoothie) ist die einzige empfohlene Ausnahme bei neutralen Lebensmitteln."
+    },
+    {
+      "rule_id": "R014",
+      "description": "Obst + Fett vermeiden",
+      "condition": {"pair": ["OBST", "FETT"]},
+      "verdict": "NOT_OK",
+      "severity": "WARNING",
+      "source_ref": "modul-1.2/page-002",
+      "explanation": "Obst sollte möglichst pur genossen werden. Fettquellen verlangsamen die schnelle Verdauung von Obst. Beim Frühstück gilt: möglichst ohne Fett (max. 1-2 TL Nussmus in einem anschließenden Frühstück sind OK, aber nicht direkt MIT dem Obst)."
+    },
+    {
+      "rule_id": "R015",
+      "description": "Mehrere KH-Quellen kombinieren ist OK",
+      "condition": {"pair": ["KH", "KH"]},
+      "verdict": "OK",
+      "severity": "INFO",
+      "source_ref": "modul-1.1/page-004",
+      "explanation": "Verschiedene Kohlenhydratquellen können miteinander kombiniert werden, z.B. Reis und Kartoffeln in einem Gericht."
+    },
+    {
+      "rule_id": "R016",
+      "description": "NEUTRAL kombiniert mit allem",
+      "condition": {"group_present": "NEUTRAL"},
+      "verdict": "OK",
+      "severity": "INFO",
+      "source_ref": "modul-1.1/page-004,modul-1.1/page-006",
+      "explanation": "Stärkearmes Gemüse, Salate und Kräuter lassen sich mit allem kombinieren und sollten mindestens 50% jeder Mahlzeit ausmachen."
+    },
+    {
+      "rule_id": "R017",
+      "description": "Fett in kleinen Mengen (1-2 TL) ist OK mit allem",
+      "condition": {"group_present": "FETT"},
+      "verdict": "CONDITIONAL",
+      "severity": "WARNING",
+      "source_ref": "modul-1.1/page-004",
+      "explanation": "Fettreiche Lebensmittel sollten nur in geringen Mengen (1-2 TL) verzehrt werden. In kleinen Mengen sind sie mit allen Gruppen kombinierbar. Größere Mengen sollten nur mit Gemüse/Salat kombiniert werden.",
+      "exception_note": "Kleine Mengen (1-2 TL) = OK mit allem. Frage nach Menge wenn unklar."
+    },
+    {
+      "rule_id": "R050",
+      "description": "Unbekannte Zutaten vorhanden",
+      "condition": {"has_unknown": true},
+      "verdict": "CONDITIONAL",
+      "severity": "WARNING",
+      "source_ref": "",
+      "explanation": "Einige Zutaten konnten nicht eindeutig zugeordnet werden. Das Ergebnis ist daher nur bedingt aussagekräftig."
+    },
+    {
+      "rule_id": "R051",
+      "description": "Vermutete (nicht bestätigte) Zutaten",
+      "condition": {"has_assumed": true},
+      "verdict": "CONDITIONAL",
+      "severity": "WARNING",
+      "source_ref": "",
+      "explanation": "Einige Zutaten wurden aufgrund des Gerichts vermutet, sind aber nicht bestätigt. Das Ergebnis kann sich ändern, wenn die tatsächlichen Zutaten abweichen."
+    }
+  ],
+
+  "rule_priority": [
+    "R001", "R002", "R003", "R004", "R005", "R006",
+    "R007", "R008", "R009", "R010",
+    "R011", "R012", "R013", "R014",
+    "R015", "R016", "R017",
+    "R050", "R051"
+  ],
+
+  "_notes": {
+    "pair_rules": "R001-R010: Forbidden combinations (CRITICAL). Order: check forbidden pairs first.",
+    "ok_rules": "R011-R016: Explicitly allowed combinations.",
+    "conditional": "R017: Fett quantity-dependent. R050-R051: Uncertainty flags.",
+    "priority": "Higher severity wins. CRITICAL > WARNING > INFO. NOT_OK > CONDITIONAL > OK.",
+    "smoothie_exception": "R012 is checked BEFORE R013. If ALL NEUTRAL items are BLATTGRUEN subgroup, R012 applies (OK). Otherwise R013 applies (NOT_OK)."
+  }
+}
