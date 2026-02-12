@@ -390,6 +390,66 @@ rotbarsch mit kartoffeln ok?      → NOT_OK (2 groups) ✓
 
 ---
 
+### 19. Englische Food Terms nicht erkannt → UNKNOWN
+**Problem:**
+- User fotografiert englische Speisekarte (z.B. "Jar breakfast: fried chicken, poached egg and pickle")
+- Vision API extrahiert englische Begriffe 1:1 vom Foto
+- Analyzer findet sie nicht in Ontology → UNKNOWN → CONDITIONAL verdict
+- Betroffene Begriffe: "poached egg", "pickle", "scrambled egg", "mushroom", "cucumber", etc.
+
+**Ursache:**
+- Ontology hatte nur deutsche Einträge + vereinzelt englische Synonyme (Chicken, Salmon, Beef)
+- Systematische englische Übersetzungen fehlten für ~80% der Einträge
+- Vision API gibt Items in der Originalsprache der Speisekarte aus
+
+**Lösung:**
+**Dual-Ansatz (beide zero Latenz):**
+
+1. **Englische Synonyme in Ontology** (deterministisch, 100% zuverlässig)
+   - ~120 Ontology-Einträge systematisch erweitert mit englischen Food Terms
+   - Neue Einträge: Pear, Banana, Cucumber, Tomato, Mushroom, Parsley, Basil, Scrambled egg, Poached egg, Pork, Lamb, Trout, Cheese, Yogurt, Bread, Rice, Carrot, Walnut, etc.
+   - Auch: Mayonnaise hinzugefügt (war im Unknowns-Log)
+   - Format: `Ei,"...,Egg,Eggs,Poached egg,Fried egg,Scrambled egg,...",PROTEIN,EIER`
+
+2. **Vision Prompt Update** (proaktiv, kostet keine Extra-Latenz)
+   - Neue Anweisung im `FOOD_EXTRACTION_PROMPT`:
+   - "WICHTIG: Gib alle Zutaten auf DEUTSCH aus, auch wenn die Speisekarte auf Englisch/Französisch/etc. ist. Übersetze erkannte Zutaten ins Deutsche"
+   - Vision API ist bereits GPT-4, kann gut übersetzen
+   - Kein zusätzlicher API-Call, nur Prompt-Text geändert
+
+**Warum dieser Ansatz?**
+- ✅ Null Extra-Latenz (CSV-Lookup + bestehender Vision-API-Call)
+- ✅ 100% deterministisch für häufige Begriffe (Ontology)
+- ✅ Flexibel für seltene Begriffe (Vision übersetzt)
+- ✅ Skaliert für alle Sprachen (nicht nur Englisch)
+- ❌ Alternative "Übersetzungs-Layer im Analyzer" hätte +200-500ms Latenz gekostet
+
+**Test-Ergebnisse:**
+```
+"fried chicken, poached egg, pickle"
+→ Hähnchen (PROTEIN/FLEISCH) + Ei (PROTEIN/EIER) + Gurke (NEUTRAL)
+→ Verdict: NOT_OK ✅ (R018 + alle Items erkannt)
+
+"salmon, rice, broccoli" → NOT_OK ✅ (keine UNKNOWN)
+"scrambled eggs, toast, butter" → NOT_OK ✅ (keine UNKNOWN)
+"mushroom soup, bread" → OK ✅ (keine UNKNOWN)
+"grilled chicken, cucumber, tomato, lettuce" → OK ✅ (keine UNKNOWN)
+"pork, mashed potato, green beans" → NOT_OK ✅ (keine UNKNOWN)
+"tuna, arugula, olives" → OK ✅ (keine UNKNOWN)
+```
+
+**Coverage:**
+- ~120 häufigste Food Items jetzt bilingual (DE + EN)
+- Ontology: 292 Einträge (Mayonnaise neu)
+- Vision Prompt: Deutsche Ausgabe bevorzugt
+
+**Test-Suite:** 66/66 Tests bestanden ✅
+
+**Datei:** `trennkost/data/ontology.csv` (+120 English synonyms), `app/vision_service.py:60-66` (Prompt)
+**Status:** ✅ Fixed (2026-02-12)
+
+---
+
 ## 🔄 BEKANNTE LIMITATIONEN
 
 ### L1. Grüner Smoothie mit partiellen Zutaten
@@ -588,10 +648,11 @@ Korrekt wäre: Pilze (NEUTRAL) + Fett (FETT) → Fett-Mengen-Frage
 ---
 
 **Letzte Aktualisierung:** 2026-02-12
-**Ontologie-Größe:** 293 Einträge (Matcha + 6 Pflanzenmilch + Zucker reklassifiziert + Salat + Ketchup)
+**Ontologie-Größe:** 292 Einträge (bilingual: ~120 Items mit EN + DE Synonymen, inkl. Mayonnaise neu)
 **Compounds:** 25 Gerichte
-**Fixes:** 18 gelöste Probleme + Zucker-Gesundheitsempfehlung (H001) + R018 Protein-Subgruppen-Regel
+**Fixes:** 19 gelöste Probleme + Zucker-Gesundheitsempfehlung (H001) + R018 Protein-Subgruppen-Regel
 **Adjektiv-Filter:** 30+ deutsche Adjektive werden ignoriert (normaler, frischer, veganer, etc.)
 **Open Issues:** 4 (I0: Kochmethoden-Adjektive, I2-I4: siehe oben)
 **Test-Suite:** 66 Tests (22 Fixture-Dishes + 44 weitere) - alle bestanden ✅
+**Sprach-Support:** Deutsch + Englisch (zero latency, deterministisch via Ontology + Vision Prompt)
 **Status:** Production-Ready (mit bekannten Limitationen + Kochmethoden-Diskussion)
