@@ -297,6 +297,46 @@ rotbarsch mit kartoffeln ok?      → NOT_OK (2 groups) ✓
 
 ---
 
+### 17. Adjektive als UNKNOWN Items erkannt + Fallback bei Korrektur
+**Problem:**
+- User: "normaler mit Hafermilch und Zucker"
+- Bot: "normale Milch + Hafermilch → bedingt OK" (interpretiert 2 Milchsorten!)
+- User: "aber hab doch Hafermilch keine normale Milch"
+- Bot: "Diese Information steht nicht im bereitgestellten Kursmaterial." ❌ (Fallback!)
+
+**Ursache:**
+1. **Adjektiv-Problem:** "normaler" wird als UNKNOWN Food Item behandelt
+   - Parser splittet auf "mit"/"und" → ["normaler", "hafermilch", "ein wenig zucker"]
+   - "normaler" ist ein Adjektiv (beschreibt Matcha Latte), KEINE Zutat
+2. **Fallback bei Korrektur:** Bot erkennt Klarstellung nicht als Follow-up
+   - User korrigiert Missverständnis → Bot denkt es ist neue Kursmaterial-Frage
+   - Rule 3 AUSNAHMEN deckte Korrekturen nicht ab
+
+**Lösung:**
+1. **Adjektiv-Blacklist:** `_ADJECTIVES_TO_IGNORE` Set erstellt
+   - 30+ häufige deutsche Adjektive: normaler, frischer, veganer, glutenfreier, etc.
+   - Filter in `_extract_foods_from_question()` und `_parse_text_input()`
+2. **Erweiterte Rule 3 AUSNAHMEN:**
+   - Neu: "Korrekturen/Klarstellungen des Users (z.B. 'aber ich hab doch X gesagt')"
+3. **Neue Rule 14 - KORREKTUR-ERKENNUNG:**
+   - Explizite Anweisung: Missverständnisse erkennen, entschuldigen, re-analysieren
+   - Muster: "aber ich hab doch", "nein, keine X", "hab doch keine X"
+   - VERBOTEN: Fallback bei Korrekturen
+
+**Test-Ergebnisse:**
+```
+"normaler mit Hafermilch und Zucker"
+→ Dish: hafermilch + ein wenig zucker (✅ "normaler" gefiltert)
+→ Verdict: OK (KH + KH erlaubt)
+→ H001 INFO: Zucker-Warnung
+→ Keine UNKNOWN Items mehr ✅
+```
+
+**Datei:** `trennkost/analyzer.py:39-60,140-142,198-200`, `app/chat_service.py:68-73,117-126`
+**Status:** ✅ Fixed (2025-02-11)
+
+---
+
 ## 🔄 BEKANNTE LIMITATIONEN
 
 ### L1. Grüner Smoothie mit partiellen Zutaten
@@ -455,5 +495,6 @@ rotbarsch mit kartoffeln ok?      → NOT_OK (2 groups) ✓
 **Letzte Aktualisierung:** 2025-02-11
 **Ontologie-Größe:** 293 Einträge (Matcha + 6 Pflanzenmilch + Zucker reklassifiziert + Salat + Ketchup)
 **Compounds:** 25 Gerichte
-**Fixes:** 16 gelöste Probleme + Zucker-Gesundheitsempfehlung (H001)
+**Fixes:** 17 gelöste Probleme + Zucker-Gesundheitsempfehlung (H001)
+**Adjektiv-Filter:** 30+ deutsche Adjektive werden ignoriert (normaler, frischer, veganer, etc.)
 **Status:** Production-Ready (mit bekannten Limitationen)

@@ -37,6 +37,28 @@ _FOOD_QUERY_RE = re.compile(
     "|".join(_FOOD_QUERY_KEYWORDS), re.IGNORECASE
 )
 
+# Common adjectives to ignore (not food items)
+_ADJECTIVES_TO_IGNORE = {
+    "normaler", "normale", "normales", "normal",
+    "frischer", "frische", "frisches", "frisch",
+    "roher", "rohe", "rohes", "roh",
+    "gekochter", "gekochte", "gekochtes", "gekocht",
+    "gebratener", "gebratene", "gebratenes", "gebraten",
+    "gegrillter", "gegrillte", "gegrilltes", "gegrillt",
+    "gedünsteter", "gedünstete", "gedünstetes", "gedünstet",
+    "geschmorter", "geschmorte", "geschmortes", "geschmort",
+    "gebackener", "gebackene", "gebackenes", "gebacken",
+    "veganer", "vegane", "veganes", "vegan",
+    "vegetarischer", "vegetarische", "vegetarisches", "vegetarisch",
+    "glutenfreier", "glutenfreie", "glutenfreies", "glutenfrei",
+    "laktosefreier", "laktosefreie", "laktosefreies", "laktosefrei",
+    "biologischer", "biologische", "biologisches", "bio",
+    "kleiner", "kleine", "kleines", "klein",
+    "großer", "große", "großes", "groß",
+    "ganzer", "ganze", "ganzes", "ganz",
+    "halber", "halbe", "halbes", "halb",
+}
+
 # Separators for ingredient lists
 _ITEM_SEPARATORS = re.compile(r"[,;]\s*|\s+und\s+|\s+mit\s+|\s+&\s+", re.IGNORECASE)
 
@@ -115,6 +137,9 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
                 seen.add(entry.canonical)
                 break
 
+    # Filter out adjectives that are not food items
+    found_items = [item for item in found_items if item.lower() not in _ADJECTIVES_TO_IGNORE]
+
     # 3. Combine results: compound + explicit ingredients if both found
     if found_compound and found_items:
         # User mentioned a compound dish AND explicit ingredients
@@ -169,6 +194,9 @@ def _parse_text_input(text: str) -> List[Dict[str, Any]]:
         # Split into potential ingredients
         parts = _ITEM_SEPARATORS.split(line)
         parts = [p.strip() for p in parts if p.strip()]
+
+        # Filter out adjectives (e.g., "normaler", "frischer") - not food items
+        parts = [p for p in parts if p.lower() not in _ADJECTIVES_TO_IGNORE]
 
         if len(parts) >= 2:
             # Check if first part is a compound dish name
