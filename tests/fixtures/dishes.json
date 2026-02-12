@@ -161,6 +161,22 @@
       "expected_verdict": "OK",
       "expected_groups": ["KH"],
       "note": "Hafer + Ahornsirup = beides KH → OK. Kurs empfiehlt dieses Frühstück."
+    },
+    {
+      "id": "D21",
+      "name": "Jar breakfast (Hähnchen mit Ei)",
+      "items": ["Hähnchen", "Ei", "Gurke"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["PROTEIN", "NEUTRAL"],
+      "note": "FLEISCH (Hähnchen) + EIER (Ei) → verschiedene Proteinquellen → NOT_OK (R018)"
+    },
+    {
+      "id": "D22",
+      "name": "Lachs-Omelette",
+      "items": ["Lachs", "Ei", "Spinat"],
+      "expected_verdict": "NOT_OK",
+      "expected_groups": ["PROTEIN", "NEUTRAL"],
+      "note": "FISCH (Lachs) + EIER (Ei) → verschiedene Proteinquellen → NOT_OK (R018)"
     }
   ]
 }

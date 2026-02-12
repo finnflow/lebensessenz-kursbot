@@ -337,6 +337,59 @@ rotbarsch mit kartoffeln ok?      → NOT_OK (2 groups) ✓
 
 ---
 
+### 18. Verschiedene Proteinquellen kombiniert → OK statt NOT_OK
+**Problem:**
+- User: "Jar breakfast: fried chicken, poached egg and pickle"
+- Bot: "Das Jar breakfast ist trennkost-konform" ❌ (FALSCH!)
+- Engine gab OK für Hähnchen (FLEISCH) + Ei (EIER)
+- Aber Kursmaterial sagt klar: "Fisch, Fleisch, Eier: NICHT mit anderen Proteinreichen Lebensmitteln kombinieren"
+
+**Ursache:**
+- Rules hatten:
+  - ✅ R001: KH + PROTEIN = NOT_OK
+  - ✅ R002: KH + MILCH = NOT_OK
+  - ✅ R006: PROTEIN + MILCH = NOT_OK
+  - ❌ **FEHLT: PROTEIN + PROTEIN (verschiedene Subgruppen) = NOT_OK**
+- PROTEIN Gruppe hat 3 Subgruppen: FLEISCH, FISCH, EIER
+- Kursmaterial (Modul 1.1, Seite 4): "NICHT mit anderen Proteinreichen Lebensmitteln kombinieren"
+- Kursmaterial (Modul 1.1, Seite 1): "Nur ein konzentriertes Lebensmittel pro Mahlzeit"
+- Kombination von verschiedenen Protein-Subgruppen war nicht verboten
+
+**Lösung:**
+- Neue Regel **R018** nach Regel-Loop in `engine.py` (analog zu H001 Zucker-Check)
+- Prüft: `len(subgroups_found.get("PROTEIN", set())) >= 2` → NOT_OK
+- Erlaubt: Hähnchen + Rind (beide FLEISCH), Lachs + Thunfisch (beide FISCH)
+- Verboten: Hähnchen + Ei (FLEISCH + EIER), Lachs + Ei (FISCH + EIER), Hähnchen + Lachs (FLEISCH + FISCH)
+
+**Test-Ergebnisse:**
+```
+"gebratenes Hähnchen, pochiertes Ei, eingelegte Gurke" (Jar breakfast)
+→ Verdict: NOT_OK ✅
+→ Problem: R018 - Verschiedene Proteinquellen nicht kombinieren
+→ Affected: ['pochiertes Ei → Ei (EIER)', 'gebratenes Hähnchen → Hähnchen (FLEISCH)']
+
+"Hähnchen, Rind, Brokkoli" (beide FLEISCH)
+→ Verdict: OK ✅ (gleiche Subgruppe erlaubt)
+
+"Lachs, Thunfisch, Salat" (beide FISCH)
+→ Verdict: OK ✅ (gleiche Subgruppe erlaubt)
+
+"Hähnchen, Lachs, Gurke" (FLEISCH + FISCH)
+→ Verdict: NOT_OK ✅
+→ Problem: R018
+```
+
+**Neue Test-Fixtures:**
+- D21: "Jar breakfast (Hähnchen mit Ei)" → NOT_OK, R018
+- D22: "Lachs-Omelette" (Lachs + Ei) → NOT_OK, R018
+
+**Test-Suite:** 66 Tests (vorher 64) - alle PASSED ✅
+
+**Datei:** `trennkost/engine.py:161-182`, `tests/fixtures/dishes.json:D21,D22`, `tests/test_engine.py:4,228,261-263`
+**Status:** ✅ Fixed (2026-02-12)
+
+---
+
 ## 🔄 BEKANNTE LIMITATIONEN
 
 ### L1. Grüner Smoothie mit partiellen Zutaten
@@ -508,6 +561,7 @@ Korrekt wäre: Pilze (NEUTRAL) + Fett (FETT) → Fett-Mengen-Frage
 10. Hummus mit Gemüsesticks (HUELSENFRUECHTE + Möhre=KH)
 11. Pad Thai (Reisnudeln + Ei = NOT_OK)
 12. Spaghetti Aglio e Olio (KH + kleine Fett-Menge = OK)
+13. ✅ **Jar breakfast (Hähnchen + Ei)** - PROTEIN-Subgruppen-Kombination NOT_OK (Fixed: R018)
 
 ---
 
@@ -533,10 +587,11 @@ Korrekt wäre: Pilze (NEUTRAL) + Fett (FETT) → Fett-Mengen-Frage
 
 ---
 
-**Letzte Aktualisierung:** 2025-02-11
+**Letzte Aktualisierung:** 2026-02-12
 **Ontologie-Größe:** 293 Einträge (Matcha + 6 Pflanzenmilch + Zucker reklassifiziert + Salat + Ketchup)
 **Compounds:** 25 Gerichte
-**Fixes:** 17 gelöste Probleme + Zucker-Gesundheitsempfehlung (H001)
+**Fixes:** 18 gelöste Probleme + Zucker-Gesundheitsempfehlung (H001) + R018 Protein-Subgruppen-Regel
 **Adjektiv-Filter:** 30+ deutsche Adjektive werden ignoriert (normaler, frischer, veganer, etc.)
 **Open Issues:** 4 (I0: Kochmethoden-Adjektive, I2-I4: siehe oben)
+**Test-Suite:** 66 Tests (22 Fixture-Dishes + 44 weitere) - alle bestanden ✅
 **Status:** Production-Ready (mit bekannten Limitationen + Kochmethoden-Diskussion)

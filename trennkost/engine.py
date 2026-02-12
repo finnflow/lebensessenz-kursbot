@@ -158,6 +158,35 @@ class TrennkostEngine:
                 explanation="Zucker ist zwar Trennkost-konform als Kohlenhydrat, wird aber im Kursmaterial als schädlich beschrieben. Besser: Honig, Ahornsirup oder Kokosblütenzucker verwenden.",
             ))
 
+        # ── Check for multiple PROTEIN subgroups (R018) ─────────────
+        # Different protein sources (FLEISCH, FISCH, EIER) should not be combined
+        protein_subgroups = subgroups_found.get("PROTEIN", set())
+        if len(protein_subgroups) >= 2:
+            # Group items by subgroup to show which protein types are mixed
+            subgroup_items = defaultdict(list)
+            for item in all_items:
+                if item.group == FoodGroup.PROTEIN and item.subgroup:
+                    label = f"{item.raw_name}"
+                    if item.canonical and item.canonical != item.raw_name:
+                        label = f"{item.raw_name} → {item.canonical}"
+                    subgroup_items[item.subgroup.value].append(label)
+
+            # Build affected items list showing subgroups
+            affected_items = []
+            for subgroup in sorted(subgroup_items.keys()):
+                for item in subgroup_items[subgroup]:
+                    affected_items.append(f"{item} ({subgroup})")
+
+            problems.append(RuleProblem(
+                rule_id="R018",
+                description="Verschiedene Proteinquellen nicht kombinieren",
+                severity=Severity.CRITICAL,
+                affected_items=affected_items,
+                affected_groups=["PROTEIN"],
+                source_ref="modul-1.1/page-004,modul-1.1/page-001",
+                explanation="Pro Mahlzeit sollte nur EINE Art von konzentriertem Lebensmittel gewählt werden. Fisch/Fleisch/Eier sind unterschiedliche Proteinquellen und sollten nicht miteinander kombiniert werden. Das Verdauungssystem ist nicht dafür geschaffen, mehr als ein konzentriertes Lebensmittel gleichzeitig zu verdauen.",
+            ))
+
         # ── Build required questions ────────────────────────────────
         required_questions = self._build_questions(
             analysis, groups_found, has_unknown, has_assumed

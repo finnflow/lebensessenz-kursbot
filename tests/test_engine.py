@@ -1,7 +1,7 @@
 """
 Tests for the Trennkost Rule Engine.
 
-Runs 20 fixture dishes through the full pipeline:
+Runs 22 fixture dishes through the full pipeline:
   ontology lookup → engine evaluation → verdict check.
 
 Usage:
@@ -225,7 +225,7 @@ class TestRuleEngine:
 # ── Fixture-Based Integration Tests ───────────────────────────────────
 
 class TestFixtureDishes:
-    """Run all 20 fixture dishes through the pipeline."""
+    """Run all 22 fixture dishes through the pipeline."""
 
     def test_all_fixtures(self, engine, ontology, dishes):
         """Test that every fixture dish gets the expected verdict."""
@@ -260,6 +260,7 @@ class TestFixtureDishes:
     @pytest.mark.parametrize("dish_id", [
         "D01", "D02", "D03", "D04", "D05", "D06", "D07", "D08", "D09", "D10",
         "D11", "D12", "D13", "D14", "D15", "D16", "D17", "D18", "D19", "D20",
+        "D21", "D22",
     ])
     def test_individual_fixture(self, engine, ontology, dishes, dish_id):
         """Test each fixture individually for clearer failure messages."""
