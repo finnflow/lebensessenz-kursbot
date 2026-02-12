@@ -63,6 +63,7 @@ REGELN:
 - Bei Speisekarten: Gib Gerichtnamen und sichtbare Beschreibungen wieder
 - Zerlege zusammengesetzte Gerichte NICHT selbst (das macht unser System)
 - IGNORIERE reine Gewürze und Würzmittel (Salz, Pfeffer, Paprikapulver, Kräuter etc.) — diese sind für die Analyse irrelevant
+- WICHTIG: Gib alle Zutaten auf DEUTSCH aus, auch wenn die Speisekarte auf Englisch/Französisch/etc. ist. Übersetze erkannte Zutaten ins Deutsche (z.B. "poached egg" → "pochiertes Ei", "fried chicken" → "gebratenes Hähnchen", "pickle" → "eingelegte Gurke")
 
 Antworte NUR als JSON:
 {
