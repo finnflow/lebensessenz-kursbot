@@ -335,6 +335,49 @@
       font-size: 14px;
     }
 
+    /* Sidebar Footer - Delete All Button */
+    .sidebar-footer {
+      padding: 12px 8px;
+      border-top: 1px solid #e5e5e5;
+      margin-top: auto;
+    }
+
+    .sidebar.collapsed .sidebar-footer {
+      display: none !important;
+    }
+
+    .delete-all-btn {
+      width: 100%;
+      padding: 12px 16px;
+      background: transparent;
+      color: #999;
+      border: 1px solid #e5e5e5;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .delete-all-btn:hover {
+      background: #fff0f0;
+      border-color: #ff6b6b;
+      color: #ff6b6b;
+      transform: translateY(-1px);
+    }
+
+    .delete-all-btn:active {
+      transform: translateY(0);
+    }
+
+    .delete-all-btn svg {
+      flex-shrink: 0;
+    }
+
     /* Main Chat Area - Floating Design */
     .main-area {
       flex: 1;
@@ -1056,6 +1099,19 @@
       <div class="conversation-list" id="conversationList">
         <div class="empty-conversations">Keine Conversations vorhanden</div>
       </div>
+
+      <!-- Delete All Button -->
+      <div class="sidebar-footer" id="sidebarFooter" style="display: none;">
+        <button class="delete-all-btn" onclick="deleteAllConversations()" title="Alle Chats löschen">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+          <span class="delete-all-text">Alle Chats löschen</span>
+        </button>
+      </div>
     </div>
 
     <!-- Main Chat Area -->
@@ -1326,11 +1382,16 @@ async function loadConversations() {
 
 function renderConversationList() {
   const listEl = document.getElementById('conversationList');
+  const footerEl = document.getElementById('sidebarFooter');
 
   if (conversations.length === 0) {
     listEl.innerHTML = '<div class="empty-conversations">Keine Conversations vorhanden</div>';
+    footerEl.style.display = 'none';
     return;
   }
+
+  // Show delete-all button when there are conversations
+  footerEl.style.display = 'block';
 
   listEl.innerHTML = conversations.map(conv => `
     <div class="conversation-item ${conv.id === conversationId ? 'active' : ''}"
@@ -1675,6 +1736,61 @@ async function deleteConversation(event, convId) {
   }
 }
 
+async function deleteAllConversations() {
+  if (conversations.length === 0) {
+    return;
+  }
+
+  const count = conversations.length;
+  if (!confirm(`Möchtest du wirklich alle ${count} Conversation${count > 1 ? 's' : ''} löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) {
+    return;
+  }
+
+  try {
+    // Delete all conversations
+    const deletePromises = conversations.map(conv =>
+      fetch(`/conversations/${conv.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ guest_id: guestId })
+      })
+    );
+
+    const results = await Promise.all(deletePromises);
+
+    // Check if all deletions were successful
+    const allSuccess = results.every(r => r.ok);
+
+    if (allSuccess) {
+      // Clear local state
+      conversations = [];
+      conversationId = null;
+      localStorage.removeItem('conversationId');
+
+      // Reset chat view
+      const chatHistory = document.getElementById('chatHistory');
+      chatHistory.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">💬</div>
+          <div class="empty-state-text">Starte eine Konversation</div>
+          <div class="empty-state-subtext">Stelle eine Frage zum Kursmaterial</div>
+        </div>
+      `;
+
+      renderConversationList();
+    } else {
+      alert('Einige Conversations konnten nicht gelöscht werden. Bitte versuche es erneut.');
+      await loadConversations(); // Reload to get current state
+    }
+  } catch (error) {
+    console.error('Delete all failed:', error);
+    alert('Fehler beim Löschen der Conversations');
+    await loadConversations(); // Reload to get current state
+  }
+}
+
 function newChat() {
   conversationId = null;
 
@@ -1691,10 +1807,37 @@ function newChat() {
   document.getElementById('messageInput').focus();
 }
 
+// Paste Handler for Screenshots (Cmd+V / Ctrl+V)
+function initPasteHandler() {
+  // Listen on the entire document for paste events
+  document.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    // Check if any clipboard item is an image
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+
+      if (item.type.indexOf('image') !== -1) {
+        e.preventDefault(); // Prevent default paste behavior
+
+        const blob = item.getAsFile();
+        if (blob) {
+          handleDroppedFile(blob);
+        }
+        break;
+      }
+    }
+  });
+}
+
 // Load conversations on page load
 window.addEventListener('DOMContentLoaded', async () => {
   // Initialize drag and drop
   initDragAndDrop();
+
+  // Initialize paste handler for screenshots
+  initPasteHandler();
 
   // Restore sidebar collapse state
   const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';

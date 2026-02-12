@@ -371,7 +371,48 @@ rotbarsch mit kartoffeln ok?      → NOT_OK (2 groups) ✓
 
 ## 🚧 OFFENE ISSUES
 
-### I1. Ambiguous Follow-ups ohne klaren Context
+### I0. Kochmethoden-Adjektive werden gefiltert (Fett geht verloren)
+**Problem:** "Fried mushrooms", "gebratenes Hähnchen", "frittierte Garnelen"
+- Kochmethoden-Adjektive (fried, gebraten, frittiert) werden als normale Adjektive behandelt
+- Aktuell in `_ADJECTIVES_TO_IGNORE`: "gebraten", "gegrillt", "gebacken"
+- Diese Kochmethoden fügen aber **Fett** hinzu → wichtig für Trennkost-Analyse!
+- Resultat: Fett wird nicht erkannt → Analyse unvollständig
+
+**Beispiel aus Sushi-Menü:**
+```
+Vision API: "Fried mushroom spring onion"
+Parser: filtert "fried" → nur "mushroom spring onion"
+Korrekt wäre: Pilze (NEUTRAL) + Fett (FETT) → Fett-Mengen-Frage
+```
+
+**Unterscheidung nötig:**
+- ✅ Reine Adjektive filtern: "normaler", "frischer", "veganer" (ändern nichts)
+- ❌ Kochmethoden NICHT filtern: "fried", "gebraten", "frittiert" (fügen Fett hinzu)
+
+**Mögliche Lösungen:**
+1. **Quick-Fix:** Kochmethoden-Adjektive aus Blacklist entfernen
+   - "gebraten", "frittiert", "gebacken" → raus aus `_ADJECTIVES_TO_IGNORE`
+   - ⚠️ Werden dann als UNKNOWN erkannt, aber sichtbar
+2. **Proper Fix:** Kochmethoden-Erkennung im Parser
+   - "fried" / "gebraten" → automatisch "Öl" oder "Fett" zur Zutatenliste hinzufügen
+   - Unterscheidung: gekocht/gedünstet (kein Fett) vs. gebraten/frittiert (viel Fett)
+   - Erfordert neue Logik + Kochmethoden-Mapping
+
+**Betroffene Kochmethoden:**
+- **Mit Fett:** fried, deep-fried, pan-fried, sautéed, gebraten, frittiert, ausgebacken, paniert
+- **Ohne/wenig Fett:** boiled, steamed, poached, grilled, gekocht, gedünstet, gedämpft, gegrillt
+
+**Priority:** 🟠 Medium (beeinflusst Genauigkeit, aber nicht kritisch)
+**Status:** ⏳ Parked (weitere Diskussion nötig)
+
+---
+
+
+
+### I1. Kochmethoden nicht in Adjektiv-Blacklist
+**Siehe:** Issue I0 oben - Parked für spätere Entscheidung
+
+### I2. Ambiguous Follow-ups ohne klaren Context
 **Problem:** Lange Konversation → User sagt nur "und mit Reis?"
 - Unklar worauf sich "und" bezieht
 - Konversations-Context wird summarized, Details gehen verloren
@@ -385,7 +426,7 @@ rotbarsch mit kartoffeln ok?      → NOT_OK (2 groups) ✓
 
 ---
 
-### I2. Neue unbekannte Lebensmittel
+### I3. Neue unbekannte Lebensmittel
 **Problem:** Trotz 284 Einträgen fehlen noch viele Items
 - User-Anfragen mit unbekannten Items → UNKNOWN → CONDITIONAL/UNKLAR
 
@@ -398,7 +439,7 @@ rotbarsch mit kartoffeln ok?      → NOT_OK (2 groups) ✓
 
 ---
 
-### I3. Compound Dishes ohne Definition
+### I4. Compound Dishes ohne Definition
 **Problem:** Viele echte Gerichte noch nicht in `compounds.json`
 - z.B. "Ratatouille", "Risotto", "Paella", etc.
 - Bot kann sie analysieren aber nicht optimal dekomponieren
@@ -497,4 +538,5 @@ rotbarsch mit kartoffeln ok?      → NOT_OK (2 groups) ✓
 **Compounds:** 25 Gerichte
 **Fixes:** 17 gelöste Probleme + Zucker-Gesundheitsempfehlung (H001)
 **Adjektiv-Filter:** 30+ deutsche Adjektive werden ignoriert (normaler, frischer, veganer, etc.)
-**Status:** Production-Ready (mit bekannten Limitationen)
+**Open Issues:** 4 (I0: Kochmethoden-Adjektive, I2-I4: siehe oben)
+**Status:** Production-Ready (mit bekannten Limitationen + Kochmethoden-Diskussion)
