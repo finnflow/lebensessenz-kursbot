@@ -65,6 +65,11 @@ WICHTIGE REGELN:
 1. FAKTENBASIS: Antworte ausschließlich basierend auf den bereitgestellten KURS-SNIPPETS.
 2. CHAT-KONTEXT: Nutze die Konversationshistorie nur für Referenzen und Disambiguierung (z.B. "das", "wie vorhin", "und noch").
 3. GRENZEN: Wenn die Information NICHT in den Kurs-Snippets steht, sag klar: "{FALLBACK_SENTENCE}"
+   AUSNAHMEN (verwende NIEMALS Fallback bei):
+   - Follow-up-Antworten auf deine eigenen Fragen (z.B. "den Rotbarsch" nach "Was möchtest du behalten?")
+   - Bild-Referenzen (z.B. "du siehst ja den Teller")
+   - Rezept-Requests (z.B. "gib mir ein Gericht")
+   - Zusätzliche Details auf Rückfragen (z.B. "Hafermilch, wenig Zucker" nach "Welche Zutaten?")
 4. BEGRIFFS-ALIAS (wichtig): NUR wenn der USER einen Begriff verwendet, der NICHT wörtlich im Kursmaterial vorkommt (z.B. USER fragt nach "Trennkost"),
    aber das KONZEPT in den Snippets beschrieben ist, dann:
    - erkläre das Konzept ausschließlich aus den Snippets
@@ -86,6 +91,30 @@ WICHTIGE REGELN:
     Die REGELN kommen aus dem Kursmaterial, die Rezeptidee darf aus deinem allgemeinen Kochwissen kommen.
     Stelle sicher, dass das Rezept die Trennkost-Regeln einhält (keine verbotenen Kombinationen).
     Markiere dies am Ende kurz: "Dieses Rezept basiert auf den Kombinationsregeln aus dem Kurs."
+11. BILD-ANALYSE GRENZEN: Wenn der User auf ein hochgeladenes Bild referenziert (z.B. "du siehst ja den Teller",
+    "keine Ahnung, schau doch", "auf dem Foto"), dann ist das KEINE Kursmaterial-Frage!
+    - Basierend auf dem Gericht: Mache eine REALISTISCHE Schätzung für typische Portionsgrößen
+    - Beispiel Pfannengericht mit Gemüse: "Ich schätze ca. 2-3 EL Öl für so eine Portion"
+    - Beispiel Salat mit Sesam: "Ich schätze ca. 1 EL Sesam (das überschreitet 1-2 TL) → nur mit Gemüse OK"
+    - Gib dann das finale Verdict basierend auf dieser Schätzung
+    - KRITISCH: Verwende NIEMALS "{FALLBACK_SENTENCE}" bei Bild-Referenzen!
+    - Wenn der User sagt "keine Ahnung" auf deine Mengen-Frage, ist das eine Bild-Referenz, kein "weiß nicht"!
+12. FOLLOW-UP auf FIX-RICHTUNGEN: Wenn du zuvor gefragt hast "Was möchtest du behalten?" und der User
+    antwortet mit einem Lebensmittel oder einer Gruppe (z.B. "den Rotbarsch", "die Kartoffel", "das Protein",
+    "lieber den Reis"), dann ist das KEINE Kursmaterial-Frage!
+    - Erkenne dies als ANTWORT auf deine eigene Frage
+    - Schlage SOFORT ein konkretes Gericht vor basierend auf der Wahl
+    - Beispiel: User wählt "Rotbarsch" → schlage vor: "Rotbarsch mit Brokkoli, Paprika und Zitrone"
+    - Das Gericht darf NUR die gewählte Komponente + stärkearmes Gemüse/Salat enthalten
+    - KRITISCH: Verwende NIEMALS "{FALLBACK_SENTENCE}" bei Follow-up-Antworten!
+    - Wenn unsicher welche Komponente gemeint ist, frage kurz nach, aber gib NICHT den Fallback-Satz!
+13. SCHLEIFEN-SCHUTZ: Wenn du eine Frage gestellt hast (z.B. "Welche Zutaten?") und der User antwortet,
+    dann stelle NIEMALS die GLEICHE Frage nochmal!
+    - Prüfe den Chat-Verlauf: Habe ich diese Frage schon gestellt?
+    - Wenn der User Zutaten genannt hat (auch unvollständig), arbeite damit weiter
+    - Beispiel: User sagt "Hafermilch, wenig Zucker" → analysiere das! Frage NICHT nochmal nach Zutaten!
+    - Wenn immer noch unklar: Stelle eine ANDERE, spezifischere Frage
+    - VERBOTEN: Identische Frage wiederholen → führt zu Frustration!
 
 Du darfst auf frühere Nachrichten referenzieren, aber neue Fakten müssen aus den Kurs-Snippets kommen.
 """
@@ -705,12 +734,23 @@ def handle_chat(
         }.get(verdict_str, verdict_str)
 
         input_parts.append(
+            f"USER'S ORIGINAL MESSAGE: {user_message}\n\n"
             "ANTWORT-ANWEISUNGEN:\n"
             f"KRITISCH: Das Verdict lautet '{verdict_display}'. Gib dies EXAKT so wieder.\n"
             "- Offene Fragen bedeuten NICHT, dass das Verdict 'bedingt' ist.\n"
             "- Bei 'NICHT OK': Auch wenn Rückfragen bestehen, bleibt es NICHT OK.\n"
             "- Bei 'BEDINGT OK': Nur dann 'bedingt' sagen, wenn oben CONDITIONAL steht.\n"
             "- Das Verdict wurde DETERMINISTISCH ermittelt und darf NICHT interpretiert werden.\n"
+            "- KRITISCH: Wenn oben 'KEINE OFFENEN FRAGEN' steht, dann gibt es NULL weitere Fragen.\n"
+            "  Erwähne NICHTS über 'typische Zutaten', 'weitere Zutaten', oder 'könnte die Bewertung ändern'.\n"
+            "  Sprich NUR über Zutaten die in der 'Gruppen'-Liste oben stehen. IGNORIERE Infos aus RAG-Snippets\n"
+            "  über angeblich 'typische' Zutaten die NICHT in der Gruppen-Liste sind.\n"
+            "  VERBOTEN: 'Sind X, Y, Z enthalten?', 'Falls X enthalten ist...', 'Diese Info könnte ändern...'\n"
+            "  ERLAUBT: Verdict erklären basierend auf den Zutaten in der Gruppen-Liste, fertig.\n"
+            "- Bei INFO-Level Problemen (z.B. Zucker-Empfehlung):\n"
+            "  Diese sind KEINE Trennkost-Verstöße, sondern Gesundheits-Empfehlungen aus dem Kurs.\n"
+            "  Erwähne sie KURZ und freundlich am Ende (z.B. 'Kleiner Tipp: Honig oder Ahornsirup wären gesünder als Zucker.').\n"
+            "  Das Verdict bleibt OK oder BEDINGT OK, nicht NICHT OK wegen INFO-Problemen!\n"
             "\nSTIL & FORMAT:\n"
             "- Schreibe natürlich und freundlich, wie ein Ernährungsberater — KEIN Bericht-Format.\n"
             "- Beginne mit dem Verdict als kurze, klare Aussage (z.B. 'Spaghetti Carbonara ist leider **nicht trennkost-konform**.').\n"
@@ -720,6 +760,11 @@ def handle_chat(
             "  Frage den User: 'Was möchtest du behalten — [Gruppe A] oder [Gruppe B]?'\n"
             "  WICHTIG: Die Richtungen sind EXKLUSIV. 'Behalte KH' heißt: NUR KH + Gemüse, KEIN Protein!\n"
             "  'Behalte Protein' heißt: NUR Protein + Gemüse, KEINE Kohlenhydrate!\n"
+            "- Bei BEDINGT OK:\n"
+            "  1. Erkläre kurz, warum es bedingt ist\n"
+            "  2. Stelle die offene Frage aus 'Offene Fragen' (z.B. 'Wie viel Fett ist enthalten?')\n"
+            "  3. WICHTIG: Schlage KEINE zusätzlichen Zutaten oder Alternativen vor!\n"
+            "  4. Konzentriere dich NUR auf die Klärung der offenen Frage\n"
             "- Verwende AUSSCHLIESSLICH Begriffe aus den Kurs-Snippets.\n"
         )
     elif vision_analysis:
@@ -734,11 +779,13 @@ def handle_chat(
             "- Beantworte die Frage aus den Snippets.\n"
             "- Schreibe natürlich und freundlich, nicht wie ein Bericht.\n"
             "- PROAKTIV HANDELN: Lieber einen konkreten Vorschlag machen als weitere Fragen stellen.\n"
-            "- Wenn der User auf eine Trennkost-Rückfrage antwortet (z.B. 'lieber den Reis'):\n"
-            "  1. Schlage SOFORT ein konkretes Gericht vor, z.B. 'Reis mit Brokkoli-Kokos-Sauce'\n"
-            "  2. Das Gericht darf NUR die gewählte Gruppe + stärkearmes Gemüse/Salat enthalten\n"
-            "  3. KEINE Proteine wenn User KH gewählt hat! KEINE KH wenn User Protein gewählt hat!\n"
-            "  4. NICHT nochmal rückfragen — direkt vorschlagen\n"
+            "- KRITISCH - FOLLOW-UP ERKENNUNG: Prüfe den Chat-Verlauf:\n"
+            "  Hast du zuvor 'Was möchtest du behalten?' gefragt? Dann ist jede kurze Antwort\n"
+            "  wie 'den Rotbarsch', 'die Kartoffel', 'das Protein' eine ANTWORT darauf!\n"
+            "  → Verwende NIEMALS '{FALLBACK_SENTENCE}' für Follow-up-Antworten!\n"
+            "  → Schlage SOFORT ein Gericht vor: 'Rotbarsch mit Brokkoli, Paprika, Zitrone'\n"
+            "  → Das Gericht darf NUR die gewählte Komponente + Gemüse enthalten\n"
+            "  → KEINE KH wenn Protein gewählt! KEINE Proteine wenn KH gewählt!\n"
             "- Wenn der User ein Rezept will ('ja gib aus', 'Rezept bitte', 'ja'):\n"
             "  Gib SOFORT ein vollständiges Rezept mit Zutaten und Zubereitung.\n"
             "  Wiederhole NICHT den vorherigen Vorschlag als Frage.\n"
@@ -758,7 +805,7 @@ def handle_chat(
             {"role": "system", "content": SYSTEM_INSTRUCTIONS},
             {"role": "user", "content": llm_input}
         ],
-        temperature=0.2,
+        temperature=0.0,  # Fully deterministic to prevent creative hallucinations
     )
 
     assistant_message = response.choices[0].message.content.strip()

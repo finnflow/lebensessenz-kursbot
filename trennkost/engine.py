@@ -28,9 +28,11 @@ logger = logging.getLogger(__name__)
 
 RULES_JSON = Path(__file__).parent / "data" / "rules.json"
 
-# Subgroups that count as BLATTGRUEN (for smoothie exception)
-BLATTGRUEN_SUBGROUPS = {
+# Subgroups that are OK in smoothies (for smoothie exception)
+# BLATTGRUEN is the main component, KRAEUTER (spices/herbs/water) are neutral
+SMOOTHIE_SAFE_SUBGROUPS = {
     FoodSubgroup.BLATTGRUEN,
+    FoodSubgroup.KRAEUTER,  # Spices, herbs, water don't affect digestion
 }
 
 
@@ -138,6 +140,24 @@ class TrennkostEngine:
                     explanation=rule.explanation,
                 ))
 
+        # ── Special health recommendations (not Trennkost rules) ────
+        # Zucker (refined white sugar) is Trennkost-conform but not recommended
+        zucker_items = [
+            item for item in all_items
+            if item.canonical and item.canonical.lower() == "zucker"
+        ]
+        if zucker_items:
+            zucker_labels = [f"{item.raw_name} → Zucker" for item in zucker_items]
+            problems.append(RuleProblem(
+                rule_id="H001",  # H = Health recommendation (not Trennkost rule)
+                description="Zucker (weißer Industriezucker) sollte vermieden werden",
+                severity=Severity.INFO,
+                affected_items=zucker_labels,
+                affected_groups=["KH"],
+                source_ref="modul-1.1,modul-1.2",
+                explanation="Zucker ist zwar Trennkost-konform als Kohlenhydrat, wird aber im Kursmaterial als schädlich beschrieben. Besser: Honig, Ahornsirup oder Kokosblütenzucker verwenden.",
+            ))
+
         # ── Build required questions ────────────────────────────────
         required_questions = self._build_questions(
             analysis, groups_found, has_unknown, has_assumed
@@ -221,11 +241,11 @@ class TrennkostEngine:
                     return True, {"pair": [g1, g2]}
                 return False, {}
 
-            # For R013 (OBST + NEUTRAL without exception): only fire if NOT all BLATTGRUEN
+            # For R013 (OBST + NEUTRAL without exception): only fire if NOT all smoothie-safe
             if rule.rule_id == "R013":
                 neutral_subs = subgroups_found.get("NEUTRAL", set())
-                if neutral_subs and neutral_subs.issubset(BLATTGRUEN_SUBGROUPS):
-                    return False, {}  # R012 handles this case
+                if neutral_subs and neutral_subs.issubset(SMOOTHIE_SAFE_SUBGROUPS):
+                    return False, {}  # R012 handles this case (smoothie exception)
 
             return True, {"pair": [g1, g2]}
 
@@ -299,9 +319,11 @@ class TrennkostEngine:
                     affects_items=fett_items,
                 ))
 
-        # Compound clarification
+        # Compound clarification - but ONLY if no explicit ingredients provided
+        # If user said "Burger mit Tempeh, Salat", they already answered the clarification
         compound = ontology.get_compound(analysis.dish_name)
-        if compound and compound.get("needs_clarification"):
+        has_explicit_items = len(analysis.items) > 0 and not all(item.assumed for item in analysis.items)
+        if compound and compound.get("needs_clarification") and not has_explicit_items:
             questions.append(RequiredQuestion(
                 question=compound["needs_clarification"],
                 reason="Details zum Gericht nötig für vollständige Analyse.",

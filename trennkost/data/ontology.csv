@@ -59,7 +59,7 @@ Bärlauch,"",NEUTRAL,ZWIEBEL_LAUCH,false,,
 Spinat,"Blattspinat,Baby-Spinat",NEUTRAL,BLATTGRUEN,false,,
 Rucola,"Rauke",NEUTRAL,BLATTGRUEN,false,,
 Feldsalat,"Rapunzel,Nüsslisalat",NEUTRAL,BLATTGRUEN,false,,
-Kopfsalat,"Blattsalat,Pflücksalat,Eisbergsalat",NEUTRAL,SALAT,false,,
+Kopfsalat,"Blattsalat,Pflücksalat,Eisbergsalat,Salat",NEUTRAL,SALAT,false,,Generischer Salat → Kopfsalat
 Endiviensalat,"Endivie",NEUTRAL,SALAT,false,,
 Radicchio,"",NEUTRAL,SALAT,false,,
 Chicoree,"Chicorée",NEUTRAL,SALAT,false,,
@@ -112,7 +112,13 @@ Chili,"Chilipulver,Chiliflocken,Cayennepfeffer",NEUTRAL,KRAEUTER,false,,Gewürz
 Senf,"Senfpulver,Dijon-Senf",NEUTRAL,KRAEUTER,false,,Gewürz
 Essig,"Apfelessig,Balsamico,Weißweinessig",NEUTRAL,KRAEUTER,false,,Würzmittel
 Sojasauce,"Sojasoße,Tamari",NEUTRAL,KRAEUTER,false,,Würzsauce
+Ketchup,"Tomatenketchup,Tomaten-Ketchup,Ketchup Sauce",NEUTRAL,KRAEUTER,false,,Tomatensauce mit Gewürzen - als Würze neutral
 Vanille,"Vanilleextrakt,Vanilleschote",NEUTRAL,KRAEUTER,false,,Gewürz
+# Getränke & Flüssigkeiten (für Trennkost neutral/irrelevant)
+Wasser,"Mineralwasser,Leitungswasser,stilles Wasser",NEUTRAL,KRAEUTER,false,,Getränk - keine Kalorien
+Tee,"Kräutertee,Schwarztee,Grüntee",NEUTRAL,KRAEUTER,false,,Getränk - ungesüßt neutral
+Matcha,"Matcha-Pulver,Matchapulver,Matcha Pulver,Matcha powder,grüner Tee Pulver,normales Matcha Pulver,standard Matcha Pulver",NEUTRAL,KRAEUTER,false,,Getränk - Grüntee-Pulver
+Kokoswasser,"Kokosnusswasser",NEUTRAL,KRAEUTER,false,,Getränk - leicht süßlich aber neutral
 # ═══════════════════════════════════════════════════════════════════════
 # KOMPLEXE KOHLENHYDRATE (KH) — nur mit NEUTRAL + kleine Menge Fett
 # NICHT mit Protein oder Milch kombinieren
@@ -224,9 +230,131 @@ Ghee,"Butterschmalz,geklärte Butter",FETT,TIERISCHES_FETT,false,,"zum Braten ge
 # ═══════════════════════════════════════════════════════════════════════
 # AMBIGUOUS / COMPOUND — items needing clarification
 # ═══════════════════════════════════════════════════════════════════════
-Pflanzenmilch,"Hafermilch,Mandelmilch,Sojamilch,Kokosmilch,Reismilch,Cashewmilch",KH,GETREIDE,true,"Hängt von der Basis ab: Hafermilch=KH, Mandelmilch=FETT, Sojamilch=HUELSENFRUECHTE, Kokosmilch=FETT",
+# Pflanzenmilch (spezifisch nach Basis)
+Hafermilch,"Haferdrink,Oat milk",KH,GETREIDE,false,,Pflanzenmilch aus Hafer
+Mandelmilch,"Mandeldrink,Almond milk",FETT,NUSS_SAMEN,false,,Pflanzenmilch aus Mandeln
+Sojamilch,"Sojadrink,Soy milk",HUELSENFRUECHTE,HUELSE,false,,Pflanzenmilch aus Soja
+Kokosmilch,"Kokosdrink,Coconut milk",FETT,NUSS_SAMEN,false,,Pflanzenmilch aus Kokosnuss
+Reismilch,"Reisdrink,Rice milk",KH,GETREIDE,false,,Pflanzenmilch aus Reis
+Cashewmilch,"Cashewdrink,Cashew milk",FETT,NUSS_SAMEN,false,,Pflanzenmilch aus Cashew
+Pflanzenmilch,"",KH,GETREIDE,true,"Generischer Begriff; frage nach spezifischer Sorte (Hafer=KH, Mandel=FETT, Soja=HUELSENFRUECHTE, Kokosnuss=FETT, Reis=KH, Cashew=FETT)",Fallback wenn Sorte nicht spezifiziert
 Sojasoße,"Sojasauce,Tamari",HUELSENFRUECHTE,HUELSE,false,,"kleine Menge als Würze; Kurs warnt vor Soja"
-Zucker,"Haushaltszucker,weißer Zucker,brauner Zucker,Rohrzucker",UNKNOWN,,false,,"im Kursmaterial als schädlich beschrieben; keine Trennkost-Gruppe"
+Zucker,"Haushaltszucker,weißer Zucker,brauner Zucker,Rohrzucker,ein wenig Zucker,wenig Zucker",KH,GETREIDE,false,,"WICHTIG: Im Kursmaterial als schädlich beschrieben und sollte vermieden werden! Chemisch aber ein Kohlenhydrat → KH-Gruppe für Trennkost-Regeln"
 Ahornsirup,"Maple Syrup",KH,GETREIDE,false,,"im Kurs als Alternative zu Zucker erwähnt"
 Honig,"",KH,GETREIDE,false,,"im Kurs als Alternative zu Zucker erwähnt"
 Kokosblütenzucker,"",KH,GETREIDE,false,,"im Kurs als Alternative zu Zucker erwähnt"
+# ═══════════════════════════════════════════════════════════════════════
+# ERWEITERTE ONTOLOGIE - 100 häufige Lebensmittel (Feb 2025)
+# Basis: BMEL Versorgungsbilanzen, FIZ Fischkonsum, Supermarkt-Analysen
+# ═══════════════════════════════════════════════════════════════════════
+# Öle (Standard-Kochöle + Spezialöle)
+Rapsöl,"Canola oil,Canola,Rapsöl kaltgepresst",FETT,OEL,false,,Standard-Kochöl in DE
+Sonnenblumenöl,"Sunflower oil",FETT,OEL,false,,Standard-Kochöl
+Sesamöl,"Sesame oil",FETT,OEL,false,,Asiaküche (geröstet/neutral)
+Erdnussöl,"Peanut oil",FETT,OEL,false,,Zum Braten/Wok
+Traubenkernöl,"Grapeseed oil",FETT,OEL,false,,Hoch erhitzbar
+Kürbiskernöl,"Pumpkin seed oil",FETT,OEL,false,,Typisch D/A, salzig-nussig
+# Nüsse & Samen (Ergänzung)
+Pistazien,"Pistazie,Pistachios",FETT,NUSS_SAMEN,false,,
+Pinienkerne,"Pine nuts",FETT,NUSS_SAMEN,false,,Pesto/Salate
+Macadamianüsse,"Macadamia,Macadamia nuts",FETT,NUSS_SAMEN,false,,
+Mohn,"Mohnsamen,Poppy seeds",FETT,NUSS_SAMEN,false,,Backzutat
+# Milchprodukte (Käse-Varietäten + fermentiert)
+Camembert,"Camembert cheese",MILCH,KAESE,false,,
+Brie,"Brie cheese",MILCH,KAESE,false,,
+Kefir,"Kefir (Milch),Milchkefir",MILCH,JOGHURT,false,,Fermentiertes Milchgetränk
+Buttermilch,"Buttermilk",MILCH,JOGHURT,false,,
+Hüttenkäse,"Cottage Cheese,Cottage cheese,Hüttenkäse körnig",MILCH,FRISCHKAESE,false,,
+# Getreideprodukte & Stärke
+Grieß,"Griess,Semolina",KH,GETREIDE,false,,Weizengrieß (Standard)
+Knäckebrot,"Knaeckebrot,Crispbread",KH,GETREIDE,false,,
+Cornflakes,"Corn flakes",KH,GETREIDE,true,"Oft gezuckert; trotzdem Getreideprodukt",
+Reiswaffeln,"Rice cakes",KH,GETREIDE,false,,
+Maiswaffeln,"Corn cakes",KH,GETREIDE,false,,
+Paniermehl,"Semmelbrösel,Breadcrumbs",KH,GETREIDE,false,,
+Kartoffelstärke,"Speisestärke (Kartoffel),Kartoffelmehl",KH,STAERKEHALTIGES_GEMUESE,true,"Extrahierte Stärke; je nach System als Zutat/Processed geführt",
+Maisstärke,"Speisestärke (Mais),Cornstarch",KH,GETREIDE,true,"Extrahierte Stärke; je nach System als Zutat/Processed geführt",
+Speisestärke,"Stärke,Starch",KH,GETREIDE,true,"Generischer Begriff; kann Kartoffel- oder Maisstärke sein",
+Zwieback,"Rusk",KH,GETREIDE,false,,
+Haferkleie,"Oat bran",KH,GETREIDE,false,,
+Weizenkleie,"Wheat bran",KH,GETREIDE,false,,
+Pizzateig,"Pizzaboden,Pizza dough",KH,GETREIDE,true,"Verarbeitetes Getreideprodukt",
+Gnocchi,"Gnocchi di patate",KH,STAERKEHALTIGES_GEMUESE,true,"Kartoffelprodukt + etwas Mehl; je nach Rezept",
+Topinambur,"Jerusalem artichoke",KH,STAERKEHALTIGES_GEMUESE,true,"Stärke/Inulin: je nach Trennkost-Liste unterschiedlich",
+# Kräuter & Gewürze (Ergänzung)
+Lorbeer,"Lorbeerblatt,Bay leaf",NEUTRAL,KRAEUTER,false,,Gewürz
+Kümmel,"Caraway",NEUTRAL,KRAEUTER,false,,Gewürz
+Meerrettich,"Kren,Horseradish",NEUTRAL,KRAEUTER,false,,Würzwurzel
+Kapern,"Capers",NEUTRAL,KRAEUTER,true,"Eingelegt (Salz/Essig)",
+Reisessig,"Rice vinegar",NEUTRAL,KRAEUTER,false,,Essig
+Fischsauce,"Fish Sauce,Fishsauce",NEUTRAL,KRAEUTER,false,,Würzsauce - fermentiert
+Kimchi,"Kimchi (fermentierter Kohl)",NEUTRAL,KRAEUTER,true,"Fermentiert + Gewürze; Einordnung als neutral plausibel",
+Nori,"Nori-Algen,Seaweed nori",NEUTRAL,KRAEUTER,true,"Algen; je nach Ontologie ggf. eigene Kategorie",
+Bockshornklee,"Fenugreek",NEUTRAL,KRAEUTER,true,"Eher Gewürz; Alltag je nach Haushalt",
+Kardamom,"Cardamom",NEUTRAL,KRAEUTER,false,,Gewürz
+Nelken,"Gewürznelke,Cloves",NEUTRAL,KRAEUTER,false,,Gewürz
+# Gemüse (stärkearm + Salate)
+Zuckerschoten,"Zuckererbsen,Snow peas",NEUTRAL,STAERKEARMES_GEMUESE,false,,Frische Erbsen -> neutral
+Romanesco,"Romanesco-Kohl",NEUTRAL,STAERKEARMES_GEMUESE,false,,
+Steckrübe,"Rutabaga,Swede",NEUTRAL,STAERKEARMES_GEMUESE,true,"Je nach Liste teils 'stärkehaltig' -> hier als neutral eingeordnet",
+Rübchen,"Mairübchen,Turnip",NEUTRAL,STAERKEARMES_GEMUESE,true,"Je nach Definition teils stärkehaltiger",
+Schwarzwurzel,"Black salsify,Schwarzwurzeln",NEUTRAL,STAERKEARMES_GEMUESE,true,"Wurzelgemüse; Stärkeanteil moderat",
+Eichblattsalat,"Eichblatt,Eichblatt-Salat,Oak leaf lettuce",NEUTRAL,BLATTGRUEN,false,,
+Lollo Rosso,"Lollo,Rosso lettuce",NEUTRAL,BLATTGRUEN,false,,
+Friséesalat,"Frisee,Frisée",NEUTRAL,BLATTGRUEN,false,,
+Portulak,"Portulak (Gemüse),Purslane",NEUTRAL,BLATTGRUEN,false,,
+# Obst (frisch)
+Aprikose,"Aprikosen,Apricot",OBST,FRISCH,false,,
+Kaki,"Persimmon,Sharonfrucht",OBST,FRISCH,false,,
+Pomelo,"Pomelos",OBST,FRISCH,false,,Zitrusfrucht
+Blutorange,"Blood orange",OBST,FRISCH,false,,
+Sauerkirsche,"Sauerkirschen,Sour cherry",OBST,FRISCH,false,,
+Rote Johannisbeere,"Johannisbeere rot,Redcurrant",OBST,FRISCH,false,,
+Schwarze Johannisbeere,"Johannisbeere schwarz,Blackcurrant",OBST,FRISCH,false,,
+Stachelbeere,"Stachelbeeren,Gooseberry",OBST,FRISCH,false,,
+Quitte,"Quitten,Quince",OBST,FRISCH,false,,
+Physalis,"Kapstachelbeere,Golden berry",OBST,FRISCH,true,"Eher 'modern', aber verbreitet",
+Passionsfrucht,"Maracuja,Passionfruit",OBST,FRISCH,true,"Eher 'modern', aber verbreitet",
+Kumquat,"Kumquats",OBST,FRISCH,false,,
+Mirabelle,"Mirabellen,Mirabellepflaume",OBST,FRISCH,false,,Pflaumenart
+Cranberry frisch,"Cranberries frisch",OBST,FRISCH,true,"Frisch selten; oft getrocknet/gesüßt",
+Holunderbeere,"Holunderbeeren,Elderberry",OBST,FRISCH,true,"Roh leicht problematisch; meist gekocht/als Saft",
+Sanddorn,"Sanddornbeere,Sea buckthorn",OBST,FRISCH,true,"Meist als Saft/Püree",
+Hagebutte,"Hagebutten,Rose hip",OBST,FRISCH,true,"Meist als Tee/Marmelade",
+Feige frisch,"frische Feige,frische Feigen,Fresh fig",OBST,FRISCH,false,,Abgrenzung zu Trockenobst-Feige
+Preiselbeere,"Preiselbeeren,Lingonberry",OBST,FRISCH,true,"In DE meist als Konfitüre/Glas; frisch seltener",
+Maulbeere frisch,"frische Maulbeeren,Mulberry",OBST,FRISCH,true,"Frisch in DE seltener; eher getrocknet",
+# Fisch (häufige Sorten)
+Alaska-Seelachs,"Seelachs,Pollock,Alaska pollock",PROTEIN,FISCH,false,,Sehr häufig (Filet/Fischstäbchen)
+Rotbarsch,"Redfish,Ocean perch",PROTEIN,FISCH,false,,
+Scholle,"Plaice",PROTEIN,FISCH,false,,
+Pangasius,"Pangas,Catrafish",PROTEIN,FISCH,false,,Häufig als Filet
+Tilapia,"Tilapia fillet",PROTEIN,FISCH,false,,Häufig als Filet
+Dorade,"Goldbrasse,Sea bream",PROTEIN,FISCH,false,,
+Wolfsbarsch,"Seabass,Branzino",PROTEIN,FISCH,false,,
+Heilbutt,"Halibut",PROTEIN,FISCH,false,,
+Schellfisch,"Haddock",PROTEIN,FISCH,false,,
+Seezunge,"Sole",PROTEIN,FISCH,false,,
+Zander,"Pike-perch",PROTEIN,FISCH,false,,
+Sardinen,"Sardine,Sardines",PROTEIN,FISCH,false,,Konserve/frisch
+Anchovis,"Anchovy,Anchovies",PROTEIN,FISCH,false,,Sardellen
+Miesmuscheln,"Miesmuschel,Blue mussel,Mussels",PROTEIN,FISCH,false,,Meeresfrüchte
+Tintenfisch,"Calamari,Squid",PROTEIN,FISCH,false,,Meeresfrüchte
+# Fleisch (häufige Cuts + Varietäten)
+Schweinefilet,"Pork tenderloin",PROTEIN,FLEISCH,false,,
+Hähnchenschenkel,"Hähnchenkeule,Chicken leg",PROTEIN,FLEISCH,false,,
+Hähnchenflügel,"Chicken wings",PROTEIN,FLEISCH,false,,
+Bauchspeck,"Pork belly",PROTEIN,FLEISCH,false,,
+Ente,"Entenfleisch,Duck",PROTEIN,FLEISCH,false,,
+Kalb,"Kalbfleisch,Veal",PROTEIN,FLEISCH,false,,
+Gans,"Gänsefleisch,Goose",PROTEIN,FLEISCH,false,,
+Kaninchen,"Kaninchenfleisch,Rabbit",PROTEIN,FLEISCH,false,,
+Leber,"Rinderleber,Schweineleber,Kalbsleber,Liver",PROTEIN,FLEISCH,true,"Organfleisch; in manchen Trennkost-Listen separat geführt",
+Mett,"Hackepeter,Brötchenmett",PROTEIN,FLEISCH,true,"Rohes Schweinehack; stark verarbeitet/gewürzt",
+# Hülsenfrüchte & Soja
+Sojabohnen getrocknet,"Sojabohnen,Soja beans,Yellow soybeans",HUELSENFRUECHTE,SOJA,false,,Getrocknet; nicht Edamame
+Sojagranulat,"Sojaflocken,Sojagranulat trocken,TVP",HUELSENFRUECHTE,SOJA,false,,Soja-Fleischersatz (trocken)
+Miso,"Misopaste,Miso paste",HUELSENFRUECHTE,SOJA,false,,Fermentierte Sojabohnen
+# Trockenobst (Ergänzung)
+Trockenpflaume,"Dörrpflaume,Backpflaume,Prunes",TROCKENOBST,TROCKEN,false,,
+Trockenapfel,"Apfelringe,Dried apple",TROCKENOBST,TROCKEN,false,,

@@ -48,7 +48,25 @@ def detect_food_query(text: str) -> bool:
     Returns True if:
     - Text contains food-related keywords, OR
     - Text contains 2+ food items from the ontology
+
+    Returns False if:
+    - User is asking FOR a recipe/suggestion (not analyzing a specific dish)
     """
+    # Exclude recipe requests (user wants suggestions, not analysis)
+    recipe_request_patterns = [
+        r"hast du.*gericht",
+        r"gib.*gericht",
+        r"kannst du.*gericht.*vorschlag",
+        r"schlage.*gericht.*vor",
+        r"empfiehl.*gericht",
+        r"idee.*für.*gericht",
+        r"rezept.*für.*heute",
+        r"was.*soll.*ich.*essen",
+    ]
+    for pattern in recipe_request_patterns:
+        if re.search(pattern, text, re.IGNORECASE):
+            return False
+
     if _FOOD_QUERY_RE.search(text):
         return True
 
@@ -72,17 +90,15 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
     text_lower = text.lower()
 
     # 1. Check for known compound dishes (longest first to avoid partial matches)
-    found_compounds = []
+    found_compound = None
     for compound_name in sorted(ontology.compounds.keys(), key=len, reverse=True):
         if compound_name.lower() in text_lower:
-            found_compounds.append({"name": compound_name, "items": None})
+            found_compound = compound_name
             # Remove matched name to avoid double-matching ingredients
             text_lower = text_lower.replace(compound_name.lower(), " ")
+            break  # Only match one compound per query
 
-    if found_compounds:
-        return found_compounds
-
-    # 2. Check for individual food items from ontology
+    # 2. Check for individual food items from ontology (even if compound found!)
     found_items = []
     seen = set()
     for entry in ontology.entries:
@@ -92,13 +108,23 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
             if len(name) < 3:
                 continue
             # Word boundary match to avoid "Reis" matching "Reise"
-            pattern = r'(?:^|[\s,;.(])' + re.escape(name) + r'(?:[\s,;.?!)]|$)'
+            # Include quotes (") and apostrophes (') in boundaries
+            pattern = r'(?:^|[\s,;.("\'])' + re.escape(name) + r'(?:[\s,;.?!)"\'"]|$)'
             if re.search(pattern, text, re.IGNORECASE) and entry.canonical not in seen:
                 found_items.append(entry.canonical)
                 seen.add(entry.canonical)
                 break
 
-    if len(found_items) >= 1:
+    # 3. Combine results: compound + explicit ingredients if both found
+    if found_compound and found_items:
+        # User mentioned a compound dish AND explicit ingredients
+        # e.g., "Burger mit Tempeh, Salat, Gurken"
+        return [{"name": found_compound, "items": found_items}]
+    elif found_compound:
+        # Only compound found, no explicit ingredients
+        return [{"name": found_compound, "items": None}]
+    elif len(found_items) >= 1:
+        # No compound, but individual items found
         return [{"name": _infer_dish_name(found_items) if len(found_items) > 1 else found_items[0],
                  "items": found_items if len(found_items) > 1 else None}]
 
@@ -145,14 +171,22 @@ def _parse_text_input(text: str) -> List[Dict[str, Any]]:
         parts = [p.strip() for p in parts if p.strip()]
 
         if len(parts) >= 2:
-            # Multiple items → treat as ingredient list
-            # But first check if the whole thing is a dish name
-            whole_compound = ontology.get_compound(line)
-            if whole_compound:
-                dishes.append({"name": line, "items": None})
+            # Check if first part is a compound dish name
+            first_part_compound = ontology.get_compound(parts[0])
+            if first_part_compound:
+                # First part is the dish name, rest are explicit ingredients
+                dish_name = parts[0]
+                ingredients = parts[1:]  # Explicit ingredients provided by user
+                dishes.append({"name": dish_name, "items": ingredients})
             else:
-                name = _infer_dish_name(parts)
-                dishes.append({"name": name, "items": parts})
+                # Multiple items → treat as ingredient list
+                # But first check if the whole thing is a dish name
+                whole_compound = ontology.get_compound(line)
+                if whole_compound:
+                    dishes.append({"name": line, "items": None})
+                else:
+                    name = _infer_dish_name(parts)
+                    dishes.append({"name": name, "items": parts})
         elif len(parts) == 1:
             # Single item → could be a dish name
             dishes.append({"name": parts[0], "items": None})
@@ -416,7 +450,13 @@ def format_results_for_llm(results: List[TrennkostResult]) -> str:
     parts = []
     parts.append("═══ TRENNKOST-ANALYSE (DETERMINISTISCH) ═══")
     parts.append("WICHTIG: Das Verdict wurde regelbasiert ermittelt und darf NICHT verändert werden.")
-    parts.append("Deine Aufgabe: Erkläre das Ergebnis anhand der Kurs-Snippets.\n")
+    parts.append("Deine Aufgabe: Erkläre das Ergebnis anhand der Kurs-Snippets.")
+
+    # Check if any result has no questions - if so, add emphatic warning
+    has_no_questions = any(not r.required_questions for r in results)
+    if has_no_questions:
+        parts.append("⚠️ KRITISCH: Alle Zutaten sind explizit genannt und bestätigt. Stelle KEINE Rückfragen zu Zutaten!")
+    parts.append("")
 
     for r in results:
         verdict_emoji = {
@@ -452,6 +492,8 @@ def format_results_for_llm(results: List[TrennkostResult]) -> str:
             parts.append("Offene Fragen (bitte an den User weitergeben):")
             for q in r.required_questions:
                 parts.append(f"  → {q.question}")
+        else:
+            parts.append("KEINE OFFENEN FRAGEN — alle Zutaten sind klar und bestätigt.")
 
         if r.ok_combinations:
             parts.append("OK-Kombinationen: " + "; ".join(r.ok_combinations))
