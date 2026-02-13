@@ -566,6 +566,135 @@ Korrekt wäre: Pilze (NEUTRAL) + Fett (FETT) → Fett-Mengen-Frage
 
 ---
 
+### I5. Bot schlägt verbotene Kombinationen vor + ignoriert Frühstücksregeln (Issue #20)
+**Problem Teil 1: Verbotene Kombination im Rezept**
+User-Szenario aus Chat (2026-02-12):
+```
+User: "ich esse morgens gerne ein brot mit schinken und käse"
+Bot: "Brot mit Schinken und Käse ist leider nicht trennkost-konform."
+     → Erklärt korrekt: KH + Protein + Milch = NOT_OK
+     → Fragt: "Was möchtest du behalten — die Kohlenhydrate (Brot) oder das Protein (Schinken)?"
+
+User: "den käse will ich am liebsten!!!"
+Bot: "Da du den Käse am liebsten behalten möchtest, schlage ich vor, ihn mit einer großen
+     Portion Gemüse zu kombinieren. Wie wäre es mit einem leckeren Käseomelette? Du kannst
+     dafür Eier verwenden und das Omelett mit viel Gemüse wie Paprika, Zucchini und Spinat füllen."
+     → ❌ FALSCH! Käseomelette = Käse (MILCH) + Ei (PROTEIN) = R006 Verstoß!
+
+User: "aber das ist doch protein und protein?"
+Bot: "Das ist richtig, Käse ist ebenfalls ein proteinreiches Lebensmittel. In der Trennkost
+     sollten wir jedoch darauf achten, dass wir nicht mehrere proteinreiche Lebensmittel
+     in einer Mahlzeit kombinieren."
+     → Gibt Regel zu, schlägt aber NOCHMAL das gleiche Käseomelette-Rezept vor! ❌
+```
+
+**Root Cause Teil 1:**
+- Bot versteht Regeln konzeptuell, ignoriert sie aber bei Rezept-Generierung
+- Keine Rezept-Validation vor Ausgabe
+- Kein Engine-Feedback nach Rezept-Vorschlag
+- LLM-Instructions nicht stark genug (Pattern 1: "LLM ignoriert Instructions")
+
+**Problem Teil 2: Frühstücksregel ignoriert**
+- User will **Käse zum Frühstück** (fettreiches Lebensmittel)
+- Bot schlägt direkt Käseomelette vor
+- **Fehlt:** Hinweis dass Frühstück vor 12 Uhr **fettarm** sein sollte
+
+**Frühstücksregel aus Kursmaterial (Modul 1.2, Seite 2):**
+> "Wie gestalte ich das Frühstück optimal?"
+>
+> Part 1: Frisches Obst ODER Grüne Smoothies
+> - "besser ohne zusätzliche Fette (Nuss-Muse, Leinoel etc.)"
+>
+> Part 2: Fettfreies weiteres Frühstück
+> - "moeglichst ohne Zugabe von Fetten (maximal 1-2TL Nussmus oder Nuesse/ Samen/
+>   Kokosoel/ oder Butter sind jedoch okay)"
+> - Empfehlungen: Overnight-Oats, Porridge, Reis-Pudding, Hirse-Griess,
+>   Glutenfreies Brot mit Gurke und Tomate und 1-2 TL Avocado
+
+**Grund für fettarmes Frühstück (Modul 1.2, Seite 1):**
+- **Entgiftung läuft bis mittags auf Hochtouren**
+- Obst/leichte Kost spart Verdauungsenergie → Energie für Entgiftung verfügbar
+- "die eingesparte Energie kann fuer Entfernung von Schlacken aus Koerper genutzt werden"
+- Fettreiche Lebensmittel belasten die Verdauung → behindern Entgiftung
+
+**Betroffene fettreiche Lebensmittel für Frühstück:**
+- Käse, Nüsse (>1-2 TL), Avocado (>1-2 TL), Öle, Butter (>1-2 TL), Nussmus (>1-2 TL),
+  Eier (PROTEIN + fetthaltig), Fleisch, Fisch
+
+**Korrekter Bot-Flow bei "Käse zum Frühstück":**
+1. **Erst:** Fettarm-Empfehlung aussprechen
+   > "Käse ist ein fettreiches Lebensmittel. Bis mittags läuft die Entgiftung deines Körpers
+   > auf Hochtouren - in dieser Phase ist es optimal, Fett zu vermeiden, damit der Körper
+   > sich auf die Entgiftung konzentrieren kann.
+   >
+   > Möchtest du stattdessen eine fettarme Frühstücksoption wählen? Zum Beispiel:
+   > - Frisches Obst (allein oder als Smoothie mit Blattgrün)
+   > - Haferflocken mit Apfel und Zimt
+   > - Gemüse-Sticks mit leichtem Dip"
+
+2. **Falls User besteht:** Käse + Gemüse vorschlagen (OHNE Ei!)
+   > "Okay, wenn du Käse möchtest: Kombiniere ihn mit viel Gemüse (Paprika, Zucchini, Spinat,
+   > Tomate). Eine Gemüse-Käse-Pfanne wäre optimal. NICHT mit Ei kombinieren (Käse ist MILCH,
+   > Ei ist PROTEIN → verboten). Hinweis: Fettarm wäre für dein Frühstück besser!"
+
+**Was NICHT vorgeschlagen werden darf:**
+- ❌ Käseomelette (Käse + Ei = MILCH + PROTEIN = R006)
+- ❌ Käse + Schinken (MILCH + PROTEIN = R006)
+- ❌ Käse + Brot (MILCH + KH = R002)
+
+**Korrekte Alternativen:**
+- ✅ Käse + Gemüse (MILCH + NEUTRAL = OK, aber suboptimal wegen Fett am Morgen)
+- ✅ Gemüse-Pfanne mit Paprika, Zucchini, Spinat (NEUTRAL = OK, fettarm)
+- ✅ Obst (OBST = OK, fettarm, unterstützt Entgiftung)
+- ✅ Haferflocken mit Apfel (KH + OBST nach Wartezeit = OK, fettarm)
+
+**Lösungsansätze:**
+1. **Rezept-Validation Layer:**
+   - Nach Rezept-Generierung: Zutaten durch Engine laufen lassen
+   - Bei NOT_OK: Rezept ablehnen, neu generieren
+   - Feedback-Loop: "Dein vorgeschlagenes Rezept verletzt R006 (MILCH + PROTEIN)"
+
+2. **Frühstücks-Detection + Instructions:**
+   - Erkennen ob Query Frühstück betrifft (Keywords: "morgens", "Frühstück", "breakfast", Uhrzeit < 12)
+   - Neue Instruction: "Bei Frühstück VOR 12 Uhr: Fettarme Optionen bevorzugen! Grund: Entgiftung."
+   - Explizite fettreiche Items-Liste in Instructions
+
+3. **Stärkere Negative Examples:**
+   - In Instructions: "VERBOTEN: Käseomelette (MILCH + PROTEIN = R006 Verstoß!)"
+   - "VERBOTEN: Käse + Schinken (MILCH + PROTEIN = R006 Verstoß!)"
+   - Mehrfache Wiederholung (Pattern 1)
+
+4. **Temperature auf 0.0 setzen:**
+   - Aktuell bei Rezept-Generierung vermutlich höher
+   - Temperature 0.0 = deterministischer, folgt Instructions besser
+
+**Test-Cases:**
+```
+User: "ich will morgens Käse essen"
+→ Bot sollte: Fettarm-Empfehlung + fettarme Alternativen (Obst, Haferflocken)
+→ Bei Insist: Käse + Gemüse (OHNE Ei)
+
+User: "ich will Avocado zum Frühstück"
+→ Bot sollte: "Avocado ist fettreich - maximal 1-2 TL okay. Besser: Obst oder Haferflocken?"
+
+User: "ich will mittags Käse essen"
+→ Bot sollte: KEINE Fettarm-Warnung (nur Trennkost-Regeln), Käse + Gemüse OK
+
+User: "Käseomelette zum Frühstück?"
+→ Bot sollte: "NICHT trennkost-konform! Käse (MILCH) + Ei (PROTEIN) = verboten (R006).
+              Außerdem: Frühstück sollte fettarm sein. Alternative: Gemüse-Pfanne oder Obst?"
+```
+
+**Kursmaterial-Quellen:**
+- Modul 1.2, Seite 2: "Wie gestalte ich das Frühstück optimal?" (fettfrei/fettarm)
+- Modul 1.2, Seite 1: "Vorteile des Obstverzehrs" (Entgiftung, Energie-Einsparung)
+- Modul 1.3, Seite 5: "Optimierung der Ernährung 2" (gesund altern, meiden von Fett)
+
+**Priority:** 🔴 HIGH (Bot gibt falsche Gesundheitsempfehlungen + verletzt eigene Regeln)
+**Status:** ⏳ To Fix (kritisch, beeinflusst Nutzererfahrung stark)
+
+---
+
 ## 📊 PATTERN & LEARNINGS
 
 ### Pattern 1: LLM ignoriert Instructions bei starkem RAG-Signal
@@ -652,7 +781,7 @@ Korrekt wäre: Pilze (NEUTRAL) + Fett (FETT) → Fett-Mengen-Frage
 **Compounds:** 25 Gerichte
 **Fixes:** 19 gelöste Probleme + Zucker-Gesundheitsempfehlung (H001) + R018 Protein-Subgruppen-Regel
 **Adjektiv-Filter:** 30+ deutsche Adjektive werden ignoriert (normaler, frischer, veganer, etc.)
-**Open Issues:** 4 (I0: Kochmethoden-Adjektive, I2-I4: siehe oben)
+**Open Issues:** 5 (I0: Kochmethoden, I2: Ambiguous Follow-ups, I3: Neue Lebensmittel, I4: Compound Dishes, I5: Bot schlägt verbotene Kombinationen + ignoriert Frühstücksregeln)
 **Test-Suite:** 66 Tests (22 Fixture-Dishes + 44 weitere) - alle bestanden ✅
 **Sprach-Support:** Deutsch + Englisch (zero latency, deterministisch via Ontology + Vision Prompt)
 **Status:** Production-Ready (mit bekannten Limitationen + Kochmethoden-Diskussion)
