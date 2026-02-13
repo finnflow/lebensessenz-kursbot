@@ -96,6 +96,12 @@ def detect_food_query(text: str) -> bool:
         r"idee.*für.*gericht",
         r"rezept.*für.*heute",
         r"was.*soll.*ich.*essen",
+        r"was.*kann.*ich.*essen",
+        r"was.*darf.*ich.*essen",
+        r"was.*könnte.*ich.*essen",
+        r"was.*wäre.*eine.*gute.*option",
+        r"gute.*option.*für",
+        r"vorschlag.*für.*(frühstück|mittagessen|abendessen)",
     ]
     for pattern in recipe_request_patterns:
         if re.search(pattern, text, re.IGNORECASE):
@@ -104,8 +110,14 @@ def detect_food_query(text: str) -> bool:
     if _FOOD_QUERY_RE.search(text):
         return True
 
-    # Check for multiple food items
+    # Check for known compound dishes (single item but should be analyzed)
     ontology = get_ontology()
+    text_lower = text.lower()
+    for compound_name in ontology.compounds.keys():
+        if compound_name.lower() in text_lower:
+            return True
+
+    # Check for multiple food items
     words = _ITEM_SEPARATORS.split(text.strip())
     found = sum(1 for w in words if w.strip() and ontology.lookup(w.strip()))
     return found >= 2
