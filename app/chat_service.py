@@ -62,6 +62,8 @@ col = chroma.get_or_create_collection(name=COLLECTION_NAME)
 
 SYSTEM_INSTRUCTIONS = f"""Du bist ein kurs-assistierender Bot.
 
+ANREDE: Sprich den User IMMER mit "du" an (informell, freundlich). Verwende NIEMALS "Sie" außer der User wünscht dies explizit.
+
 WICHTIGE REGELN:
 1. FAKTENBASIS: Antworte ausschließlich basierend auf den bereitgestellten KURS-SNIPPETS.
 2. CHAT-KONTEXT: Nutze die Konversationshistorie nur für Referenzen und Disambiguierung (z.B. "das", "wie vorhin", "und noch").
@@ -721,6 +723,25 @@ def handle_chat(
                 category = item.get("category", "?")
                 amount = item.get("amount", "?")
                 input_parts.append(f"  - {name} ({category}, Menge: {amount})")
+        input_parts.append("")
+
+    # ── Inject standalone breakfast guidance if breakfast detected but no engine results ──
+    if is_breakfast and not trennkost_results:
+        input_parts.append("FRÜHSTÜCKS-HINWEIS (Kurs Modul 1.2):")
+        input_parts.append("Das Kursmaterial empfiehlt ein zweistufiges Frühstück:")
+        input_parts.append("  1. Frühstück: Frisches Obst ODER Grüner Smoothie (fettfrei)")
+        input_parts.append("     → Obst verdaut in 20-30 Min, Bananen/Trockenobst 45-60 Min")
+        input_parts.append("  2. Frühstück (falls 1. nicht reicht): Fettfreie Kohlenhydrate (max 1-2 TL Fett)")
+        input_parts.append("     → Empfehlungen: Overnight-Oats, Porridge, Reis-Pudding, Hirse-Grieß,")
+        input_parts.append("       glutenfreies Brot mit Gurke/Tomate + max 1-2 TL Avocado")
+        input_parts.append("")
+        input_parts.append("WARUM FETTARM VOR MITTAGS?")
+        input_parts.append("  Bis mittags läuft die Entgiftung des Körpers auf Hochtouren.")
+        input_parts.append("  Leichte Kost spart Verdauungsenergie → mehr Energie für Entgiftung/Entschlackung.")
+        input_parts.append("  Fettreiche Lebensmittel belasten die Verdauung und behindern diesen Prozess.")
+        input_parts.append("")
+        input_parts.append("ANWEISUNG: Erwähne das zweistufige Frühstücks-Konzept PROAKTIV in deiner Antwort!")
+        input_parts.append("Empfehle IMMER zuerst die fettarme Option (Obst/Smoothie, dann ggf. fettfreie KH).")
         input_parts.append("")
 
     input_parts.append(f"KURS-SNIPPETS (FAKTENBASIS):\n{course_context}\n")

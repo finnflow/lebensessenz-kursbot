@@ -290,22 +290,20 @@ def analyze_text(
             if assumed_names:
                 # Different message depending on current verdict
                 if result.verdict == Verdict.NOT_OK:
-                    question_text = (
-                        f"Typische weitere Zutaten in {dish_name}: "
-                        f"{', '.join(assumed_groups)}. "
-                        f"Falls enthalten, verstärkt das nur die Problematik."
-                    )
+                    # Bei NOT_OK: Assumed items verstärken nur die Problematik, keine Frage nötig
+                    # Skip adding this to required_questions
+                    pass
                 else:
                     question_text = (
                         f"Typische weitere Zutaten in {dish_name}: "
                         f"{', '.join(assumed_groups)}. "
                         f"Sind diese enthalten? Das könnte die Bewertung ändern."
                     )
-                result.required_questions.append(RequiredQuestion(
-                    question=question_text,
-                    reason="Vermutete Zutaten könnten die Kombination beeinflussen.",
-                    affects_items=assumed_names,
-                ))
+                    result.required_questions.append(RequiredQuestion(
+                        question=question_text,
+                        reason="Vermutete Zutaten könnten die Kombination beeinflussen.",
+                        affects_items=assumed_names,
+                    ))
                 # If strict result was OK but assumed items would change it,
                 # escalate to CONDITIONAL
                 if result.verdict == Verdict.OK and assumed_names:

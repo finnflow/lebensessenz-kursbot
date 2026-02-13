@@ -86,6 +86,18 @@
       "needs_clarification": null,
       "note": "NOT_OK: KH (Brot) + MILCH (Käse)"
     },
+    "Wurstbrot": {
+      "base_items": ["Brot", "Wurst"],
+      "optional_items": ["Butter"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Brot) + PROTEIN (Wurst). Standard-Wurst = FLEISCH/PROTEIN."
+    },
+    "Schinkenbrot": {
+      "base_items": ["Brot", "Schinken"],
+      "optional_items": ["Butter"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Brot) + PROTEIN (Schinken)"
+    },
     "Rührei mit Toast": {
       "base_items": ["Ei", "Brot"],
       "optional_items": ["Butter"],
