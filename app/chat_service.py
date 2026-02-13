@@ -33,6 +33,7 @@ from app.vision_service import (
 from app.image_handler import ImageValidationError
 from trennkost.analyzer import (
     detect_food_query,
+    detect_breakfast_context,
     analyze_text as trennkost_analyze_text,
     analyze_vision as trennkost_analyze_vision,
     format_results_for_llm,
@@ -617,6 +618,9 @@ def handle_chat(
             import traceback
             traceback.print_exc()
 
+    # 6c. Breakfast context detection
+    is_breakfast = detect_breakfast_context(user_message)
+
     # 7. Load context
     summary = conv_data.get("summary_text")
     last_messages = get_last_n_messages(conversation_id, LAST_N)
@@ -624,7 +628,7 @@ def handle_chat(
     # 8. Rewrite query for better retrieval
     if trennkost_results:
         # Use engine-targeted RAG query for relevant course sections
-        standalone_query = build_rag_query(trennkost_results)
+        standalone_query = build_rag_query(trennkost_results, breakfast_context=is_breakfast)
     elif image_path and food_groups:
         standalone_query = generate_trennkost_query(food_groups)
     else:
@@ -702,7 +706,7 @@ def handle_chat(
 
     # ── Inject Trennkost engine results ────────────────────────────
     if trennkost_results:
-        engine_context = format_results_for_llm(trennkost_results)
+        engine_context = format_results_for_llm(trennkost_results, breakfast_context=is_breakfast)
         input_parts.append(engine_context)
         input_parts.append("")
 
@@ -768,6 +772,30 @@ def handle_chat(
             "  Frage den User: 'Was möchtest du behalten — [Gruppe A] oder [Gruppe B]?'\n"
             "  WICHTIG: Die Richtungen sind EXKLUSIV. 'Behalte KH' heißt: NUR KH + Gemüse, KEIN Protein!\n"
             "  'Behalte Protein' heißt: NUR Protein + Gemüse, KEINE Kohlenhydrate!\n"
+            "- REZEPT-VALIDIERUNG (KRITISCH — lies das!):\n"
+            "  Bevor du ein Rezept oder eine Alternative vorschlägst, prüfe JEDE Zutat gegen die Regeln!\n"
+            "  VERBOTENE Kombinationen die du NIEMALS vorschlagen darfst:\n"
+            "  ❌ Käseomelette = Käse (MILCH) + Ei (PROTEIN) → R006 Verstoß!\n"
+            "  ❌ Käse + Schinken = MILCH + PROTEIN → R006 Verstoß!\n"
+            "  ❌ Ei + Brot/Toast = PROTEIN + KH → R001 Verstoß!\n"
+            "  ❌ Ei + Käse = PROTEIN + MILCH → R006 Verstoß!\n"
+            "  ❌ Käse + Brot = MILCH + KH → R002 Verstoß!\n"
+            "  ❌ Joghurt + Müsli = MILCH + KH → R002 Verstoß!\n"
+            "  GRUNDREGEL für Alternativen:\n"
+            "  Gewählte Gruppe + NEUTRAL (Gemüse/Salat) = EINZIG erlaubte Kombination!\n"
+            "  'Behalte MILCH' → NUR Milchprodukte + Gemüse. KEIN Ei, KEIN Fleisch, KEIN Brot!\n"
+            "  'Behalte PROTEIN' → NUR Fleisch/Fisch/Ei + Gemüse. KEINE KH, KEINE Milch!\n"
+            "  'Behalte KH' → NUR Brot/Reis/Pasta + Gemüse. KEIN Protein, KEINE Milch!\n"
+            + (
+                "- FRÜHSTÜCK-SPEZIFISCH (User fragt nach Frühstück!):\n"
+                "  1. Empfehle ZUERST die fettarme Option aus dem FRÜHSTÜCKS-HINWEIS oben.\n"
+                "  2. Erkläre KURZ warum: Entgiftung läuft bis mittags, fettarme Kost optimal.\n"
+                "  3. Erwähne das zweistufige Frühstücks-Konzept (1. Obst → 2. fettfreie KH).\n"
+                "  4. Falls User auf fettreiche Option besteht: erlaubt, aber mit freundlichem Hinweis.\n"
+                "  5. Konkrete fettarme Empfehlungen: Obst, Grüner Smoothie, Overnight-Oats, Porridge,\n"
+                "     Reis-Pudding, Hirse-Grieß, glutenfreies Brot mit Gemüse + max 1-2 TL Avocado.\n"
+                if is_breakfast else ""
+            ) +
             "- Bei BEDINGT OK:\n"
             "  1. Erkläre kurz, warum es bedingt ist\n"
             "  2. Stelle die offene Frage aus 'Offene Fragen' (z.B. 'Wie viel Fett ist enthalten?')\n"
@@ -782,6 +810,18 @@ def handle_chat(
             "- Verwende AUSSCHLIESSLICH Begriffe aus den Kurs-Snippets.\n"
         )
     else:
+        breakfast_instruction = ""
+        if is_breakfast:
+            breakfast_instruction = (
+                "- FRÜHSTÜCK-SPEZIFISCH (User fragt nach Frühstück!):\n"
+                "  Das Kursmaterial empfiehlt ein zweistufiges Frühstück:\n"
+                "  1. Frühstück: Frisches Obst ODER Grüner Smoothie (fettfrei)\n"
+                "     → Obst verdaut in 20-30 Min, dann 2. Frühstück möglich\n"
+                "  2. Frühstück: Fettfreie Kohlenhydrate (max 1-2 TL Fett)\n"
+                "     → Overnight-Oats, Porridge, Reis-Pudding, Hirse, glutenfreies Brot + Gemüse\n"
+                "  WARUM: Bis mittags läuft Entgiftung — fettarme Kost spart Verdauungsenergie.\n"
+                "  → Empfehle IMMER zuerst die fettarme Option. Bei Insistieren: erlaubt, aber mit Hinweis.\n"
+            )
         input_parts.append(
             "ANTWORT (deutsch, natürlich, materialgebunden):\n"
             "- Beantworte die Frage aus den Snippets.\n"
@@ -794,6 +834,13 @@ def handle_chat(
             "  → Schlage SOFORT ein Gericht vor: 'Rotbarsch mit Brokkoli, Paprika, Zitrone'\n"
             "  → Das Gericht darf NUR die gewählte Komponente + Gemüse enthalten\n"
             "  → KEINE KH wenn Protein gewählt! KEINE Proteine wenn KH gewählt!\n"
+            "- REZEPT-VALIDIERUNG: Prüfe JEDES vorgeschlagene Rezept gegen die Regeln!\n"
+            "  ❌ Käseomelette = Käse (MILCH) + Ei (PROTEIN) → VERBOTEN!\n"
+            "  ❌ Käse + Schinken/Fleisch = MILCH + PROTEIN → VERBOTEN!\n"
+            "  ❌ Ei + Brot = PROTEIN + KH → VERBOTEN!\n"
+            "  ❌ Ei + Käse = PROTEIN + MILCH → VERBOTEN!\n"
+            "  Gewählte Gruppe + Gemüse/Salat = EINZIG erlaubte Kombination!\n"
+            + breakfast_instruction +
             "- Wenn der User ein Rezept will ('ja gib aus', 'Rezept bitte', 'ja'):\n"
             "  Gib SOFORT ein vollständiges Rezept mit Zutaten und Zubereitung.\n"
             "  Wiederhole NICHT den vorherigen Vorschlag als Frage.\n"

@@ -62,6 +62,18 @@ _ADJECTIVES_TO_IGNORE = {
 # Separators for ingredient lists
 _ITEM_SEPARATORS = re.compile(r"[,;]\s*|\s+und\s+|\s+mit\s+|\s+&\s+", re.IGNORECASE)
 
+# Breakfast detection keywords
+_BREAKFAST_KEYWORDS = re.compile(
+    r"frühstück|fruehstueck|morgens|vormittag|zum\s*frühstück|breakfast"
+    r"|morgenessen|am\s*morgen|in\s*der\s*früh|in\s*der\s*frueh",
+    re.IGNORECASE,
+)
+
+
+def detect_breakfast_context(text: str) -> bool:
+    """Detect if a user message is about breakfast / morning eating."""
+    return bool(_BREAKFAST_KEYWORDS.search(text))
+
 
 def detect_food_query(text: str) -> bool:
     """
@@ -467,9 +479,51 @@ def _generate_fix_directions(result: TrennkostResult) -> List[str]:
     return directions
 
 
+# ── Breakfast Guidance ─────────────────────────────────────────────────
+
+def _generate_breakfast_block(result: TrennkostResult) -> List[str]:
+    """
+    Generate breakfast-specific guidance block.
+
+    Based on Modul 1.2 Seite 1-2:
+    - Two-stage breakfast concept
+    - Fat-free/fat-low recommendation before noon
+    - Detoxification reasoning
+    """
+    lines = []
+    lines.append("FRÜHSTÜCKS-HINWEIS (Kurs Modul 1.2):")
+    lines.append("Das Kursmaterial empfiehlt ein zweistufiges Frühstück:")
+    lines.append("  1. Frühstück: Frisches Obst ODER Grüner Smoothie (fettfrei)")
+    lines.append("     → Obst verdaut in 20-30 Min, Bananen/Trockenobst 45-60 Min")
+    lines.append("  2. Frühstück (falls 1. nicht reicht): Fettfreie Kohlenhydrate (max 1-2 TL Fett)")
+    lines.append("     → Empfehlungen: Overnight-Oats, Porridge, Reis-Pudding, Hirse-Grieß,")
+    lines.append("       glutenfreies Brot mit Gurke/Tomate + max 1-2 TL Avocado")
+    lines.append("")
+    lines.append("WARUM FETTARM VOR MITTAGS?")
+    lines.append("  Bis mittags läuft die Entgiftung des Körpers auf Hochtouren.")
+    lines.append("  Leichte Kost spart Verdauungsenergie → mehr Energie für Entgiftung/Entschlackung.")
+    lines.append("  Fettreiche Lebensmittel belasten die Verdauung und behindern diesen Prozess.")
+
+    # Identify fat-rich items in the current meal
+    fat_rich_groups = {"FETT", "MILCH", "PROTEIN"}
+    fat_items = []
+    for group in sorted(fat_rich_groups):
+        for item in result.groups_found.get(group, []):
+            clean_name = item.split(" → ")[0]
+            fat_items.append(f"{clean_name} ({_GROUP_DISPLAY.get(group, group)})")
+
+    if fat_items:
+        lines.append("")
+        lines.append(f"FETTREICHE ITEMS IN DIESER MAHLZEIT: {', '.join(fat_items)}")
+        lines.append("→ Empfehle dem User ZUERST fettarme Frühstücks-Alternativen (Obst, Haferflocken, Gemüse-Sticks).")
+        lines.append("→ Falls der User darauf besteht: gewählte Komponente + Gemüse ist erlaubt, aber mit Hinweis.")
+
+    return lines
+
+
 # ── Formatting for LLM Context ────────────────────────────────────────
 
-def format_results_for_llm(results: List[TrennkostResult]) -> str:
+def format_results_for_llm(results: List[TrennkostResult], breakfast_context: bool = False) -> str:
     """
     Format TrennkostResult(s) as structured text for the LLM context.
 
@@ -534,17 +588,25 @@ def format_results_for_llm(results: List[TrennkostResult]) -> str:
                 parts.append(f"  Richtung {i}: {d}")
             parts.append("  → Frage den User, welche Komponente er behalten möchte.")
 
+        # Breakfast guidance
+        if breakfast_context:
+            parts.append("")
+            parts.extend(_generate_breakfast_block(r))
+
         parts.append("")
 
     parts.append("═══ ENDE TRENNKOST-ANALYSE ═══")
     return "\n".join(parts)
 
 
-def build_rag_query(results: List[TrennkostResult]) -> str:
+def build_rag_query(results: List[TrennkostResult], breakfast_context: bool = False) -> str:
     """
     Build a RAG query from TrennkostResult(s) targeting relevant course sections.
     """
     query_parts = ["Lebensmittelkombinationen Trennkost Regeln"]
+
+    if breakfast_context:
+        query_parts.append("Frühstück optimal fettfrei fettarm Obst Smoothie Entgiftung zweistufig Overnight-Oats Porridge")
 
     groups_mentioned = set()
     for r in results:

@@ -690,8 +690,34 @@ User: "Käseomelette zum Frühstück?"
 - Modul 1.2, Seite 1: "Vorteile des Obstverzehrs" (Entgiftung, Energie-Einsparung)
 - Modul 1.3, Seite 5: "Optimierung der Ernährung 2" (gesund altern, meiden von Fett)
 
+**Lösung (implementiert 2026-02-13):**
+
+**1. Rezept-Validierung in LLM-Instructions:**
+- Explizite "VERBOTENE Kombinationen" Liste in den Answer Instructions
+- ❌ Käseomelette, ❌ Käse+Schinken, ❌ Ei+Brot, ❌ Ei+Käse, ❌ Käse+Brot, ❌ Joghurt+Müsli
+- GRUNDREGEL: "Gewählte Gruppe + NEUTRAL = EINZIG erlaubte Kombination!"
+- In BEIDEN Pfaden (Engine-basiert + normaler Antwort-Pfad)
+
+**2. Frühstücks-Detection + Zweistufiges Frühstück:**
+- `detect_breakfast_context()` in `trennkost/analyzer.py`: Keywords "Frühstück", "morgens", "vormittag", etc.
+- `_generate_breakfast_block()`: Generiert strukturierten Frühstücks-Hinweis für LLM-Context
+- Zweistufiges Frühstücks-Konzept (Modul 1.2):
+  - 1. Frühstück: Obst/Smoothie (fettfrei)
+  - 2. Frühstück: Fettfreie KH (max 1-2 TL Fett) — Overnight-Oats, Porridge, etc.
+- Entgiftungs-Begründung: "Bis mittags läuft Entgiftung auf Hochtouren"
+- Fettreiche Items in Mahlzeit werden explizit gelistet
+- Empfehlung: ZUERST fettarme Alternative, bei Insistieren erlaubt mit Hinweis
+
+**3. Breakfast-spezifische RAG-Query:**
+- `build_rag_query()` ergänzt Frühstücks-Keywords → Modul 1.2 Snippets werden bevorzugt gefunden
+- Keywords: "Frühstück optimal fettfrei fettarm Obst Smoothie Entgiftung zweistufig Overnight-Oats Porridge"
+
+**Dateien:**
+- `trennkost/analyzer.py`: `detect_breakfast_context()`, `_generate_breakfast_block()`, `format_results_for_llm(breakfast_context)`, `build_rag_query(breakfast_context)`
+- `app/chat_service.py`: Import + Frühstücks-Detection + Rezept-Validierung in BEIDEN Antwort-Pfaden
+
 **Priority:** 🔴 HIGH (Bot gibt falsche Gesundheitsempfehlungen + verletzt eigene Regeln)
-**Status:** ⏳ To Fix (kritisch, beeinflusst Nutzererfahrung stark)
+**Status:** ✅ Fixed (2026-02-13)
 
 ---
 
@@ -776,12 +802,13 @@ User: "Käseomelette zum Frühstück?"
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12
+**Letzte Aktualisierung:** 2026-02-13
 **Ontologie-Größe:** 292 Einträge (bilingual: ~120 Items mit EN + DE Synonymen, inkl. Mayonnaise neu)
 **Compounds:** 25 Gerichte
-**Fixes:** 19 gelöste Probleme + Zucker-Gesundheitsempfehlung (H001) + R018 Protein-Subgruppen-Regel
+**Fixes:** 20 gelöste Probleme + Zucker-Gesundheitsempfehlung (H001) + R018 Protein-Subgruppen-Regel + Frühstücksregeln/Rezept-Validierung
 **Adjektiv-Filter:** 30+ deutsche Adjektive werden ignoriert (normaler, frischer, veganer, etc.)
-**Open Issues:** 5 (I0: Kochmethoden, I2: Ambiguous Follow-ups, I3: Neue Lebensmittel, I4: Compound Dishes, I5: Bot schlägt verbotene Kombinationen + ignoriert Frühstücksregeln)
+**Open Issues:** 4 (I0: Kochmethoden, I2: Ambiguous Follow-ups, I3: Neue Lebensmittel, I4: Compound Dishes)
 **Test-Suite:** 66 Tests (22 Fixture-Dishes + 44 weitere) - alle bestanden ✅
 **Sprach-Support:** Deutsch + Englisch (zero latency, deterministisch via Ontology + Vision Prompt)
+**Features:** Zweistufiges Frühstück (Modul 1.2), Rezept-Validierung, Frühstücks-Detection
 **Status:** Production-Ready (mit bekannten Limitationen + Kochmethoden-Diskussion)
