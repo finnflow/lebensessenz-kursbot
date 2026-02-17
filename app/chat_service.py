@@ -112,8 +112,12 @@ WICHTIGE REGELN:
     - Das Gericht darf NUR die gewählte Komponente + stärkearmes Gemüse/Salat enthalten
     - KRITISCH: Verwende NIEMALS "{FALLBACK_SENTENCE}" bei Follow-up-Antworten!
     - Wenn unsicher welche Komponente gemeint ist, frage kurz nach, aber gib NICHT den Fallback-Satz!
-13. SCHLEIFEN-SCHUTZ: Wenn du eine Frage gestellt hast (z.B. "Welche Zutaten?") und der User antwortet,
-    dann stelle NIEMALS die GLEICHE Frage nochmal!
+13. SCHLEIFEN-SCHUTZ & WIEDERHOLUNGSVERBOT:
+    a) Wenn du eine Frage gestellt hast und der User antwortet, stelle NIEMALS die GLEICHE Frage nochmal!
+    b) Wenn der User nach der SPEISEKARTE/MENÜ fragt ("von der Karte", "auf der Speisekarte"),
+       dann empfehle AUSSCHLIESSLICH Gerichte VON DER KARTE — NIEMALS deine eigenen Vorschläge!
+       Wiederhole NICHT "Gebratener Reis mit Brokkoli" wenn der User explizit nach Karten-Gerichten fragt.
+    c) Wenn der User sagt "ein anderes Gericht", "was anderes" → nenne ein NEUES Gericht, nicht das gleiche!
     - Prüfe den Chat-Verlauf: Habe ich diese Frage schon gestellt?
     - Wenn der User Zutaten genannt hat (auch unvollständig), arbeite damit weiter
     - Beispiel: User sagt "Hafermilch, wenig Zucker" → analysiere das! Frage NICHT nochmal nach Zutaten!
@@ -569,16 +573,39 @@ def handle_chat(
     vision_analysis = None
     food_groups = None
     vision_extraction = None  # New: structured extraction for engine
+    vision_is_menu = False  # Track if image is a menu/Speisekarte
+    vision_failed = False  # Track vision failures for user feedback
     if image_path:
         try:
             # New structured extraction for Trennkost engine
             vision_extraction = extract_food_from_image(image_path, user_message)
+            vision_is_menu = vision_extraction.get("type") == "menu"
+            dishes = vision_extraction.get("dishes", [])
+            if not dishes or all(not d.get("items") for d in dishes):
+                print(f"[VISION] Warning: extraction returned no usable items from image")
+                vision_failed = True
+            else:
+                print(f"[VISION] Extracted {len(dishes)} dishes (type={vision_extraction.get('type')})")
             # Legacy analysis for backward compat
             vision_analysis = analyze_meal_image(image_path, user_message)
             if vision_analysis.get("items"):
                 food_groups = categorize_food_groups(vision_analysis["items"])
         except VisionAnalysisError as e:
-            print(f"Vision analysis failed: {e}")
+            print(f"[VISION] Analysis failed: {e}")
+            vision_failed = True
+
+    # ── 6a. Detect menu-reference in text-only follow-ups ────────────
+    # User says "von der Speisekarte" / "auf der Karte" / "ein anderes Gericht"
+    # without sending a new image → needs context from previous menu analysis
+    import re as _re
+    _menu_ref_pattern = _re.compile(
+        r"(von der |auf der |von dieser )?(speisekarte|karte|menü|menu)"
+        r"|ein anderes gericht"
+        r"|was anderes (von|auf|aus)"
+        r"|gibt.s (noch |auch )?(was|etwas) anderes",
+        _re.IGNORECASE,
+    )
+    is_menu_reference = bool(_menu_ref_pattern.search(user_message))
 
     # ── 6b. Trennkost Rule Engine Analysis ─────────────────────────
     trennkost_results: Optional[List[TrennkostResult]] = None
@@ -586,12 +613,12 @@ def handle_chat(
 
     # In follow-up messages, only re-run engine if actual food items found (2+),
     # not just generic keywords like "gericht" or "mahlzeit"
+    # EXCEPTION: Never suppress for images or menu references
     _recent = get_last_n_messages(conversation_id, 4)
     is_followup = not is_new_conversation and len(_recent) >= 2
-    if is_food_query and is_followup and not image_path:
+    if is_food_query and is_followup and not image_path and not is_menu_reference:
         from trennkost.ontology import get_ontology as _get_ontology
         _ont = _get_ontology()
-        import re as _re
         _words = _re.split(r'[,;\s]+', user_message.strip())
         _food_count = sum(1 for w in _words if w.strip() and len(w.strip()) >= 3 and _ont.lookup(w.strip()))
         if _food_count < 2:
@@ -712,8 +739,31 @@ def handle_chat(
         input_parts.append(engine_context)
         input_parts.append("")
 
+        # ── Menu-specific instruction: help user CHOOSE from the menu ──
+        if vision_is_menu:
+            ok_dishes = [r.dish_name for r in trennkost_results if r.verdict.value == "OK"]
+            cond_dishes = [r.dish_name for r in trennkost_results if r.verdict.value == "CONDITIONAL"]
+            input_parts.append("SPEISEKARTE-MODUS:")
+            input_parts.append("Der User hat eine SPEISEKARTE/MENÜ geschickt und möchte wissen was er bestellen kann.")
+            if ok_dishes:
+                input_parts.append(f"✅ Konforme Gerichte: {', '.join(ok_dishes)}")
+            if cond_dishes:
+                input_parts.append(f"⚠️ Bedingt konforme Gerichte: {', '.join(cond_dishes)}")
+            if not ok_dishes and not cond_dishes:
+                input_parts.append("❌ Kein Gericht auf der Karte ist vollständig konform.")
+                input_parts.append("→ Schlage die BESTE Option vor (wenigstes Probleme) und erkläre was man weglassen könnte.")
+            input_parts.append("WICHTIG: Empfehle NUR Gerichte VON DER KARTE. Erfinde KEINE eigenen Gerichte!")
+            input_parts.append("Wenn User nach 'einem anderen Gericht' fragt → nächstes konformes Gericht VON DER KARTE.\n")
+
+    # ── Vision failed: tell LLM to ask user ──
+    if image_path and vision_failed and not trennkost_results:
+        input_parts.append("BILD-ANALYSE FEHLGESCHLAGEN:")
+        input_parts.append("Das hochgeladene Bild konnte nicht analysiert werden.")
+        input_parts.append("Bitte den User, die Gerichte oder Zutaten als Text aufzulisten.")
+        input_parts.append("SAGE NICHT 'Diese Information steht nicht im Kursmaterial'!\n")
+
     # Include vision summary if available (not the old categorization)
-    if vision_analysis and not trennkost_results:
+    if vision_analysis and not trennkost_results and not vision_failed:
         input_parts.append("BILD-ANALYSE (Mahlzeit):")
         input_parts.append(f"Zusammenfassung: {vision_analysis.get('summary', 'Keine Beschreibung')}")
         if vision_analysis.get("items"):
@@ -743,6 +793,14 @@ def handle_chat(
         input_parts.append("ANWEISUNG: Erwähne das zweistufige Frühstücks-Konzept PROAKTIV in deiner Antwort!")
         input_parts.append("Empfehle IMMER zuerst die fettarme Option (Obst/Smoothie, dann ggf. fettfreie KH).")
         input_parts.append("")
+
+    # ── Menu-reference without new image: remind LLM about previous menu ──
+    if is_menu_reference and not image_path and not trennkost_results:
+        input_parts.append("SPEISEKARTEN-REFERENZ:")
+        input_parts.append("Der User verweist auf eine zuvor geschickte Speisekarte.")
+        input_parts.append("Schau im Chat-Verlauf nach den analysierten Gerichten von der Karte.")
+        input_parts.append("Empfehle ein ANDERES konformes Gericht VON DER KARTE — NICHT deine eigenen Vorschläge!")
+        input_parts.append("Wenn kein konformes Gericht auf der Karte ist, sage das ehrlich und erkläre was man anpassen könnte.\n")
 
     input_parts.append(f"KURS-SNIPPETS (FAKTENBASIS):\n{course_context}\n")
     input_parts.append(f"AKTUELLE FRAGE:\n{user_message}\n")

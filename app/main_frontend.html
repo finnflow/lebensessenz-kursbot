@@ -2,7 +2,10 @@
 <html lang="de">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="theme-color" content="#f5f1ed"/>
   <title>Lebensessenz Kursbot</title>
   <style>
     * {
@@ -15,6 +18,7 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       background: #f5f1ed;
       min-height: 100vh;
+      min-height: 100dvh; /* Dynamic viewport height for mobile */
       display: flex;
       line-height: 1.6;
       overflow: hidden;
@@ -30,6 +34,17 @@
       height: calc(100vh - 40px);
     }
 
+    /* Safe area support for notch/camera cutout */
+    @supports (padding: max(0px)) {
+      .chat-header {
+        padding-top: max(24px, env(safe-area-inset-top));
+      }
+
+      .input-container {
+        padding-bottom: max(24px, env(safe-area-inset-bottom));
+      }
+    }
+
     /* Sidebar - Floating Design with Collapse */
     .sidebar {
       width: 280px;
@@ -42,6 +57,7 @@
       overflow: hidden;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       position: relative;
+      z-index: 10; /* Above main content, below modals */
     }
 
     .sidebar.collapsed {
@@ -389,6 +405,7 @@
       overflow: hidden;
       animation: slideUp 0.5s ease-out;
       position: relative;
+      z-index: 1; /* Below sidebar and backdrop on mobile */
     }
 
     @keyframes slideUp {
@@ -405,6 +422,40 @@
     .chat-header {
       padding: 24px 32px;
       border-bottom: 1px solid #e5e5e5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .mobile-menu-btn {
+      display: none;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      background: transparent;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      border-radius: 10px;
+      transition: all 0.2s ease;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .mobile-menu-btn:hover {
+      background: #f5f1ed;
+      color: #c9a897;
+    }
+
+    .mobile-menu-btn:active {
+      transform: scale(0.95);
+    }
+
+    .chat-header-content {
+      flex: 1;
+      min-width: 0;
     }
 
     .chat-header h1 {
@@ -1027,26 +1078,309 @@
       color: #999;
     }
 
-    /* Mobile Responsive */
+    /* Mobile Sidebar Backdrop */
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 10000; /* Above all main content, below sidebar */
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .sidebar-backdrop.active {
+      display: block;
+      opacity: 1;
+    }
+
+    /* Feedback Button in Chat Header */
+    .feedback-btn {
+      padding: 10px 18px;
+      background: transparent;
+      color: #999;
+      border: 1.5px solid #e5e5e5;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      min-height: 44px; /* Touch-friendly */
+    }
+
+    .feedback-btn.visible {
+      display: flex;
+    }
+
+    .feedback-btn:hover {
+      border-color: #c9a897;
+      color: #c9a897;
+      background: #faf8f6;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(201, 168, 151, 0.15);
+    }
+
+    .feedback-btn:active {
+      transform: scale(0.97);
+    }
+
+    .feedback-btn svg {
+      flex-shrink: 0;
+    }
+
+    /* Feedback Modal Overlay */
+    .feedback-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .feedback-overlay.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    .feedback-modal {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+      width: 90%;
+      max-width: 560px;
+      max-height: 80vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(20px) scale(0.97);
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .feedback-overlay.active .feedback-modal {
+      transform: translateY(0) scale(1);
+    }
+
+    .feedback-modal-header {
+      padding: 28px 32px 0 32px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    .feedback-modal-header h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: #1a1a1a;
+      letter-spacing: -0.3px;
+    }
+
+    .feedback-modal-header p {
+      font-size: 0.875rem;
+      color: #888;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    .feedback-close-btn {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      background: #f5f1ed;
+      color: #999;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+      margin-left: 16px;
+    }
+
+    .feedback-close-btn:hover {
+      background: #e8dfd8;
+      color: #666;
+      transform: rotate(90deg);
+    }
+
+    .feedback-modal-body {
+      padding: 24px 32px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .feedback-textarea {
+      width: 100%;
+      min-height: 160px;
+      max-height: 300px;
+      padding: 18px 20px;
+      border: 1.5px solid #e5e5e5;
+      border-radius: 14px;
+      font-family: inherit;
+      font-size: 15px;
+      line-height: 1.6;
+      resize: vertical;
+      color: #1a1a1a;
+      background: #fafafa;
+      transition: all 0.2s ease;
+    }
+
+    .feedback-textarea:focus {
+      outline: none;
+      border-color: #c9a897;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(201, 168, 151, 0.12);
+    }
+
+    .feedback-textarea::placeholder {
+      color: #bbb;
+    }
+
+    .feedback-modal-footer {
+      padding: 0 32px 28px 32px;
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    .feedback-cancel-btn {
+      padding: 12px 24px;
+      background: transparent;
+      color: #888;
+      border: 1.5px solid #e5e5e5;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .feedback-cancel-btn:hover {
+      border-color: #ccc;
+      color: #666;
+    }
+
+    .feedback-submit-btn {
+      padding: 12px 28px;
+      background: #c9a897;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(201, 168, 151, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .feedback-submit-btn:hover:not(:disabled) {
+      background: #b89786;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(201, 168, 151, 0.4);
+    }
+
+    .feedback-submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Feedback Success State */
+    .feedback-success {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 32px;
+      text-align: center;
+    }
+
+    .feedback-success.show {
+      display: flex;
+    }
+
+    .feedback-success-icon {
+      width: 64px;
+      height: 64px;
+      background: #e8f5e9;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      animation: successPop 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes successPop {
+      0% { transform: scale(0); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    .feedback-success-icon svg {
+      color: #4caf50;
+    }
+
+    .feedback-success h3 {
+      font-size: 1.2rem;
+      color: #1a1a1a;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .feedback-success p {
+      font-size: 0.875rem;
+      color: #888;
+      line-height: 1.5;
+    }
+
+    /* Mobile Responsive - Optimized for modern Android phones */
     @media (max-width: 768px) {
       body {
-        padding: 10px;
+        padding: 0;
       }
 
       .app-container {
-        gap: 10px;
-        height: calc(100vh - 20px);
+        gap: 0;
+        height: 100vh;
+        height: 100dvh; /* Dynamic viewport for mobile browsers */
+        max-width: 100%;
+        margin: 0;
       }
 
       .sidebar {
         position: fixed;
-        left: 10px;
-        top: 10px;
-        height: calc(100vh - 20px);
-        z-index: 1000;
+        left: 0;
+        top: 0;
+        height: 100vh;
+        height: 100dvh;
+        z-index: 10001; /* Above backdrop (999) but below modals */
         transform: translateX(-100%);
-        transition: transform 0.3s ease;
-        width: 280px;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        width: 85%;
+        max-width: 320px;
+        border-radius: 0;
+        box-shadow: 2px 0 20px rgba(0, 0, 0, 0.15);
       }
 
       .sidebar.open {
@@ -1054,26 +1388,426 @@
       }
 
       .sidebar.collapsed {
-        width: 60px;
+        width: 85%;
+        max-width: 320px;
       }
 
-      .chat-header, .chat-history, .input-container {
-        padding-left: 20px;
-        padding-right: 20px;
+      .sidebar.collapsed.open {
+        transform: translateX(0);
+      }
+
+      /* Hide sidebar toggle button on mobile (we use hamburger menu instead) */
+      .sidebar-toggle-btn {
+        display: none !important;
+      }
+
+      /* Always show sidebar content on mobile (no collapsed state) */
+      .sidebar .sidebar-header h2 {
+        display: block !important;
+      }
+
+      .sidebar .conversation-list {
+        display: block !important;
+      }
+
+      .sidebar #expandedNewChat {
+        display: block !important;
+      }
+
+      .sidebar #collapsedNewChat {
+        display: none !important;
+      }
+
+      .sidebar-footer {
+        display: flex !important;
+      }
+
+      .mobile-menu-btn {
+        display: flex;
+        margin-right: 12px;
+      }
+
+      .main-area {
+        border-radius: 0;
+        box-shadow: none;
+      }
+
+      .chat-header {
+        padding: 20px 20px 16px 20px;
+        flex-wrap: wrap;
+        align-items: center;
+        min-height: auto;
+      }
+
+      .chat-header-content {
+        flex: 1 1 auto;
+        min-width: 0;
+        margin-right: 12px;
+      }
+
+      .chat-header h1 {
+        font-size: 1.375rem;
+        margin-bottom: 2px;
+      }
+
+      .chat-header .subtitle {
+        font-size: 0.875rem;
+        line-height: 1.4;
+      }
+
+      .feedback-btn {
+        flex: 0 0 auto;
+        padding: 10px 16px;
+        min-height: 44px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      .feedback-btn svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      .feedback-btn:hover {
+        transform: none; /* Disable hover effects on touch */
+      }
+
+      .feedback-btn:active {
+        transform: scale(0.96);
+      }
+
+      .chat-history {
+        padding: 20px;
+      }
+
+      .message {
+        margin-bottom: 24px;
+      }
+
+      .message-role {
+        font-size: 0.75rem;
+        margin-bottom: 8px;
+        letter-spacing: 0.5px;
+      }
+
+      .message-content {
+        font-size: 15px;
+        line-height: 1.65;
+      }
+
+      .message.assistant .message-content {
+        padding: 18px 20px;
+        border-radius: 12px;
+      }
+
+      .message-image img {
+        max-width: 100%;
+        border-radius: 10px;
       }
 
       .input-container {
-        padding-top: 16px;
-        padding-bottom: 16px;
+        padding: 16px 20px 20px 20px;
+        padding-bottom: max(20px, env(safe-area-inset-bottom));
       }
 
-      .send-btn {
-        padding: 18px 24px;
+      .input-group {
+        gap: 10px;
+      }
+
+      .upload-btn, .send-btn {
+        width: 56px;
+        height: 56px;
+        flex-shrink: 0;
+      }
+
+      .upload-btn svg, .send-btn svg {
+        width: 26px;
+        height: 26px;
+      }
+
+      /* Remove hover tooltips on mobile */
+      .upload-btn:hover::after,
+      .send-btn:hover::after {
+        display: none;
+      }
+
+      textarea {
+        min-height: 56px;
+        max-height: 140px;
+        padding: 16px 18px;
+        font-size: 16px; /* Prevents zoom on focus */
+        line-height: 1.5;
+      }
+
+      .feedback-modal {
+        width: calc(100vw - 40px);
+        max-height: calc(100vh - 100px);
+        max-height: calc(100dvh - 100px);
+        border-radius: 20px;
+      }
+
+      .feedback-modal-header {
+        padding: 24px 20px 0 20px;
+      }
+
+      .feedback-modal-header h2 {
+        font-size: 1.25rem;
+      }
+
+      .feedback-modal-header p {
+        font-size: 0.875rem;
+        margin-top: 8px;
+      }
+
+      .feedback-modal-body {
+        padding: 20px;
+      }
+
+      .feedback-textarea {
+        min-height: 160px;
+        font-size: 16px; /* Prevents zoom */
+        padding: 16px 18px;
+        border-radius: 12px;
+      }
+
+      .feedback-modal-footer {
+        padding: 0 20px 24px 20px;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .feedback-cancel-btn,
+      .feedback-submit-btn {
+        width: 100%;
+        padding: 16px 24px;
+        min-height: 52px;
+        justify-content: center;
+        font-size: 15px;
+        border-radius: 12px;
+      }
+
+      .feedback-success {
+        padding: 48px 28px;
+      }
+
+      /* Improve touch targets */
+      .conversation-delete-btn {
+        width: 44px;
+        height: 44px;
+        opacity: 1;
+      }
+
+      .sidebar-toggle-btn {
+        width: 48px;
+        height: 48px;
+      }
+
+      .new-chat-btn {
+        min-height: 52px;
+        font-size: 15px;
+      }
+
+      .conversation-item {
+        padding: 14px 16px;
+        margin-bottom: 6px;
+        border-radius: 12px;
+      }
+
+      .conversation-title {
+        font-size: 15px;
+      }
+
+      .conversation-date {
+        font-size: 13px;
+        margin-top: 2px;
+      }
+
+      /* Sources accordion */
+      .sources-accordion summary {
+        font-size: 12px;
+        padding: 10px 14px;
+      }
+
+      .source-tag {
+        font-size: 12px;
+        padding: 7px 12px;
+      }
+
+      /* Empty state */
+      .empty-state {
+        padding: 60px 30px;
+      }
+
+      .empty-state-icon {
+        font-size: 3rem;
+      }
+
+      .empty-state-text {
+        font-size: 1.125rem;
+      }
+
+      .empty-state-subtext {
+        font-size: 0.938rem;
+      }
+    }
+
+    /* Small phones - iPhone 12 mini, iPhone SE, small Android */
+    @media (max-width: 400px) {
+      .chat-header {
+        padding: 16px 16px 12px 16px;
+      }
+
+      .chat-header h1 {
+        font-size: 1.25rem;
+      }
+
+      .chat-header .subtitle {
+        font-size: 0.813rem;
+      }
+
+      .mobile-menu-btn {
+        width: 40px;
+        height: 40px;
+        margin-right: 8px;
+      }
+
+      .mobile-menu-btn svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .feedback-btn {
+        padding: 8px 12px;
+        min-height: 40px;
+        font-size: 12px;
+        gap: 6px;
+      }
+
+      .feedback-btn svg {
+        width: 13px;
+        height: 13px;
+      }
+
+      .chat-history {
+        padding: 16px;
+      }
+
+      .message {
+        margin-bottom: 20px;
+      }
+
+      .message-content {
+        font-size: 14px;
+      }
+
+      .message.assistant .message-content {
+        padding: 14px 16px;
+      }
+
+      .input-container {
+        padding: 12px 16px 16px 16px;
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
+      }
+
+      .input-group {
+        gap: 8px;
+      }
+
+      .upload-btn, .send-btn {
+        width: 50px;
+        height: 50px;
+      }
+
+      .upload-btn svg, .send-btn svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      textarea {
+        min-height: 50px;
+        padding: 14px 16px;
+        font-size: 16px;
+      }
+
+      .feedback-modal {
+        width: calc(100vw - 32px);
+        border-radius: 16px;
+      }
+
+      .feedback-modal-header {
+        padding: 20px 16px 0 16px;
+      }
+
+      .feedback-modal-header h2 {
+        font-size: 1.125rem;
+      }
+
+      .feedback-modal-header p {
+        font-size: 0.813rem;
+      }
+
+      .feedback-close-btn {
+        width: 32px;
+        height: 32px;
+      }
+
+      .feedback-modal-body {
+        padding: 16px;
+      }
+
+      .feedback-textarea {
+        min-height: 140px;
+        padding: 14px 16px;
+      }
+
+      .feedback-modal-footer {
+        padding: 0 16px 20px 16px;
+        gap: 8px;
+      }
+
+      .feedback-cancel-btn,
+      .feedback-submit-btn {
+        padding: 14px 20px;
+        min-height: 48px;
+        font-size: 14px;
+      }
+
+      .sidebar {
+        width: 90%;
+        max-width: 300px;
+      }
+
+      .sidebar-header {
+        padding: 20px 16px 16px 16px;
+      }
+
+      .sidebar-header h2 {
+        font-size: 1.125rem;
+      }
+
+      .conversation-item {
+        padding: 12px 14px;
+      }
+
+      .conversation-title {
+        font-size: 14px;
+      }
+
+      .conversation-date {
+        font-size: 12px;
+      }
+
+      .source-tag {
+        font-size: 11px;
+        padding: 6px 10px;
       }
     }
   </style>
 </head>
 <body>
+  <!-- Mobile Sidebar Backdrop -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeMobileSidebar()"></div>
+
   <div class="app-container">
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
@@ -1126,8 +1860,23 @@
       </div>
 
       <div class="chat-header">
-        <h1>Kursbot</h1>
-        <p class="subtitle">Stelle deine Fragen zum Kursmaterial</p>
+        <button class="mobile-menu-btn" onclick="toggleMobileSidebar()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <div class="chat-header-content">
+          <h1>Kursbot</h1>
+          <p class="subtitle">Stelle deine Fragen zum Kursmaterial</p>
+        </div>
+        <button class="feedback-btn" id="feedbackBtn" onclick="openFeedbackModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span>Feedback</span>
+        </button>
       </div>
 
       <div class="chat-history" id="chatHistory">
@@ -1166,6 +1915,50 @@
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feedback Modal -->
+  <div class="feedback-overlay" id="feedbackOverlay" onclick="closeFeedbackOnBackdrop(event)">
+    <div class="feedback-modal">
+      <!-- Form State -->
+      <div id="feedbackFormState">
+        <div class="feedback-modal-header">
+          <div>
+            <h2>Feedback geben</h2>
+            <p>Dein Feedback wird zusammen mit dem gesamten Chat gespeichert.</p>
+          </div>
+          <button class="feedback-close-btn" onclick="closeFeedbackModal()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="feedback-modal-body">
+          <textarea class="feedback-textarea" id="feedbackText" placeholder="Was ist dir aufgefallen? Was sollte der Bot anders machen?"></textarea>
+        </div>
+        <div class="feedback-modal-footer">
+          <button class="feedback-cancel-btn" onclick="closeFeedbackModal()">Abbrechen</button>
+          <button class="feedback-submit-btn" id="feedbackSubmitBtn" onclick="submitFeedback()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+            </svg>
+            Absenden
+          </button>
+        </div>
+      </div>
+
+      <!-- Success State -->
+      <div class="feedback-success" id="feedbackSuccessState">
+        <div class="feedback-success-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <h3>Feedback gespeichert</h3>
+        <p>Chat + Feedback wurden in den Feedback-Ordner exportiert.</p>
       </div>
     </div>
   </div>
@@ -1423,6 +2216,8 @@ function escapeHtml(text) {
 async function loadConversation(convId) {
   conversationId = convId;
   renderConversationList(); // Update active state
+  updateFeedbackButton();
+  closeMobileSidebar(); // Close on mobile after selection
 
   try {
     const response = await fetch(`/conversations/${convId}/messages?guest_id=${guestId}`);
@@ -1646,6 +2441,7 @@ async function sendMessage() {
     // Update conversation ID if new
     if (!conversationId) {
       conversationId = data.conversationId;
+      updateFeedbackButton();
       await loadConversations(); // Refresh sidebar
     }
 
@@ -1669,6 +2465,11 @@ async function sendMessage() {
 }
 
 function toggleSidebar() {
+  // Only allow on desktop (> 768px)
+  if (window.innerWidth <= 768) {
+    return;
+  }
+
   const sidebar = document.getElementById('sidebar');
   const collapsedBtn = document.getElementById('collapsedNewChat');
   const expandedBtn = document.getElementById('expandedNewChat');
@@ -1716,6 +2517,7 @@ async function deleteConversation(event, convId) {
       if (conversationId === convId) {
         conversationId = null;
         localStorage.removeItem('conversationId');
+        updateFeedbackButton();
         const chatHistory = document.getElementById('chatHistory');
         chatHistory.innerHTML = `
           <div class="empty-state">
@@ -1768,6 +2570,7 @@ async function deleteAllConversations() {
       conversations = [];
       conversationId = null;
       localStorage.removeItem('conversationId');
+      updateFeedbackButton();
 
       // Reset chat view
       const chatHistory = document.getElementById('chatHistory');
@@ -1793,6 +2596,8 @@ async function deleteAllConversations() {
 
 function newChat() {
   conversationId = null;
+  updateFeedbackButton();
+  closeMobileSidebar(); // Close on mobile
 
   const chatHistory = document.getElementById('chatHistory');
   chatHistory.innerHTML = `
@@ -1831,6 +2636,161 @@ function initPasteHandler() {
   });
 }
 
+// ── Mobile Sidebar Functions ──
+
+function toggleMobileSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+
+  if (window.innerWidth > 768) return; // Only on mobile
+
+  sidebar.classList.toggle('open');
+  backdrop.classList.toggle('active');
+
+  if (sidebar.classList.contains('open')) {
+    document.body.style.overflow = 'hidden';
+  } else {
+    document.body.style.overflow = '';
+  }
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+
+  sidebar.classList.remove('open');
+  backdrop.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+// Close mobile sidebar when window is resized to desktop
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 768) {
+    closeMobileSidebar();
+  }
+});
+
+// ── Feedback Functions ──
+
+function updateFeedbackButton() {
+  const btn = document.getElementById('feedbackBtn');
+  if (conversationId) {
+    btn.classList.add('visible');
+  } else {
+    btn.classList.remove('visible');
+  }
+}
+
+function openFeedbackModal() {
+  if (!conversationId) return;
+
+  const overlay = document.getElementById('feedbackOverlay');
+  const formState = document.getElementById('feedbackFormState');
+  const successState = document.getElementById('feedbackSuccessState');
+  const textarea = document.getElementById('feedbackText');
+
+  // Reset to form state
+  formState.style.display = 'block';
+  successState.classList.remove('show');
+  textarea.value = '';
+
+  // Prevent body scroll on mobile
+  document.body.style.overflow = 'hidden';
+
+  // Show modal with animation
+  overlay.style.display = 'flex';
+  requestAnimationFrame(() => {
+    overlay.classList.add('active');
+  });
+
+  // Focus textarea after animation (with iOS keyboard workaround)
+  setTimeout(() => {
+    textarea.focus();
+    // Scroll into view on mobile if keyboard appears
+    if (window.innerWidth <= 768) {
+      setTimeout(() => {
+        textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    }
+  }, 350);
+}
+
+function closeFeedbackModal() {
+  const overlay = document.getElementById('feedbackOverlay');
+  overlay.classList.remove('active');
+
+  // Re-enable body scroll
+  document.body.style.overflow = '';
+
+  setTimeout(() => {
+    overlay.style.display = 'none';
+  }, 300);
+}
+
+function closeFeedbackOnBackdrop(event) {
+  if (event.target === event.currentTarget) {
+    closeFeedbackModal();
+  }
+}
+
+async function submitFeedback() {
+  const textarea = document.getElementById('feedbackText');
+  const feedback = textarea.value.trim();
+  if (!feedback) {
+    textarea.focus();
+    textarea.style.borderColor = '#ff6b6b';
+    setTimeout(() => { textarea.style.borderColor = ''; }, 1500);
+    return;
+  }
+
+  const submitBtn = document.getElementById('feedbackSubmitBtn');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> Speichern...';
+
+  try {
+    const response = await fetch('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conversationId: conversationId,
+        feedback: feedback,
+        guestId: guestId,
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'Fehler beim Speichern');
+    }
+
+    // Show success state
+    const formState = document.getElementById('feedbackFormState');
+    const successState = document.getElementById('feedbackSuccessState');
+    formState.style.display = 'none';
+    successState.classList.add('show');
+
+    // Auto-close after 2s
+    setTimeout(() => closeFeedbackModal(), 2000);
+
+  } catch (error) {
+    console.error('Feedback error:', error);
+    alert('Fehler beim Speichern: ' + error.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Absenden';
+  }
+}
+
+// Close feedback modal with Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('feedbackOverlay');
+    if (overlay.classList.contains('active')) {
+      closeFeedbackModal();
+    }
+  }
+});
+
 // Load conversations on page load
 window.addEventListener('DOMContentLoaded', async () => {
   // Initialize drag and drop
@@ -1839,18 +2799,20 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Initialize paste handler for screenshots
   initPasteHandler();
 
-  // Restore sidebar collapse state
-  const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-  if (sidebarCollapsed) {
-    const sidebar = document.getElementById('sidebar');
-    const collapsedBtn = document.getElementById('collapsedNewChat');
-    const expandedBtn = document.getElementById('expandedNewChat');
-    const toggleIcon = document.getElementById('toggleIcon');
+  // Restore sidebar collapse state (only on desktop)
+  if (window.innerWidth > 768) {
+    const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    if (sidebarCollapsed) {
+      const sidebar = document.getElementById('sidebar');
+      const collapsedBtn = document.getElementById('collapsedNewChat');
+      const expandedBtn = document.getElementById('expandedNewChat');
+      const toggleIcon = document.getElementById('toggleIcon');
 
-    sidebar.classList.add('collapsed');
-    collapsedBtn.style.display = 'block';
-    expandedBtn.style.display = 'none';
-    toggleIcon.style.transform = 'rotate(180deg)';
+      sidebar.classList.add('collapsed');
+      collapsedBtn.style.display = 'block';
+      expandedBtn.style.display = 'none';
+      toggleIcon.style.transform = 'rotate(180deg)';
+    }
   }
 
   await loadConversations();
@@ -1861,6 +2823,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (urlConvId && conversations.some(c => c.id === urlConvId)) {
     await loadConversation(urlConvId);
   }
+
+  // Update feedback button visibility on initial load
+  updateFeedbackButton();
 
   document.getElementById('messageInput').focus();
 });

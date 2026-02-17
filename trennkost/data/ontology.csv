@@ -119,6 +119,9 @@ Mayonnaise,"Mayo,Mayonaise",NEUTRAL,KRAEUTER,false,,Würzsauce - kleine Mengen a
 Wasser,"Mineralwasser,Leitungswasser,stilles Wasser,Water",NEUTRAL,KRAEUTER,false,,Getränk - keine Kalorien
 Tee,"Kräutertee,Schwarztee,Grüntee,Tea,Herbal tea,Green tea,Black tea",NEUTRAL,KRAEUTER,false,,Getränk - ungesüßt neutral
 Matcha,"Matcha-Pulver,Matchapulver,Matcha Pulver,Matcha powder,grüner Tee Pulver,normales Matcha Pulver,standard Matcha Pulver",NEUTRAL,KRAEUTER,false,,Getränk - Grüntee-Pulver
+Kaffee,"Espresso,Americano,Coffee,Cappuccino,Latte,Flat white,Mocha,Dirty coffee",NEUTRAL,KRAEUTER,false,,"Getränk - ungesüßt für Trennkost neutral. GESUNDHEIT: Säureverstärker! Kombinierbar wie Tee/Wasser"
+Sprudelwasser,"Mineralwasser mit Kohlensäure,Soda Water,Sparkling water,Carbonated water",NEUTRAL,KRAEUTER,false,,"Getränk - Wasser mit CO2. GESUNDHEIT: säurebildend durch Kohlensäure"
+Soda,"Limonade,Limo,Softdrink,Soft drink",KH,GETREIDE,true,"Klärungsbedarf: Meist mit Zucker gesüßt = KH. Bitte spezifizieren ob gesüßt oder ungesüßt","Gesüßte Soda = Zucker = KH-Gruppe. Ungesüßt = siehe Sprudelwasser"
 Kokoswasser,"Kokosnusswasser,Coconut water",NEUTRAL,KRAEUTER,false,,Getränk - leicht süßlich aber neutral
 # ═══════════════════════════════════════════════════════════════════════
 # KOMPLEXE KOHLENHYDRATE (KH) — nur mit NEUTRAL + kleine Menge Fett
@@ -241,6 +244,7 @@ Cashewmilch,"Cashewdrink,Cashew milk",FETT,NUSS_SAMEN,false,,Pflanzenmilch aus C
 Pflanzenmilch,"Plant milk",KH,GETREIDE,true,"Generischer Begriff; frage nach spezifischer Sorte (Hafer=KH, Mandel=FETT, Soja=HUELSENFRUECHTE, Kokosnuss=FETT, Reis=KH, Cashew=FETT)",Fallback wenn Sorte nicht spezifiziert
 Sojasoße,"Sojasauce,Tamari",HUELSENFRUECHTE,HUELSE,false,,"kleine Menge als Würze; Kurs warnt vor Soja"
 Zucker,"Haushaltszucker,weißer Zucker,brauner Zucker,Rohrzucker,ein wenig Zucker,wenig Zucker,Sugar,White sugar,Brown sugar",KH,GETREIDE,false,,"WICHTIG: Im Kursmaterial als schädlich beschrieben und sollte vermieden werden! Chemisch aber ein Kohlenhydrat → KH-Gruppe für Trennkost-Regeln"
+Karamell,"Karamellsirup,Karamellsauce,Caramel,Caramel syrup,Caramel sauce",KH,GETREIDE,false,,"Karamell ist karamellisierter Zucker → KH-Gruppe. Im Kurs als schädlich (wie Zucker)"
 Ahornsirup,"Maple Syrup,Maple syrup",KH,GETREIDE,false,,"im Kurs als Alternative zu Zucker erwähnt"
 Honig,"Honey",KH,GETREIDE,false,,"im Kurs als Alternative zu Zucker erwähnt"
 Kokosblütenzucker,"Coconut sugar,Coconut blossom sugar",KH,GETREIDE,false,,"im Kurs als Alternative zu Zucker erwähnt"
@@ -359,3 +363,7 @@ Miso,"Misopaste,Miso paste",HUELSENFRUECHTE,SOJA,false,,Fermentierte Sojabohnen
 # Trockenobst (Ergänzung)
 Trockenpflaume,"Dörrpflaume,Backpflaume,Prunes",TROCKENOBST,TROCKEN,false,,
 Trockenapfel,"Apfelringe,Dried apple",TROCKENOBST,TROCKEN,false,,
+# ═══════════════════════════════════════════════════════════════════════
+# UNKNOWN / KLÄRUNGSBEDARF — Items die noch kategorisiert werden müssen
+# ═══════════════════════════════════════════════════════════════════════
+Kakao,"Kakaopulver,Schokolade,Chocolate,Cocoa,Cocoa powder,Schokopulver",UNKNOWN,UNKNOWN,true,"Klärungsbedarf: Kakao/Schokolade muss noch kategorisiert werden. Evtl. FETT? Evtl. mit Zucker = KH? Bitte spezifizieren","WICHTIG: Dieser Eintrag ist PLACEHOLDER - Kategorie muss noch geklärt werden!"

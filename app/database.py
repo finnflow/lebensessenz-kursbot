@@ -244,6 +244,25 @@ def conversation_belongs_to_guest(conversation_id: str, guest_id: Optional[str])
         # Otherwise, check if guest_id matches
         return conv_guest_id == guest_id
 
+def export_conversation_for_feedback(conversation_id: str) -> Optional[Dict[str, Any]]:
+    """Export full conversation data for feedback saving."""
+    with get_db() as conn:
+        cursor = conn.execute("SELECT * FROM conversations WHERE id = ?", (conversation_id,))
+        conv = cursor.fetchone()
+        if not conv:
+            return None
+
+        cursor = conn.execute("""
+            SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC
+        """, (conversation_id,))
+        messages = [dict(row) for row in cursor.fetchall()]
+
+        return {
+            "conversation": dict(conv),
+            "messages": messages,
+        }
+
+
 def delete_conversation(conversation_id: str):
     """Delete a conversation and all its messages."""
     with get_db() as conn:

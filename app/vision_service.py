@@ -57,12 +57,18 @@ A) Eine SPEISEKARTE / ein MENÜ → Extrahiere alle Gerichte mit erkennbaren Zut
 B) Eine MAHLZEIT / ein TELLER → Identifiziere alle sichtbaren Zutaten
 
 REGELN:
-- Extrahiere NUR was du SICHER erkennen kannst
+- Extrahiere NUR was du SICHER auf dem Bild LESEN oder SEHEN kannst
+- ERFINDE KEINE Zutaten aus deinem Weltwissen! Wenn "Tofu" auf der Karte steht, gib NUR "Tofu" aus — NICHT dessen Herstellungszutaten (Calcium-Sulfat etc.)
 - Zutaten die du nur vermutest → in "uncertain_items"
 - KEINE Bewertung, KEINE Kategorisierung — nur Extraktion
-- Bei Speisekarten: Gib Gerichtnamen und sichtbare Beschreibungen wieder
+- Bei Speisekarten: Gib Gerichtnamen und sichtbare Beschreibungen wieder, füge KEINE Zutaten hinzu die nicht auf der Karte stehen
 - Zerlege zusammengesetzte Gerichte NICHT selbst (das macht unser System)
-- IGNORIERE reine Gewürze und Würzmittel (Salz, Pfeffer, Paprikapulver, Kräuter etc.) — diese sind für die Analyse irrelevant
+- IGNORIERE folgende Dinge KOMPLETT (sie sind für die Trennkost-Analyse irrelevant):
+  * Gewürze und Würzmittel (Salz, Pfeffer, Paprikapulver, Kräuter etc.)
+  * Zusatzstoffe und Herstellungsmittel (Calcium-Sulfat, Magnesiumchlorid, Lecithin, Xanthan, E-Nummern etc.)
+  * Verdickungsmittel, Emulgatoren, Säureregulatoren, Farbstoffe
+  * Verarbeitungshilfsstoffe (Gerinnungsmittel bei Tofu, Starterkulturen bei Joghurt etc.)
+- Extrahiere NUR essbare Hauptzutaten die für die Lebensmittelkombination relevant sind
 - WICHTIG: Gib alle Zutaten auf DEUTSCH aus, auch wenn die Speisekarte auf Englisch/Französisch/etc. ist. Übersetze erkannte Zutaten ins Deutsche (z.B. "poached egg" → "pochiertes Ei", "fried chicken" → "gebratenes Hähnchen", "pickle" → "eingelegte Gurke")
 
 Antworte NUR als JSON:
