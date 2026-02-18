@@ -161,4 +161,5 @@ class OntologyEntry(BaseModel):
     subgroup: Optional[FoodSubgroup] = None
     ambiguity_flag: bool = False
     ambiguity_note: Optional[str] = None
+    high_fat: bool = False  # True for Mayo, Aioli, Pesto — quantity-sensitive
     notes: Optional[str] = None

@@ -72,6 +72,7 @@ class Ontology:
                     subgroup=subgroup,
                     ambiguity_flag=row.get("ambiguity_flag", "false").lower() == "true",
                     ambiguity_note=row.get("ambiguity_note", "").strip() or None,
+                    high_fat=row.get("high_fat", "false").lower() == "true",
                     notes=row.get("notes", "").strip() or None,
                 )
                 self._entries.append(entry)

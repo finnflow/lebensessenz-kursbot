@@ -348,6 +348,24 @@ class TrennkostEngine:
                     affects_items=fett_items,
                 ))
 
+        # HIGH_FAT items (Mayo, Aioli, Pesto) + KH/PROTEIN quantity question
+        high_fat_items = []
+        for item in all_items:
+            if item.canonical:
+                entry = ontology.lookup(item.canonical)
+                if entry and entry.high_fat:
+                    high_fat_items.append(item.raw_name)
+
+        if high_fat_items:
+            other_concentrated = set(groups_found.keys()) - {"NEUTRAL", "UNKNOWN"}
+            if other_concentrated:
+                item_str = ', '.join(high_fat_items)
+                questions.append(RequiredQuestion(
+                    question=f"Wie viel {item_str} verwendest du? (1-2 TL als Würze sind OK mit allem, größere Mengen nur mit Gemüse/Salat)",
+                    reason=f"{item_str} ist sehr fettreich (häufig Sonnenblumen-/Rapsöl → entzündungsfördernd). Die Menge ist entscheidend.",
+                    affects_items=high_fat_items,
+                ))
+
         # Compound clarification - but ONLY if no explicit ingredients provided
         # If user said "Burger mit Tempeh, Salat", they already answered the clarification
         compound = ontology.get_compound(analysis.dish_name)
