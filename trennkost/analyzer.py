@@ -137,11 +137,12 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
 
     # 1. Check for known compound dishes (longest first to avoid partial matches)
     found_compound = None
+    search_text = text_lower  # Use this for subsequent searches
     for compound_name in sorted(ontology.compounds.keys(), key=len, reverse=True):
         if compound_name.lower() in text_lower:
             found_compound = compound_name
             # Remove matched name to avoid double-matching ingredients
-            text_lower = text_lower.replace(compound_name.lower(), " ")
+            search_text = text_lower.replace(compound_name.lower(), " ")
             break  # Only match one compound per query
 
     # 2. Check for individual food items from ontology (even if compound found!)
@@ -156,7 +157,8 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
             # Word boundary match to avoid "Reis" matching "Reise"
             # Include quotes (") and apostrophes (') in boundaries
             pattern = r'(?:^|[\s,;.("\'])' + re.escape(name) + r'(?:[\s,;.?!)"\'"]|$)'
-            if re.search(pattern, text, re.IGNORECASE) and entry.canonical not in seen:
+            # Use search_text (with compound removed) instead of original text
+            if re.search(pattern, search_text, re.IGNORECASE) and entry.canonical not in seen:
                 found_items.append(entry.canonical)
                 seen.add(entry.canonical)
                 break
@@ -584,6 +586,8 @@ def format_results_for_llm(results: List[TrennkostResult], breakfast_context: bo
             parts.append("Offene Fragen (bitte an den User weitergeben):")
             for q in r.required_questions:
                 parts.append(f"  → {q.question}")
+                if q.reason:
+                    parts.append(f"     Grund: {q.reason}")
         else:
             parts.append("KEINE OFFENEN FRAGEN — alle Zutaten sind klar und bestätigt.")
 
