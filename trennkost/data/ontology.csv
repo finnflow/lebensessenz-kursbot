@@ -239,6 +239,7 @@ Hafermilch,"Haferdrink,Oat milk",KH,GETREIDE,false,,false,Pflanzenmilch aus Hafe
 Mandelmilch,"Mandeldrink,Almond milk",FETT,NUSS_SAMEN,false,,false,Pflanzenmilch aus Mandeln
 Sojamilch,"Sojadrink,Soy milk",HUELSENFRUECHTE,HUELSE,false,,false,Pflanzenmilch aus Soja
 Kokosmilch,"Kokosdrink,Coconut milk",FETT,NUSS_SAMEN,false,,false,Pflanzenmilch aus Kokosnuss
+Kokos,"Kokosnuss,Coconut,Coco",FETT,NUSS_SAMEN,true,"Generischer Begriff; meist Kokosmilch/Kokosfleisch (FETT). Achtung: Kokoswasser=NEUTRAL, Kokosblütenzucker=KH",false,Pflanzlich - NICHT mit Kuhmilch verwechseln!
 Reismilch,"Reisdrink,Rice milk",KH,GETREIDE,false,,false,Pflanzenmilch aus Reis
 Cashewmilch,"Cashewdrink,Cashew milk",FETT,NUSS_SAMEN,false,,false,Pflanzenmilch aus Cashew
 Pflanzenmilch,Plant milk,KH,GETREIDE,true,"Generischer Begriff; frage nach spezifischer Sorte (Hafer=KH, Mandel=FETT, Soja=HUELSENFRUECHTE, Kokosnuss=FETT, Reis=KH, Cashew=FETT)",false,Fallback wenn Sorte nicht spezifiziert
