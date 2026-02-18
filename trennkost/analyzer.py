@@ -123,6 +123,64 @@ def detect_food_query(text: str) -> bool:
     return found >= 2
 
 
+def detect_temporal_separation(text: str) -> Optional[Dict[str, Any]]:
+    """
+    Detect if user is asking about SEQUENTIAL eating (temporal separation).
+
+    Examples:
+    - "Apfel vor Reis essen"
+    - "erst Obst, dann KH"
+    - "Apfel 30 Min vor dem Mittagessen"
+    - "nach 45 Min dann Hähnchen"
+
+    Returns:
+        {
+            "is_temporal": bool,
+            "first_foods": List[str],  # foods eaten first
+            "second_foods": List[str], # foods eaten later
+            "wait_time": Optional[int] # minutes if specified
+        }
+        or None if no temporal separation detected
+    """
+    text_lower = text.lower()
+
+    # Temporal keywords indicating sequential eating
+    temporal_patterns = [
+        # "X vor Y"
+        r"(\w+(?:\s+\w+)?)\s+(?:(\d+)\s*min(?:uten)?\s+)?vor\s+(?:dem|der)?\s*(\w+)",
+        # "erst X, dann Y" / "zuerst X, danach Y"
+        r"(?:erst|zuerst)\s+(\w+(?:\s+\w+)?),?\s+(?:dann|danach|anschließend)\s+(\w+)",
+        # "X und nach Y Min Z"
+        r"(\w+(?:\s+\w+)?)\s+und\s+nach\s+(\d+)\s*min(?:uten)?\s+(\w+)",
+        # "nach X dann Y"
+        r"nach\s+(?:dem|der)?\s*(\w+(?:\s+\w+)?)\s+dann\s+(\w+)",
+    ]
+
+    for pattern in temporal_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            groups = match.groups()
+            # Extract foods and wait time
+            if len(groups) == 3 and groups[1] and groups[1].isdigit():
+                # Pattern with time: "X 30 min vor Y"
+                return {
+                    "is_temporal": True,
+                    "first_foods": [groups[0].strip()],
+                    "second_foods": [groups[2].strip()],
+                    "wait_time": int(groups[1])
+                }
+            elif len(groups) == 2:
+                # Pattern without time: "erst X dann Y"
+                return {
+                    "is_temporal": True,
+                    "first_foods": [groups[0].strip()],
+                    "second_foods": [groups[1].strip()],
+                    "wait_time": None
+                }
+
+    return None
+
+
 # ── Text Parsing ───────────────────────────────────────────────────────
 
 def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:

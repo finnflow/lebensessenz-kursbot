@@ -34,6 +34,7 @@ from app.image_handler import ImageValidationError
 from trennkost.analyzer import (
     detect_food_query,
     detect_breakfast_context,
+    detect_temporal_separation,
     analyze_text as trennkost_analyze_text,
     analyze_vision as trennkost_analyze_vision,
     format_results_for_llm,
@@ -766,6 +767,34 @@ def handle_chat(
     modifiers.vision_failed = vision_data.get("vision_failed", False)
 
     print(f"[PIPELINE] mode={mode.value} | is_breakfast={modifiers.is_breakfast} | wants_recipe={modifiers.wants_recipe}")
+
+    # 3b. Check for temporal separation (sequential eating)
+    temporal_sep = detect_temporal_separation(user_message)
+    if temporal_sep and temporal_sep["is_temporal"]:
+        print(f"[PIPELINE] Temporal separation detected: {temporal_sep}")
+        # Build response explaining sequential eating is OK with proper wait times
+        first = ", ".join(temporal_sep["first_foods"])
+        second = ", ".join(temporal_sep["second_foods"])
+        wait = temporal_sep.get("wait_time")
+
+        response_text = f"Ja, das ist **trennkost-konform**! 🎉\n\n"
+        response_text += f"Du isst {first} **zuerst allein** und wartest "
+        if wait:
+            response_text += f"**{wait} Minuten**, "
+        response_text += f"bevor du {second} isst. Das ist sequenzielles Essen und **völlig in Ordnung**!\n\n"
+        response_text += "**Wichtige Wartezeiten nach Obst:**\n"
+        response_text += "- Wasserreiche Früchte (Melone, Orangen): 20-30 Min\n"
+        response_text += "- Äpfel, Birnen, Beeren: 30-45 Min\n"
+        response_text += "- Bananen, Trockenobst: 45-60 Min\n\n"
+        if wait and wait >= 30:
+            response_text += f"✅ Deine {wait} Minuten Wartezeit sind perfekt für die meisten Früchte!"
+        elif wait and wait < 30:
+            response_text += f"⚠️ Hinweis: {wait} Min könnten bei manchen Früchten knapp sein. Optimal sind 30-45 Min."
+        else:
+            response_text += "💡 Achte auf die richtigen Wartezeiten, dann ist die Trennung optimal!"
+
+        create_message(conversation_id, "assistant", response_text)
+        return {"answer": response_text, "conversationId": conversation_id}
 
     # 4. Run Trennkost engine
     trennkost_results = _run_engine(
