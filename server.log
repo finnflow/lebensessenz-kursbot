@@ -1,32 +1,301 @@
 INFO:     Will watch for changes in these directories: ['/Users/finn/Documents/lebensessenz-kursbot']
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [43061] using WatchFiles
-INFO:     Started server process [43064]
+INFO:     Started reloader process [66551] using WatchFiles
+INFO:     Started server process [66554]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     192.168.0.102:56991 - "GET / HTTP/1.1" 200 OK
-INFO:     192.168.0.102:56991 - "GET /conversations?guest_id=b7259a9e-c8fe-423f-90f2-e633654e6c0b HTTP/1.1" 200 OK
-INFO:     192.168.0.102:56991 - "GET /favicon.ico HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:57038 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57038 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57056 - "GET /conversations/10705238-96d0-4f3e-b701-47330f94a682/messages?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57058 - "GET /conversations/8d394cb3-65f9-4e39-bea4-c91a1ecd710f/messages?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57058 - "GET /conversations/67d9f7d7-6656-44a9-90af-51f027054224/messages?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57058 - "GET /conversations/86560b11-43fc-41e1-ba51-453de107b1ad/messages?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57061 - "GET /conversations/a97ed0cc-ca3d-4ce8-9307-3e4bbbaa65f5/messages?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57066 - "POST /chat HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57066 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57066 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57069 - "POST /chat HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57069 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57076 - "POST /chat HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57076 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57095 - "POST /chat HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57095 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57100 - "POST /chat HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57100 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57104 - "POST /chat HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57104 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57108 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57108 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57111 - "GET /conversations/76257c22-593a-46da-b64d-281089e2ffa3/messages?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49333 - "GET /health HTTP/1.1" 200 OK
+INFO:     94.190.195.238:0 - "GET / HTTP/1.1" 200 OK
+INFO:     94.190.195.238:0 - "GET /conversations?guest_id=bf2fbd3a-2d9a-4315-b5b5-95a62f0d06f3 HTTP/1.1" 200 OK
+INFO:     94.190.195.238:0 - "POST /chat HTTP/1.1" 200 OK
+INFO:     94.190.195.238:0 - "GET /conversations?guest_id=bf2fbd3a-2d9a-4315-b5b5-95a62f0d06f3 HTTP/1.1" 200 OK
+INFO:     94.190.195.238:0 - "GET /conversations?guest_id=bf2fbd3a-2d9a-4315-b5b5-95a62f0d06f3 HTTP/1.1" 200 OK
+INFO:     94.190.195.238:0 - "POST /chat HTTP/1.1" 200 OK
+INFO:     94.190.195.238:0 - "GET /conversations?guest_id=bf2fbd3a-2d9a-4315-b5b5-95a62f0d06f3 HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'app/chat_modes.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [66554]
+INFO:     Started server process [84865]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/prompt_builder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [84865]
+INFO:     Started server process [84992]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/chat_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [84992]
+INFO:     Started server process [86110]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'scripts/parse_recipes.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [86110]
+INFO:     Started server process [86237]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'scripts/parse_recipes.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [86237]
+INFO:     Started server process [86341]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'scripts/parse_recipes.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [86341]
+INFO:     Started server process [86346]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'scripts/parse_recipes.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [86346]
+INFO:     Started server process [86394]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/recipe_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [86394]
+INFO:     Started server process [86481]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/prompt_builder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [86481]
+INFO:     Started server process [86557]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/recipe_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [86557]
+INFO:     Started server process [86570]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'scripts/parse_recipes.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [86570]
+INFO:     Started server process [87293]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'scripts/parse_recipes.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [87293]
+INFO:     Started server process [87462]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/prompt_builder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [87462]
+INFO:     Started server process [87538]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/recipe_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [87538]
+INFO:     Started server process [87555]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'scripts/parse_recipes.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [87555]
+INFO:     Started server process [87720]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:56787 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56787 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56787 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56787 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56787 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56811 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56811 - "GET /conversations?guest_id=1e3a9159-1fe1-46b4-8760-3483708fff11 HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'app/chat_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [87720]
+INFO:     Started server process [88809]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/chat_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [88809]
+INFO:     Started server process [88828]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/prompt_builder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [88828]
+INFO:     Started server process [89119]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/chat_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [89119]
+INFO:     Started server process [89146]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/chat_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [89146]
+INFO:     Started server process [89160]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/prompt_builder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [89160]
+INFO:     Started server process [89531]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/chat_modes.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [89531]
+INFO:     Started server process [89558]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/chat_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [89558]
+INFO:     Started server process [89593]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/prompt_builder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [89593]
+INFO:     Started server process [90108]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/prompt_builder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [90108]
+INFO:     Started server process [90155]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'trennkost/models.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [90155]
+INFO:     Started server process [90643]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'scripts/add_high_fat_column.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [90643]
+INFO:     Started server process [90682]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'trennkost/ontology.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [90682]
+INFO:     Started server process [90817]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'trennkost/engine.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [90817]
+INFO:     Started server process [90908]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'trennkost/engine.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [90908]
+INFO:     Started server process [90943]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'trennkost/engine.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [90943]
+INFO:     Started server process [90968]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'test_mayo.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [90968]
+INFO:     Started server process [91024]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'test_mayo.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [91024]
+INFO:     Started server process [91156]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'test_mayo.py', 'scripts/add_high_fat_column.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [91156]
+INFO:     Started server process [91214]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/prompt_builder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [91214]
+INFO:     Started server process [91240]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

@@ -13,7 +13,8 @@ from app.image_handler import encode_image_base64, get_image_mime_type
 load_dotenv()
 
 # Configuration
-VISION_MODEL = os.getenv("VISION_MODEL", "gpt-4o-mini")  # gpt-4o-mini supports vision
+# gpt-4o for better vision accuracy (17x cost vs mini, but critical for food identification)
+VISION_MODEL = os.getenv("VISION_MODEL", "gpt-4o")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # System prompt for food identification (legacy, kept for backward compat)

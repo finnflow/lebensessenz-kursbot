@@ -25,6 +25,14 @@
       padding: 20px;
     }
 
+    /* Accessibility - Focus States for Keyboard Navigation */
+    button:focus-visible,
+    a:focus-visible,
+    [role="button"]:focus-visible {
+      outline: 2px solid #c9a897;
+      outline-offset: 2px;
+    }
+
     .app-container {
       display: flex;
       width: 100%;
@@ -525,10 +533,11 @@
 
     .message-content {
       color: #1a1a1a;
-      line-height: 1.75;
+      line-height: 1.8;
       word-wrap: break-word;
       font-size: 15px;
       white-space: pre-wrap;
+      letter-spacing: 0.01em;
     }
 
     .message-content p {
@@ -540,9 +549,10 @@
     }
 
     .message.assistant .message-content {
-      background: #f5f1ed;
+      background: white;
       padding: 20px 24px;
       border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.06);
     }
 
     .message-content strong {
@@ -695,6 +705,11 @@
 
     .upload-btn:active {
       transform: scale(0.95);
+    }
+
+    .upload-btn:focus-visible {
+      outline: 3px solid #c9a897;
+      outline-offset: 3px;
     }
 
     .upload-btn svg {
@@ -999,6 +1014,11 @@
     .send-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+
+    .send-btn:focus-visible {
+      outline: 3px solid #c9a897;
+      outline-offset: 3px;
     }
 
     .send-btn svg {
@@ -2377,8 +2397,7 @@ async function sendMessage() {
   const sendBtn = document.getElementById('sendBtn');
   const sendBtnText = document.getElementById('sendBtnText');
 
-  // Disable input and show loading spinner in button
-  input.disabled = true;
+  // Disable send button (but keep input enabled for typing next message)
   sendBtn.disabled = true;
   sendBtn.innerHTML = '<div class="spinner"></div>';
 
@@ -2457,7 +2476,6 @@ async function sendMessage() {
     await new Promise(resolve => setTimeout(resolve, 350));
     renderMessage('assistant', 'Fehler beim Abrufen der Antwort. Bitte versuche es erneut.');
   } finally {
-    input.disabled = false;
     sendBtn.disabled = false;
     sendBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
     input.focus();
