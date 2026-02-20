@@ -62,8 +62,13 @@ REGELN:
 - ERFINDE KEINE Zutaten aus deinem Weltwissen! Wenn "Tofu" auf der Karte steht, gib NUR "Tofu" aus — NICHT dessen Herstellungszutaten (Calcium-Sulfat etc.)
 - Zutaten die du nur vermutest → in "uncertain_items"
 - KEINE Bewertung, KEINE Kategorisierung — nur Extraktion
-- Bei Speisekarten: Gib Gerichtnamen und sichtbare Beschreibungen wieder, füge KEINE Zutaten hinzu die nicht auf der Karte stehen
-- Zerlege zusammengesetzte Gerichte NICHT selbst (das macht unser System)
+- **KRITISCH bei Speisekarten**: Parse die Beschreibung und extrahiere die HAUPTZUTATEN in "items"!
+  Beispiele:
+  * "Hühnersuppe mit Glasnudeln und Gemüse" → items: ["Huhn", "Glasnudeln", "Gemüse"]
+  * "Rindfleisch-Salat mit Kohlsalat und Sesam" → items: ["Rindfleisch", "Kohlsalat", "Sesam"]
+  * "Miso Tofu Suppe mit Tofu, Seetang und Glasnudeln" → items: ["Tofu", "Seetang", "Glasnudeln"]
+- Wenn auf der Karte steht "mit X und Y" → extrahiere X und Y als separate items
+- Die items-Liste darf NICHT leer sein bei Speisekarten! Parse die Beschreibung für Zutaten.
 - IGNORIERE folgende Dinge KOMPLETT (sie sind für die Trennkost-Analyse irrelevant):
   * Gewürze und Würzmittel (Salz, Pfeffer, Paprikapulver, Kräuter etc.)
   * Zusatzstoffe und Herstellungsmittel (Calcium-Sulfat, Magnesiumchlorid, Lecithin, Xanthan, E-Nummern etc.)
@@ -85,12 +90,13 @@ Antworte NUR als JSON:
   ]
 }
 
-Beispiel Speisekarte:
+Beispiel Speisekarte (WICHTIG: Parse Beschreibungen für items!):
 {
   "type": "menu",
   "dishes": [
-    {"name": "Spaghetti Carbonara", "description": "mit Speck und Parmesan", "items": ["Spaghetti", "Speck", "Parmesan"], "uncertain_items": ["Sahne"]},
-    {"name": "Caesar Salad", "description": "mit gegrilltem Hähnchen", "items": ["Salat", "Hähnchen", "Croutons", "Parmesan"], "uncertain_items": []}
+    {"name": "Spaghetti Carbonara", "description": "mit Speck und Parmesan", "items": ["Spaghetti", "Speck", "Parmesan", "Ei"], "uncertain_items": ["Sahne"]},
+    {"name": "Caesar Salad", "description": "mit gegrilltem Hähnchen", "items": ["Salat", "Hähnchen", "Croutons", "Parmesan"], "uncertain_items": []},
+    {"name": "Tom Kha Gai", "description": "Huhn und Gemüse in Kokos-Curry (scharf)", "items": ["Huhn", "Gemüse", "Kokos"], "uncertain_items": []}
   ]
 }
 

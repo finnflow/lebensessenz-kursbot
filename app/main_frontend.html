@@ -49,6 +49,7 @@
       }
 
       .input-container {
+        padding-top: max(24px, env(safe-area-inset-bottom));
         padding-bottom: max(24px, env(safe-area-inset-bottom));
       }
     }
@@ -69,7 +70,7 @@
     }
 
     .sidebar.collapsed {
-      width: 60px;
+      width: 72px;
     }
 
     .sidebar-header {
@@ -82,8 +83,10 @@
     }
 
     .sidebar.collapsed .sidebar-header {
-      padding: 16px 8px;
+      padding: 20px 14px;
       flex-direction: column;
+      gap: 12px;
+      border-bottom: none;
     }
 
     .sidebar-header h2 {
@@ -531,6 +534,11 @@
       color: #1a1a1a;
     }
 
+    /* Hide "DU" label for user messages - message bubble alignment makes it obvious */
+    .message.user .message-role {
+      display: none;
+    }
+
     .message-content {
       color: #1a1a1a;
       line-height: 1.8;
@@ -554,12 +562,14 @@
       border-radius: 14px;
       margin-left: auto;
       max-width: 85%;
+      border-bottom-right-radius: 4px; /* Tail effect on user messages */
     }
 
     .message.assistant .message-content {
       background: white;
       padding: 20px 24px;
       border-radius: 14px;
+      border-bottom-left-radius: 4px; /* Tail effect on assistant messages */
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.06);
     }
 
@@ -682,13 +692,15 @@
 
     .input-group {
       display: flex;
-      gap: 12px;
-      align-items: center;
+      gap: 32px;
+      align-items: flex-end;
     }
 
     .upload-btn {
-      width: 66px;
-      height: 66px;
+      width: 56px;
+      height: 56px;
+      min-width: 56px;
+      min-height: 56px;
       padding: 0;
       background: #e8dfd8;
       color: #666;
@@ -700,7 +712,6 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      margin-right: 5px;
       position: relative;
       z-index: 10000;
       overflow: visible;
@@ -721,8 +732,8 @@
     }
 
     .upload-btn svg {
-      width: 30px;
-      height: 30px;
+      width: 28px;
+      height: 28px;
     }
 
     .upload-btn:hover::after {
@@ -962,18 +973,21 @@
 
     textarea {
       flex: 1;
-      min-height: 72px;
+      height: 56px;
+      min-height: 56px;
       max-height: 180px;
-      padding: 18px 20px;
+      padding: 16px 20px;
       border: 1px solid #e5e5e5;
       border-radius: 14px;
       font-family: inherit;
       font-size: 15px;
       line-height: 1.5;
       resize: none;
+      overflow-y: hidden;
       transition: all 0.3s ease;
       background: white;
       color: #1a1a1a;
+      box-sizing: border-box; /* Ensure padding is included in height */
     }
 
     textarea:focus {
@@ -987,8 +1001,10 @@
     }
 
     .send-btn {
-      width: 66px;
-      height: 66px;
+      width: 56px;
+      height: 56px;
+      min-width: 56px;
+      min-height: 56px;
       padding: 0;
       background: #c9a897;
       color: white;
@@ -1003,7 +1019,6 @@
       justify-content: center;
       box-shadow: 0 2px 8px rgba(201, 168, 151, 0.3);
       flex-shrink: 0;
-      margin-left: 5px;
       position: relative;
       z-index: 10000;
       overflow: visible;
@@ -1030,8 +1045,8 @@
     }
 
     .send-btn svg {
-      width: 30px;
-      height: 30px;
+      width: 28px;
+      height: 28px;
     }
 
     .send-btn:hover:not(:disabled)::after {
@@ -1089,21 +1104,40 @@
     }
 
     .empty-state-icon {
-      font-size: 3.5rem;
-      margin-bottom: 20px;
-      opacity: 0.8;
+      width: 64px;
+      height: 64px;
+      margin-bottom: 32px;
+      background: rgba(201, 168, 151, 0.06);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      border: 1px solid rgba(201, 168, 151, 0.08);
+    }
+
+    .empty-state-icon::before {
+      content: '';
+      width: 28px;
+      height: 2px;
+      background: rgba(201, 168, 151, 0.35);
+      border-radius: 1px;
+      position: absolute;
+      box-shadow: 0 8px 0 rgba(201, 168, 151, 0.35), 0 16px 0 rgba(201, 168, 151, 0.35);
     }
 
     .empty-state-text {
-      font-size: 1.25rem;
-      margin-bottom: 10px;
-      color: #666;
+      font-size: 1.5rem;
+      margin-bottom: 12px;
+      color: #1a1a1a;
       font-weight: 500;
+      letter-spacing: -0.3px;
     }
 
     .empty-state-subtext {
-      font-size: 0.938rem;
+      font-size: 1rem;
       color: #999;
+      font-weight: 400;
     }
 
     /* Mobile Sidebar Backdrop */
@@ -1462,7 +1496,6 @@
 
       .chat-header {
         padding: 20px 20px 16px 20px;
-        flex-wrap: wrap;
         align-items: center;
         min-height: auto;
       }
@@ -1485,15 +1518,19 @@
 
       .feedback-btn {
         flex: 0 0 auto;
-        padding: 10px 16px;
+        padding: 10px;
+        min-width: 44px;
         min-height: 44px;
         font-size: 13px;
-        white-space: nowrap;
+      }
+
+      .feedback-btn span {
+        display: none;
       }
 
       .feedback-btn svg {
-        width: 14px;
-        height: 14px;
+        width: 18px;
+        height: 18px;
       }
 
       .feedback-btn:hover {
@@ -1534,17 +1571,20 @@
       }
 
       .input-container {
-        padding: 16px 20px 20px 20px;
-        padding-bottom: max(20px, env(safe-area-inset-bottom));
+        padding: 16px 20px;
+        padding-top: max(16px, env(safe-area-inset-bottom));
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
       }
 
       .input-group {
-        gap: 10px;
+        gap: 20px;
       }
 
       .upload-btn, .send-btn {
         width: 56px;
         height: 56px;
+        min-width: 56px;
+        min-height: 56px;
         flex-shrink: 0;
       }
 
@@ -1565,6 +1605,13 @@
         padding: 16px 18px;
         font-size: 16px; /* Prevents zoom on focus */
         line-height: 1.5;
+        box-sizing: border-box;
+      }
+
+      textarea::placeholder {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .feedback-modal {
@@ -1733,17 +1780,20 @@
       }
 
       .input-container {
-        padding: 12px 16px 16px 16px;
-        padding-bottom: max(16px, env(safe-area-inset-bottom));
+        padding: 12px 16px;
+        padding-top: max(12px, env(safe-area-inset-bottom));
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
       }
 
       .input-group {
-        gap: 8px;
+        gap: 16px;
       }
 
       .upload-btn, .send-btn {
         width: 50px;
         height: 50px;
+        min-width: 50px;
+        min-height: 50px;
       }
 
       .upload-btn svg, .send-btn svg {
@@ -1752,9 +1802,11 @@
       }
 
       textarea {
+        height: 50px;
         min-height: 50px;
-        padding: 14px 16px;
+        padding: 13px 16px;
         font-size: 16px;
+        box-sizing: border-box;
       }
 
       .feedback-modal {
@@ -1909,7 +1961,7 @@
 
       <div class="chat-history" id="chatHistory">
         <div class="empty-state">
-          <div class="empty-state-icon">💬</div>
+          <div class="empty-state-icon"></div>
           <div class="empty-state-text">Starte eine Konversation</div>
           <div class="empty-state-subtext">Stelle eine Frage zum Kursmaterial</div>
         </div>
@@ -1933,7 +1985,9 @@
             </button>
             <textarea
               id="messageInput"
+              rows="1"
               placeholder="Stelle eine Frage oder lade ein Foto hoch..."
+              oninput="this.style.height='auto'; const sh=this.scrollHeight; this.style.height=Math.min(sh,180)+'px'; this.style.overflowY=sh>180?'auto':'hidden';"
               onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"
             ></textarea>
             <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Senden">
@@ -2416,6 +2470,7 @@ async function sendMessage() {
   // Render user message immediately (with image if present)
   renderMessage('user', message, null, imageDataUrl);
   input.value = '';
+  input.style.height = '';
 
   if (selectedImage) {
     removeImage();
@@ -2547,7 +2602,7 @@ async function deleteConversation(event, convId) {
         const chatHistory = document.getElementById('chatHistory');
         chatHistory.innerHTML = `
           <div class="empty-state">
-            <div class="empty-state-icon">💬</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">Starte eine Konversation</div>
             <div class="empty-state-subtext">Stelle eine Frage zum Kursmaterial</div>
           </div>

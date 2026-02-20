@@ -6,6 +6,7 @@ from openai import OpenAI
 import chromadb
 from chromadb.config import Settings
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Load environment variables
 load_dotenv()
@@ -224,6 +225,112 @@ def deduplicate_by_source(docs: List[str], metas: List[Dict], dists: List[float]
             seen_sources[source] = count + 1
 
     return deduped_docs, deduped_metas, deduped_dists
+
+
+def normalize_input(
+    user_message: str,
+    recent_messages: List[Dict[str, Any]],
+    is_new_conversation: bool
+) -> str:
+    """
+    Normalize user input to create canonical format for deterministic logic.
+
+    Handles:
+    - Language translation to German
+    - Time format standardization ("30 minuten" → "30 min")
+    - Food name standardization
+    - Typo fixing
+    - Punctuation cleanup
+    - Abbreviation expansion
+
+    Special handling for follow-ups:
+    - Short messages (<5 words) with recent context are marked as potential follow-ups
+    - LLM preserves or minimally expands follow-ups with context reference
+    - Prevents incorrect expansion of context-dependent messages like "den Fisch"
+    """
+    # Skip normalization for very long messages (already well-formed)
+    if len(user_message) > 200:
+        return user_message
+
+    # Detect potential follow-up context
+    is_potential_followup = False
+    previous_context = ""
+
+    if not is_new_conversation and recent_messages:
+        # Check if message is short (likely a follow-up)
+        word_count = len(user_message.strip().split())
+        if word_count <= 5:
+            is_potential_followup = True
+
+            # Extract last 2-3 messages for context
+            context_messages = []
+            for msg in recent_messages[-4:]:
+                role = "User" if msg.get("role") == "user" else "Assistant"
+                content = msg.get("content", "")[:200]  # Truncate long messages
+                context_messages.append(f"{role}: {content}")
+            previous_context = "\n".join(context_messages)
+
+    # Build normalization prompt
+    normalization_prompt = f"""Du normalisierst Benutzereingaben für ein Trennkost-Ernährungsberatungs-System.
+
+**Deine Aufgaben:**
+1. **Sprache:** Übersetze alle Texte ins Deutsche (falls nicht bereits Deutsch)
+2. **Zeitangaben:** Standardisiere zu "X min" Format (z.B. "30 minuten" → "30 min", "eine halbe Stunde" → "30 min")
+3. **Lebensmittel:** Verwende deutsche Standardnamen (z.B. "chicken" → "Hähnchen", "rice" → "Reis")
+4. **Tippfehler:** Korrigiere offensichtliche Tippfehler (z.B. "danm" → "dann", "Resi" → "Reis")
+5. **Interpunktion:** Bereinige und vervollständige
+6. **Abkürzungen:** Expandiere gängige Abkürzungen (z.B. "z.B." bleibt, aber "min" → "Minuten" nur bei Mehrdeutigkeit)
+
+**WICHTIG - Follow-up Nachrichten:**
+- Wenn die Nachricht sehr kurz ist (<5 Wörter) UND vorheriger Kontext existiert, ist es wahrscheinlich eine Follow-up-Nachricht
+- Follow-ups sollten NICHT erweitert werden, wenn sie klar kontextabhängig sind
+- Beispiele:
+  * "den Fisch" (im Kontext einer Wahlsituation) → "den Fisch" (NICHT erweitern!)
+  * "ok" (als Bestätigung) → "ok" (NICHT erweitern!)
+  * "egal" (als Antwort) → "egal" (NICHT erweitern!)
+  * "danm" (als Standalone) → "dann" (Tippfehler korrigieren ist OK)
+
+"""
+
+    if is_potential_followup and previous_context:
+        normalization_prompt += f"""
+**VORHERIGER KONTEXT (Follow-up-Erkennung):**
+{previous_context}
+
+Die aktuelle Nachricht ist wahrscheinlich eine Follow-up-Antwort. Bewahre ihre Bedeutung, erweitere sie NICHT zu einer vollständigen Frage, außer sie ist offensichtlich unvollständig.
+"""
+
+    normalization_prompt += f"""
+**Aktuelle Nachricht:**
+{user_message}
+
+**Normalisierte Nachricht:**"""
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": normalization_prompt}],
+            temperature=0.0,
+            max_tokens=150,
+            timeout=5
+        )
+        normalized = response.choices[0].message.content.strip()
+
+        # Safety check: if normalization is wildly different in length, use original
+        original_len = len(user_message)
+        normalized_len = len(normalized)
+        if normalized_len > original_len * 3:  # More than 3x longer → likely over-expanded
+            print(f"[NORMALIZE] Warning: normalized message too long ({normalized_len} vs {original_len}), using original")
+            return user_message
+
+        if normalized != user_message:
+            print(f"[NORMALIZE] '{user_message}' → '{normalized}'")
+
+        return normalized
+
+    except Exception as e:
+        print(f"[NORMALIZE] Failed: {e}, using original message")
+        return user_message
 
 
 def classify_food_items(user_message: str, standalone_query: str) -> Optional[Dict[str, Any]]:
@@ -727,7 +834,8 @@ def handle_chat(
     Main chat handler — pipeline architecture.
 
     Steps:
-    1. Setup conversation (create/validate, save message, title)
+    0. Normalize input (typo fixing, language, time formats)
+    1. Setup conversation (create/validate, save ORIGINAL message, title)
     2. Process vision (if image)
     3. Detect chat mode + modifiers
     4. Run Trennkost engine (if food-related)
@@ -738,26 +846,41 @@ def handle_chat(
     9. Generate response + save
     10. Update summary
     """
-    # 1. Setup conversation
+    # 1. Setup conversation (saves ORIGINAL message for transparency)
     conversation_id, is_new, conv_data = _setup_conversation(
         conversation_id, user_message, guest_id, image_path
     )
 
-    # 2. Process vision
+    # 1b. Get recent messages for normalization context
+    recent_messages_for_norm = get_last_n_messages(conversation_id, 4)
+
+    # 1c & 2. Parallel: Normalize + Vision (if image present)
     vision_data = {"vision_analysis": None, "food_groups": None,
                    "vision_extraction": None, "vision_is_menu": False,
                    "vision_failed": False}
-    if image_path:
-        vision_data = _process_vision(image_path, user_message)
 
-    # 3. Detect chat mode
+    if image_path:
+        # Parallelize: Run normalization + vision simultaneously
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            normalize_future = executor.submit(normalize_input, user_message, recent_messages_for_norm, is_new)
+            vision_future = executor.submit(_process_vision, image_path, user_message)
+
+            # Wait for both to complete
+            normalized_message = normalize_future.result()
+            vision_data = vision_future.result()
+        print(f"[PIPELINE] Parallel execution: normalization + vision completed")
+    else:
+        # No image: just normalize
+        normalized_message = normalize_input(user_message, recent_messages_for_norm, is_new)
+
+    # 3. Detect chat mode (use normalized message)
     vision_type = None
     if vision_data.get("vision_extraction"):
         vision_type = vision_data["vision_extraction"].get("type")
 
     recent = get_last_n_messages(conversation_id, 4)
     mode, modifiers = detect_chat_mode(
-        user_message,
+        normalized_message,
         image_path=image_path,
         vision_type=vision_type,
         is_new_conversation=is_new,
@@ -768,8 +891,8 @@ def handle_chat(
 
     print(f"[PIPELINE] mode={mode.value} | is_breakfast={modifiers.is_breakfast} | wants_recipe={modifiers.wants_recipe}")
 
-    # 3b. Check for temporal separation (sequential eating)
-    temporal_sep = detect_temporal_separation(user_message)
+    # 3b. Check for temporal separation (use normalized message)
+    temporal_sep = detect_temporal_separation(normalized_message)
     if temporal_sep and temporal_sep["is_temporal"]:
         print(f"[PIPELINE] Temporal separation detected: {temporal_sep}")
         # Build response explaining sequential eating is OK with proper wait times
@@ -796,9 +919,9 @@ def handle_chat(
         create_message(conversation_id, "assistant", response_text)
         return {"answer": response_text, "conversationId": conversation_id}
 
-    # 4. Run Trennkost engine
+    # 4. Run Trennkost engine (use normalized message)
     trennkost_results = _run_engine(
-        user_message, vision_data.get("vision_extraction"), mode
+        normalized_message, vision_data.get("vision_extraction"), mode
     )
 
     if DEBUG_RAG and trennkost_results:
@@ -806,20 +929,20 @@ def handle_chat(
             print(f"[TRENNKOST] {r.dish_name}: {r.verdict.value} | "
                   f"problems={len(r.problems)} | questions={len(r.required_questions)}")
 
-    # 5. Search recipes (if recipe request)
+    # 5. Search recipes (if recipe request, use normalized message)
     recipe_results = None
     if mode == ChatMode.RECIPE_REQUEST:
         try:
             from app.recipe_service import search_recipes
 
             # For short follow-up messages (e.g. "egal", "ok"), use previous user query
-            search_query = user_message
-            if modifiers.is_followup and len(user_message.strip()) <= 20:
+            search_query = normalized_message
+            if modifiers.is_followup and len(normalized_message.strip()) <= 20:
                 # Extract previous substantial user message from chat history
                 for msg in reversed(recent):
                     if msg.get("role") == "user":
                         content = msg.get("content", "").strip()
-                        if len(content) > 20 and content != user_message:
+                        if len(content) > 20 and content != normalized_message:
                             search_query = content
                             print(f"[PIPELINE] Short follow-up detected, using previous query: '{search_query[:50]}...'")
                             break
@@ -832,24 +955,24 @@ def handle_chat(
             print(f"[PIPELINE] recipe search failed: {e}")
             recipe_results = []
 
-    # 6. Load context + build RAG query + retrieve
+    # 6. Load context + build RAG query + retrieve (use normalized message)
     summary = conv_data.get("summary_text")
     last_messages = get_last_n_messages(conversation_id, LAST_N)
 
     standalone_query = _build_rag_query(
         trennkost_results, vision_data.get("food_groups"),
-        image_path, summary, last_messages, user_message,
+        image_path, summary, last_messages, normalized_message,
         modifiers.is_breakfast,
     )
 
-    # LLM food classification for better retrieval (skip if engine already ran)
+    # LLM food classification for better retrieval (skip if engine already ran, use normalized message)
     needs_clarification = None
     is_followup = not is_new and len(last_messages) >= 2
     if not trennkost_results:
-        food_classification_result = classify_food_items(user_message, standalone_query)
+        food_classification_result = classify_food_items(normalized_message, standalone_query)
         if food_classification_result:
             classification = food_classification_result.get("classification", "")
-            if not is_followup or len(user_message) > 80:
+            if not is_followup or len(normalized_message) > 80:
                 needs_clarification = food_classification_result.get("needs_clarification")
             if classification:
                 standalone_query += f"\n{classification}"
@@ -857,7 +980,7 @@ def handle_chat(
     if DEBUG_RAG:
         print(f"\n[RAG] Primary query: {standalone_query}")
 
-    docs, metas, dists, is_partial = retrieve_with_fallback(standalone_query, user_message)
+    docs, metas, dists, is_partial = retrieve_with_fallback(standalone_query, normalized_message)
 
     if DEBUG_RAG:
         print(f"[RAG] Retrieved {len(docs)} chunk(s) | partial={is_partial}")
@@ -880,15 +1003,15 @@ def handle_chat(
             "sources": []
         }
 
-    # 8. Build prompt
+    # 8. Build prompt (use normalized message)
     prompt_parts, answer_instructions = _build_prompt_parts(
         mode, modifiers, trennkost_results, vision_data,
-        summary, last_messages, user_message, recipe_results,
+        summary, last_messages, normalized_message, recipe_results,
     )
     modifiers.needs_clarification = needs_clarification
 
     llm_input = assemble_prompt(
-        prompt_parts, course_context, user_message,
+        prompt_parts, course_context, normalized_message,
         answer_instructions, needs_clarification,
     )
 

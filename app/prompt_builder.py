@@ -219,6 +219,14 @@ def build_prompt_food_analysis(
     is_breakfast: bool = False,
 ) -> str:
     """Answer instructions when engine results are present."""
+    # Check if this is a menu analysis (multiple dishes)
+    is_menu = len(trennkost_results) > 1
+
+    if is_menu:
+        # Menu analysis: overview of all dishes
+        return build_prompt_menu_overview(trennkost_results, user_message)
+
+    # Single dish analysis
     verdict_str = trennkost_results[0].verdict.value if trennkost_results else "UNKNOWN"
     verdict_display = {
         "OK": "OK",
@@ -287,6 +295,48 @@ def build_prompt_food_analysis(
         "  3. WICHTIG: Schlage KEINE zusätzlichen Zutaten oder Alternativen vor!\n"
         "  4. Konzentriere dich NUR auf die Klärung der offenen Frage\n"
         "- Verwende AUSSCHLIESSLICH Begriffe aus den Kurs-Snippets.\n"
+    )
+
+
+def build_prompt_menu_overview(
+    trennkost_results: List[TrennkostResult],
+    user_message: str,
+) -> str:
+    """Answer instructions for menu analysis (multiple dishes)."""
+    ok_dishes = [r.dish_name for r in trennkost_results if r.verdict.value == "OK"]
+    conditional_dishes = [r.dish_name for r in trennkost_results if r.verdict.value == "CONDITIONAL"]
+    not_ok_dishes = [r.dish_name for r in trennkost_results if r.verdict.value == "NOT_OK"]
+
+    return (
+        f"USER'S ORIGINAL MESSAGE: {user_message}\n\n"
+        "SPEISEKARTEN-ANALYSE — MEHRERE GERICHTE:\n"
+        "Du hast eine Speisekarte/Menü mit mehreren Gerichten analysiert.\n"
+        "\n"
+        "ANTWORT-ANWEISUNGEN:\n"
+        "1. **ÜBERSICHT GEBEN**: Gib eine klare Übersicht über ALLE Gerichte:\n"
+        f"   - ✅ Trennkost-konforme Gerichte ({len(ok_dishes)}): {', '.join(ok_dishes) if ok_dishes else 'Keine'}\n"
+        f"   - ⚠️ Bedingt konforme Gerichte ({len(conditional_dishes)}): {', '.join(conditional_dishes) if conditional_dishes else 'Keine'}\n"
+        f"   - ❌ Nicht konforme Gerichte ({len(not_ok_dishes)}): {', '.join(not_ok_dishes) if not_ok_dishes else 'Keine'}\n"
+        "\n"
+        "2. **EMPFEHLUNG**: Wenn es konforme Gerichte gibt:\n"
+        "   - Empfehle 1-2 der BESTEN konformen Gerichte mit kurzer Begründung\n"
+        "   - Beispiel: 'Der **Rindfleisch-Salat** ist perfekt — Protein mit stärkearmem Gemüse!'\n"
+        "\n"
+        "3. **ERKLÄRUNG**: Für nicht konforme Gerichte:\n"
+        "   - Erkläre KURZ warum sie nicht konform sind (z.B. 'Hühnersuppe: Glasnudeln (KH) + Huhn (PROTEIN)')\n"
+        "   - KEINE ausführlichen Erklärungen für JEDES Gericht — nur die Hauptprobleme\n"
+        "\n"
+        "4. **STIL**:\n"
+        "   - Freundlich und hilfreich\n"
+        "   - Strukturiert aber nicht als nummeriete Liste\n"
+        "   - Fokus auf die GUTEN Optionen (was der User bestellen kann)\n"
+        "   - Verwende Emojis sparsam für visuelle Struktur (✅ ⚠️ ❌)\n"
+        "\n"
+        "5. **WICHTIG**:\n"
+        "   - Nenne ALLE analysierten Gerichte, nicht nur ein einzelnes\n"
+        "   - Der User will wissen 'was kann ich da essen' — also alle Optionen sehen\n"
+        "   - Stelle KEINE Follow-up-Frage wie 'Was möchtest du behalten?' bei einer Menü-Übersicht\n"
+        "   - Follow-up-Fragen nur wenn der User später ein SPEZIFISCHES nicht-konformes Gericht auswählt\n"
     )
 
 

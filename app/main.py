@@ -308,7 +308,15 @@ def home():
     html_path = pathlib.Path(__file__).parent / "main_frontend.html"
     with open(html_path, "r", encoding="utf-8") as f:
         html_content = f.read()
-    return HTMLResponse(html_content)
+    # Add no-cache headers to force browser reload
+    return HTMLResponse(
+        html_content,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
 
 @app.get("/old", response_class=HTMLResponse)
 def old_ui():
