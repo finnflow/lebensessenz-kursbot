@@ -55,13 +55,15 @@ def is_menu_reference(text: str) -> bool:
 _RECIPE_REQUEST_PATTERNS = [
     r"rezept",
     r"was.*(kochen|zubereiten|machen)",
+    r"was.*kann.*ich.*(kochen|machen|zubereiten|essen)",
+    r"was.*soll.*ich.*(kochen|machen|zubereiten|essen)",
+    r"was.*kann.*ich.*heute.*(essen|kochen)",
+    r"was.*gibt.*es.*zum",
     r"gericht\s*vorschlag",
     r"vorschlag.*gericht",
-    r"was.*kann.*ich.*(kochen|machen|zubereiten)",
-    r"was.*soll.*ich.*(kochen|machen|zubereiten)",
     r"idee.*zum.*(kochen|essen)",
     r"koch.?idee",
-    r"was.*könnte.*ich.*(kochen|machen)",
+    r"was.*könnte.*ich.*(kochen|machen|essen)",
     r"einkauf",
     r"meal.?prep",
     r"gib.*mir.*(ein|was|gericht)",
@@ -278,13 +280,16 @@ def _is_recipe_followup(user_message: str, last_messages: List[Dict]) -> bool:
     if any(re.match(pattern, msg_lower) for pattern in explanation_patterns):
         return False  # It's a question ABOUT the recipe, not a request FOR a recipe
 
-    # Check if recent assistant message mentioned recipes/Rezept
+    # Check if recent assistant message mentioned recipes or asked a food-preference clarification
     for msg in reversed(last_messages[-4:]):
         if msg.get("role") == "assistant":
             content_lower = msg.get("content", "").lower()
             if any(kw in content_lower for kw in [
                 "rezept", "rezeptdatenbank", "zubereitung",
                 "welche zutaten", "was für einen",
+                # Bot clarification questions about dinner preferences:
+                "art von lebensmittel", "schwebt dir", "passenden vorschlag",
+                "vorschlag zu machen", "abendessen vor", "mittagessen vor",
             ]):
                 return True
             break  # Only check last assistant message
