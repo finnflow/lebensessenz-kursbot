@@ -62,6 +62,24 @@ _ADJECTIVES_TO_IGNORE = {
 # Separators for ingredient lists
 _ITEM_SEPARATORS = re.compile(r"[,;]\s*|\s+und\s+|\s+mit\s+|\s+&\s+", re.IGNORECASE)
 
+# Pattern: "IngredientName (optional notes): quantity/description"
+# Matches "Haferflocken: 60g", "Kokosjoghurt (vegan): 2-3 EL", "Banane: ½ Stück"
+_INGREDIENT_QUANTITY_LINE = re.compile(
+    r"^([A-ZÄÖÜa-zäöüß][A-ZÄÖÜa-zäöüß\s\-]{1,40}?)"  # ingredient name (2-40 chars)
+    r"(?:\s*\([^)]{1,30}\))?"                           # optional (parenthetical note)
+    r"\s*:\s*"                                           # colon separator
+    r"[\d½¼¾⅓⅔\-–~<>]",                                # starts with quantity/range
+    re.UNICODE,
+)
+
+# Lines to skip when parsing ingredient lists (instructions, emojis, section headers)
+_SKIP_LINE_RE = re.compile(
+    r"[🧪🥄🍳🔪✅❌⚠️🎉💡→]"
+    r"|zubereitung|anleitung|schritt|tipps?:|hinweis|warum|erklärt"
+    r"|einweichen|einrühren|vorbereiten|vermischen|anrichten|unterheben",
+    re.IGNORECASE,
+)
+
 # Breakfast detection keywords
 _BREAKFAST_KEYWORDS = re.compile(
     r"frühstück|fruehstueck|morgens|vormittag|zum\s*frühstück|breakfast"
@@ -240,6 +258,57 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
     return None
 
 
+def _try_parse_as_ingredient_list(text: str) -> Optional[List[Dict[str, Any]]]:
+    """
+    Detect if text is a structured multi-ingredient compliance check (pasted recipe).
+    If yes: aggregate all ingredient lines into a SINGLE dish for combined evaluation.
+
+    Detection: ≥3 lines matching "IngredientName: quantity" pattern.
+    Aggregation: extract ingredient names (before colon), ignore instructions/questions.
+
+    Returns single-element list [{"name": dish_name, "items": [ingredients]}],
+    or None if text doesn't look like an ingredient list.
+    """
+    raw_lines = [l.strip() for l in text.split('\n') if l.strip()]
+    if len(raw_lines) < 3:
+        return None
+
+    ingredients: List[str] = []
+    question_intro: Optional[str] = None
+
+    for line in raw_lines:
+        # Skip instruction/emoji/section-header lines
+        if _SKIP_LINE_RE.search(line):
+            continue
+
+        # Check for "IngredientName: quantity" pattern
+        m = _INGREDIENT_QUANTITY_LINE.match(line)
+        if m:
+            name = m.group(1).strip().rstrip('-– ')
+            if len(name) >= 2:
+                ingredients.append(name)
+            continue
+
+        # Keep track of the first question line for naming the dish
+        if '?' in line and question_intro is None and len(line) < 80:
+            question_intro = line
+
+    # Only aggregate if we found enough ingredient lines
+    if len(ingredients) < 3:
+        return None
+
+    # Build a clean dish name from the question or use generic fallback
+    if question_intro:
+        dish_name = re.sub(r'\?.*', '', question_intro).strip()
+        dish_name = re.sub(r'(?i)^(folgendes?|mein|das|ein|eine)\s+', '', dish_name).strip()
+        dish_name = dish_name or "Rezept-Kombination"
+    else:
+        dish_name = "Rezept-Kombination"
+
+    logger.debug(f"[PARSE] Ingredient-list detected: '{dish_name}' with {len(ingredients)} items: {ingredients}")
+    return [{"name": dish_name, "items": ingredients}]
+
+
 def _parse_text_input(text: str) -> List[Dict[str, Any]]:
     """
     Parse text input into dish(es) with ingredients.
@@ -254,6 +323,13 @@ def _parse_text_input(text: str) -> List[Dict[str, Any]]:
     """
     text = text.strip()
     ontology = get_ontology()
+
+    # Check for structured ingredient list (pasted recipe / compliance check)
+    # Must run BEFORE question detection — a pasted recipe has a question intro
+    # but the body is an ingredient list, not a natural-language question.
+    ingredient_list = _try_parse_as_ingredient_list(text)
+    if ingredient_list:
+        return ingredient_list
 
     # If text looks like a natural language question, extract food items first
     is_question = bool(re.search(r'\?', text)) or bool(
