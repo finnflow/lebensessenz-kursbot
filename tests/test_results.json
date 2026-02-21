@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-02-04T19:10:16.442000",
+  "timestamp": "2026-02-21T17:16:14.662433",
   "summary": {
-    "passed": 8,
-    "failed": 0,
+    "passed": 5,
+    "failed": 3,
     "total": 8
   },
   "results": [
@@ -20,7 +20,8 @@
     },
     {
       "id": "nonexistent_topic",
-      "status": "PASSED"
+      "status": "FAILED",
+      "reason": "Check details below"
     },
     {
       "id": "diversification_test",
@@ -32,11 +33,13 @@
     },
     {
       "id": "specific_food_burger_fries",
-      "status": "PASSED"
+      "status": "FAILED",
+      "reason": "Check details below"
     },
     {
       "id": "specific_food_fish_rice",
-      "status": "PASSED"
+      "status": "FAILED",
+      "reason": "Check details below"
     }
   ]
 }

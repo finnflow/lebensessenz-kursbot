@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 _FOOD_QUERY_KEYWORDS = [
     "kombinieren", "kombination", "zusammen essen", "zusammen ok",
     "trennkost", "erlaubt", "darf ich", "kann ich.*essen",
-    "ist.*ok", "passt.*zusammen", "speisekarte", "menü",
+    "ist.*ok", "in ordnung", "passt.*zusammen", "speisekarte", "menü",
     "gericht", "mahlzeit", "teller",
 ]
 _FOOD_QUERY_RE = re.compile(
@@ -136,9 +136,25 @@ def detect_food_query(text: str) -> bool:
             return True
 
     # Check for multiple food items
-    words = _ITEM_SEPARATORS.split(text.strip())
-    found = sum(1 for w in words if w.strip() and ontology.lookup(w.strip()))
-    return found >= 2
+    # Split by common separators ("mit", "und", comma etc.)
+    segments = _ITEM_SEPARATORS.split(text.strip())
+    found_foods: set = set()
+    for segment in segments:
+        segment = segment.strip()
+        if not segment:
+            continue
+        # Try full segment first (e.g. "Hähnchen")
+        if ontology.lookup(segment):
+            found_foods.add(segment.lower())
+        else:
+            # Try each individual word in segment
+            # Handles cases like "Ei in Ordnung?" → "Ei" is a food, rest is not
+            for word in re.split(r'\s+', segment):
+                word_clean = word.strip('?!.,;:()')
+                if word_clean and len(word_clean) >= 3 and ontology.lookup(word_clean):
+                    found_foods.add(word_clean.lower())
+                    break  # One food hit per segment is enough
+    return len(found_foods) >= 2
 
 
 def detect_temporal_separation(text: str) -> Optional[Dict[str, Any]]:
@@ -228,7 +244,7 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
         # Check canonical and synonyms against the text
         names_to_check = [entry.canonical] + entry.synonyms
         for name in names_to_check:
-            if len(name) < 3:
+            if len(name) < 2:
                 continue
             # Word boundary match to avoid "Reis" matching "Reise"
             # Include quotes (") and apostrophes (') in boundaries

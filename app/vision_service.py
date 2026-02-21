@@ -323,13 +323,25 @@ def extract_food_from_image(
 
         raw = response.choices[0].message.content
 
-        # Strip markdown code fences if present
+        # Extract JSON from response (handles preamble text + embedded code blocks)
+        import re as _re
         cleaned = raw.strip()
-        if cleaned.startswith("```"):
+
+        # 1. Try to find JSON object in a ```json ... ``` code block
+        m = _re.search(r'```(?:json)?\s*(\{.*?\})\s*```', cleaned, _re.DOTALL)
+        if m:
+            cleaned = m.group(1).strip()
+        elif cleaned.startswith("```"):
+            # Strip leading/trailing code fences (no preamble)
             cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
+        else:
+            # 2. Find the first { ... } JSON block in the text (handles preamble text)
+            m = _re.search(r'(\{.*\})', cleaned, _re.DOTALL)
+            if m:
+                cleaned = m.group(1).strip()
 
         try:
             parsed = _json.loads(cleaned)

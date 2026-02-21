@@ -107,8 +107,8 @@ def normalize_dish(
 
     # ── Step 1: Compound lookup ─────────────────────────────────────
     compound = ontology.get_compound(dish_name)
-    if compound and raw_items is None:
-        # Use compound's known ingredients
+    if compound:
+        # Always use compound's base ingredients (even if raw_items also provided)
         all_compound_items = compound.get("base_items", [])
         optional = compound.get("optional_items", [])
 
@@ -116,12 +116,15 @@ def normalize_dish(
             fi = ontology.lookup_to_food_item(name, assumed=False)
             items.append(fi)
 
-        for name in optional:
-            fi = ontology.lookup_to_food_item(
-                name, assumed=True,
-                assumption_reason=f"Typische optionale Zutat in {dish_name}"
-            )
-            assumed_items.append(fi)
+        # Only add optional items when user didn't supply explicit extra items.
+        # If raw_items provided, user has expressed what they want → skip optionals.
+        if raw_items is None:
+            for name in optional:
+                fi = ontology.lookup_to_food_item(
+                    name, assumed=True,
+                    assumption_reason=f"Typische optionale Zutat in {dish_name}"
+                )
+                assumed_items.append(fi)
 
         # Check if compound needs clarification (handled by engine as CONDITIONAL)
         clarification = compound.get("needs_clarification")

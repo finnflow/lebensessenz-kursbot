@@ -563,8 +563,13 @@ Erkenne NUR diese spezifische Absicht:
 "recipe_from_ingredients" – Der Nutzer möchte ein Rezept aus verfügbaren/vorhandenen Zutaten.
 Signale: "ich hab nur", "zu Hause", "im Kühlschrank", "aus diesen Zutaten", "mach daraus", "nur das was ich hab", "gerade da", "vorhandene Zutaten", "was kann ich damit machen", "was mach ich damit", "aus dem was ich habe".
 
-Wenn keines dieser Signale vorhanden → intent = null.
-Wenn Nutzer nach beliebigen Rezepten fragt (ohne Einschränkung auf vorhandene Zutaten) → intent = null.
+NIEMALS "recipe_from_ingredients" bei:
+- Compliance-Fragen: "Ist X ok?", "Ist X in Ordnung?", "Ist X trennkostkonform?", "Darf ich X?", "Kann ich X essen?"
+- Zeitliche Trennung: "X vor Y", "erst X dann Y", "X 30 Minuten vor Y"
+- Erklärungsfragen: "Warum...?", "Wieso...?", "Was bedeutet...?"
+- Rezept-Requests ohne Einschränkung: "Gib mir ein Rezept mit Hähnchen"
+
+Wenn keines der positiven Signale eindeutig vorhanden → intent = null.
 
 Antworte NUR mit JSON, kein Kommentar:
 {{"intent": "recipe_from_ingredients" | null, "confidence": "high" | "low"}}"""
@@ -1208,44 +1213,11 @@ def handle_chat(
     )
     modifiers.vision_failed = vision_data.get("vision_failed", False)
 
-    # 3b. Intent override — only for ambiguous modes where regex had no strong signal
-    # NEVER override FOOD_ANALYSIS (compliance check, meal photo), MENU_ANALYSIS, MENU_FOLLOWUP
-    if (
-        intent_result
-        and intent_result.get("intent") == "recipe_from_ingredients"
-        and intent_result.get("confidence") == "high"
-        and mode in (ChatMode.KNOWLEDGE, ChatMode.RECIPE_REQUEST)
-    ):
-        mode = ChatMode.RECIPE_FROM_INGREDIENTS
-        modifiers.intent_hint = "recipe_from_ingredients"
-        print(f"[INTENT] Override → RECIPE_FROM_INGREDIENTS")
-
-    print(f"[PIPELINE] mode={mode.value} | is_breakfast={modifiers.is_breakfast} | wants_recipe={modifiers.wants_recipe}")
-
-    # 3c. Early-exit for RECIPE_FROM_INGREDIENTS
-    if mode == ChatMode.RECIPE_FROM_INGREDIENTS:
-        available_ingredients = _extract_available_ingredients(
-            normalized_message, recent_messages_for_norm, vision_data.get("vision_extraction")
-        )
-        if available_ingredients:
-            print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS | ingredients={available_ingredients[:5]}")
-            response = _handle_recipe_from_ingredients(
-                conversation_id, available_ingredients, modifiers.is_breakfast
-            )
-            conv_data_updated = get_conversation(conversation_id)
-            if should_update_summary(conversation_id, conv_data_updated):
-                update_conversation_summary(conversation_id, conv_data_updated)
-            return {"conversationId": conversation_id, "answer": response, "sources": []}
-        else:
-            print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS: no ingredients found, falling back to RECIPE_REQUEST")
-            mode = ChatMode.RECIPE_REQUEST
-            modifiers.wants_recipe = True
-
-    # 3d. Check for temporal separation (use normalized message)
+    # 3b. Temporal separation check — runs BEFORE intent override so "Apfel 30 min vor Reis"
+    # is intercepted immediately regardless of what the intent classifier returns.
     temporal_sep = detect_temporal_separation(normalized_message)
     if temporal_sep and temporal_sep["is_temporal"]:
         print(f"[PIPELINE] Temporal separation detected: {temporal_sep}")
-        # Build response explaining sequential eating is OK with proper wait times
         first = ", ".join(temporal_sep["first_foods"])
         second = ", ".join(temporal_sep["second_foods"])
         wait = temporal_sep.get("wait_time")
@@ -1268,6 +1240,46 @@ def handle_chat(
 
         create_message(conversation_id, "assistant", response_text)
         return {"answer": response_text, "conversationId": conversation_id}
+
+    # 3c. Intent override — for modes where regex had no strong signal
+    # Also override FOOD_ANALYSIS when it's not a compliance check (e.g. "Ich hab nur X, Y.
+    # Mach daraus was" — food items get detected but the intent is really a recipe request).
+    # NEVER override: MENU_ANALYSIS, MENU_FOLLOWUP, or compliance checks.
+    _can_override_food_analysis = (
+        mode == ChatMode.FOOD_ANALYSIS
+        and not modifiers.is_compliance_check
+        and not image_path  # real meal photo → always food analysis
+    )
+    if (
+        intent_result
+        and intent_result.get("intent") == "recipe_from_ingredients"
+        and intent_result.get("confidence") == "high"
+        and (mode in (ChatMode.KNOWLEDGE, ChatMode.RECIPE_REQUEST) or _can_override_food_analysis)
+    ):
+        mode = ChatMode.RECIPE_FROM_INGREDIENTS
+        modifiers.intent_hint = "recipe_from_ingredients"
+        print(f"[INTENT] Override → RECIPE_FROM_INGREDIENTS")
+
+    print(f"[PIPELINE] mode={mode.value} | is_breakfast={modifiers.is_breakfast} | wants_recipe={modifiers.wants_recipe}")
+
+    # 3d. Early-exit for RECIPE_FROM_INGREDIENTS
+    if mode == ChatMode.RECIPE_FROM_INGREDIENTS:
+        available_ingredients = _extract_available_ingredients(
+            normalized_message, recent_messages_for_norm, vision_data.get("vision_extraction")
+        )
+        if available_ingredients:
+            print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS | ingredients={available_ingredients[:5]}")
+            response = _handle_recipe_from_ingredients(
+                conversation_id, available_ingredients, modifiers.is_breakfast
+            )
+            conv_data_updated = get_conversation(conversation_id)
+            if should_update_summary(conversation_id, conv_data_updated):
+                update_conversation_summary(conversation_id, conv_data_updated)
+            return {"conversationId": conversation_id, "answer": response, "sources": []}
+        else:
+            print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS: no ingredients found, falling back to RECIPE_REQUEST")
+            mode = ChatMode.RECIPE_REQUEST
+            modifiers.wants_recipe = True
 
     # 4. Run Trennkost engine (use normalized message)
     trennkost_results = _run_engine(
