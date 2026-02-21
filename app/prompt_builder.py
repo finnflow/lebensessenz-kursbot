@@ -507,7 +507,7 @@ def build_prompt_recipe_request(
     if recipes:
         top_score = recipes[0].get("score", 0.0) if recipes else 0.0
         has_clear_match = top_score >= 5.0
-        has_no_match = top_score <= 1.5
+        has_no_match = top_score < 5.0
 
         score_instruction = ""
         if has_no_match:

@@ -4,12 +4,27 @@ Recipe search service.
 Loads curated Trennkost-compliant recipes from recipes.json
 and provides filtered search with ranking.
 """
+import os
 import json
 import re
 from pathlib import Path
 from typing import List, Dict, Optional
 
+from dotenv import load_dotenv
+from openai import OpenAI
 from trennkost.ontology import get_ontology
+
+load_dotenv()
+
+_openai_client: Optional[OpenAI] = None
+
+def _get_client() -> OpenAI:
+    global _openai_client
+    if _openai_client is None:
+        _openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    return _openai_client
+
+MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 DATA_PATH = Path(__file__).parent / "data" / "recipes.json"
 
@@ -77,6 +92,69 @@ def _ingredient_matches(recipe_ingredient: str, search_term: str) -> bool:
     return False
 
 
+def _llm_select_recipe_ids(
+    query: str,
+    recipes: List[Dict],
+    limit: int = 3,
+) -> List[str]:
+    """
+    LLM-based recipe selection: show all recipe names to the model,
+    get back a ranked list of IDs that best match the query.
+
+    Works for up to ~300 recipes (fits easily in mini's 128k context).
+    Handles inflections, synonyms and concepts that keyword matching misses.
+
+    Returns: ordered list of recipe IDs (empty if nothing matches).
+    On error: returns [] and falls back to keyword scoring.
+    """
+    # Build compact recipe list: "id — Name (Section) [tag1, tag2]"
+    lines = []
+    for r in recipes:
+        tags_str = ", ".join(r.get("tags", [])[:4])  # max 4 tags to save tokens
+        tags_part = f" [{tags_str}]" if tags_str else ""
+        lines.append(f"{r['id']} — {r['name']} ({r.get('section', '')}){tags_part}")
+    recipe_list = "\n".join(lines)
+
+    prompt = f"""Du bist ein Rezept-Suchassistent für eine Trennkost-App.
+
+NUTZER-ANFRAGE: {query}
+
+VERFÜGBARE REZEPTE:
+{recipe_list}
+
+Wähle bis zu {limit} Rezepte die am BESTEN zur Anfrage passen.
+Berücksichtige: Küche/Herkunft, Zutaten, Stil, Stimmung — auch wenn Wörter nicht exakt übereinstimmen.
+Beispiel: "etwas Italienisches" → Rezepte mit "italienisch", "mediterran", "Pasta", "Risotto" im Namen.
+Beispiel: "etwas Traditionelles" → Rezepte mit "altmodisch", "klassisch", "deftig" im Namen.
+
+Wenn KEIN Rezept zur Anfrage passt: leere ids-Liste zurückgeben.
+Antworte NUR mit JSON, kein Kommentar:
+{{"ids": ["id1", "id2", "id3"]}}"""
+
+    try:
+        response = _get_client().chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=100,
+            timeout=5,
+            response_format={"type": "json_object"},
+        )
+        raw = response.choices[0].message.content.strip()
+        result = json.loads(raw)
+        ids = result.get("ids", [])
+        if not isinstance(ids, list):
+            return []
+        # Validate: only return IDs that actually exist
+        valid_ids = {r["id"] for r in recipes}
+        filtered = [i for i in ids if i in valid_ids]
+        print(f"[RECIPE_LLM] query='{query[:50]}' → selected={filtered}")
+        return filtered[:limit]
+    except Exception as e:
+        print(f"[RECIPE_LLM] selection failed (fallback to keyword): {e}")
+        return []
+
+
 def search_recipes(
     query: str,
     category: Optional[str] = None,
@@ -86,55 +164,73 @@ def search_recipes(
     limit: int = 5,
 ) -> List[Dict]:
     """
-    Search curated recipes with filtering and ranking.
+    Search curated recipes with LLM-based selection (primary) + keyword scoring (fallback).
+
+    Primary path: _llm_select_recipe_ids() — handles inflections, synonyms, cuisine names.
+    Fallback path: keyword + ingredient + tag scoring (used when LLM call fails).
 
     Args:
-        query: User's text (used for keyword matching)
+        query: User's text
         category: Trennkost category filter (KH, PROTEIN, NEUTRAL, OBST, HUELSENFRUECHTE)
         ingredients: Required ingredients (match any)
         tags: Required tags (match any)
-        exclude_ingredients: Ingredients to exclude (allergies/preferences)
+        exclude_ingredients: Ingredients to exclude
         limit: Max results
 
     Returns:
-        List of recipe dicts (without full_recipe_md for brevity)
+        List of recipe dicts (with full_recipe_md for top match only)
     """
     all_recipes = load_recipes()
     if not all_recipes:
         return []
 
-    # Extract useful info from query
     query_lower = query.lower()
-    query_words = set(re.split(r'[\s,;]+', query_lower))
 
-    # Auto-detect category from query if not specified
+    # Hard filters (explicit constraints — applied regardless of search path)
     if not category:
         category = _detect_category_from_query(query_lower)
 
-    # Auto-detect ingredients from query using ontology
+    def _passes_filters(recipe: Dict) -> bool:
+        if category and recipe["trennkost_category"] != category:
+            return False
+        if exclude_ingredients:
+            all_items = " ".join(
+                recipe["ingredients"] + recipe.get("optional_ingredients", [])
+            ).lower()
+            if any(_normalize_ingredient(ex) in all_items for ex in exclude_ingredients):
+                return False
+        return True
+
+    candidates = [r for r in all_recipes if _passes_filters(r)]
+    if not candidates:
+        return []
+
+    # ── Primary: LLM selection ────────────────────────────────────────
+    selected_ids = _llm_select_recipe_ids(query, candidates, limit=limit)
+
+    if selected_ids:
+        # Build results in LLM-ranked order, assign descending scores
+        # Scores 6.0, 5.5, 5.0 … → above "clear match" threshold (5.0),
+        # below direct-output bypass threshold (7.0) so main LLM writes intro.
+        id_to_recipe = {r["id"]: r for r in candidates}
+        results = []
+        for i, rid in enumerate(selected_ids):
+            recipe = id_to_recipe.get(rid)
+            if not recipe:
+                continue
+            score = max(5.0, 6.0 - i * 0.5)
+            result = _build_result(recipe, score, include_full_md=(i == 0))
+            results.append(result)
+        return results
+
+    # ── Fallback: keyword + ingredient + tag scoring ──────────────────
+    print(f"[RECIPE_LLM] LLM returned no matches — falling back to keyword scoring")
     if not ingredients:
         ingredients = _extract_ingredients_from_query(query_lower)
-
-    # Auto-detect tags from query
     if not tags:
         tags = _detect_tags_from_query(query_lower)
 
-    # Filter phase
-    candidates = []
-    for recipe in all_recipes:
-        # Category filter
-        if category and recipe["trennkost_category"] != category:
-            continue
-
-        # Exclude filter
-        if exclude_ingredients:
-            all_items = " ".join(recipe["ingredients"] + recipe.get("optional_ingredients", [])).lower()
-            if any(_normalize_ingredient(ex) in all_items for ex in exclude_ingredients):
-                continue
-
-        candidates.append(recipe)
-
-    # Scoring phase
+    query_words = set(re.split(r'[\s,;]+', query_lower))
     scored = []
     for recipe in candidates:
         score = 0.0
@@ -142,60 +238,51 @@ def search_recipes(
         all_items_lower = " ".join(all_recipe_items).lower()
         recipe_name_lower = recipe["name"].lower()
 
-        # Ingredient match scoring
         if ingredients:
             for ing in ingredients:
                 if any(_ingredient_matches(ri, ing) for ri in all_recipe_items):
                     score += 3.0
-
-        # Tag match scoring
         if tags:
             for tag in tags:
                 if tag in recipe.get("tags", []):
                     score += 2.0
-
-        # Query keyword matching (name + ingredients)
         for word in query_words:
             if len(word) >= 3:
                 if word in recipe_name_lower:
                     score += 2.0
                 elif word in all_items_lower:
                     score += 1.0
-
-        # Bonus for matching section keywords in query
         section_lower = recipe.get("section", "").lower()
         if any(w in query_lower for w in section_lower.split() if len(w) >= 4):
             score += 1.0
-
         scored.append((score, recipe))
 
-    # Sort by score descending, then by name
     scored.sort(key=lambda x: (-x[0], x[1]["name"]))
+    return [
+        _build_result(recipe, score, include_full_md=(i == 0))
+        for i, (score, recipe) in enumerate(scored[:limit])
+    ]
 
-    # Return top N (include full_recipe_md only for top match to save tokens)
-    results = []
-    for i, (score, recipe) in enumerate(scored[:limit]):
-        result = {
-            "id": recipe["id"],
-            "name": recipe["name"],
-            "section": recipe["section"],
-            "time_minutes": recipe["time_minutes"],
-            "servings": recipe["servings"],
-            "ingredients": recipe["ingredients"],
-            "optional_ingredients": recipe.get("optional_ingredients", []),
-            "trennkost_category": recipe["trennkost_category"],
-            "tags": recipe.get("tags", []),
-            "score": score,
-        }
-        # Include full recipe markdown only for top match
-        if i == 0:
-            result["full_recipe_md"] = recipe.get("full_recipe_md", "")
-        # Pass through trennkost_hinweis if present
-        if recipe.get("trennkost_hinweis"):
-            result["trennkost_hinweis"] = recipe["trennkost_hinweis"]
-        results.append(result)
 
-    return results
+def _build_result(recipe: Dict, score: float, include_full_md: bool = False) -> Dict:
+    """Build a standardized result dict from a recipe."""
+    result = {
+        "id": recipe["id"],
+        "name": recipe["name"],
+        "section": recipe["section"],
+        "time_minutes": recipe["time_minutes"],
+        "servings": recipe["servings"],
+        "ingredients": recipe["ingredients"],
+        "optional_ingredients": recipe.get("optional_ingredients", []),
+        "trennkost_category": recipe["trennkost_category"],
+        "tags": recipe.get("tags", []),
+        "score": score,
+    }
+    if include_full_md:
+        result["full_recipe_md"] = recipe.get("full_recipe_md", "")
+    if recipe.get("trennkost_hinweis"):
+        result["trennkost_hinweis"] = recipe["trennkost_hinweis"]
+    return result
 
 
 def _detect_category_from_query(query_lower: str) -> Optional[str]:
