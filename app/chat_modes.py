@@ -77,6 +77,8 @@ _RECIPE_REQUEST_PATTERNS = [
     r"einfaches.*gericht",
     r"abendessen.*idee",
     r"mittagessen.*idee",
+    r"frühstücks?.*idee",
+    r"idee.*frühstück",
 ]
 
 _RECIPE_REQUEST_RE = re.compile(

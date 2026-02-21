@@ -6,7 +6,7 @@ Apfel,"Äpfel,Apple,Apples",OBST,FRISCH,false,,false,
 Birne,"Birnen,Pear,Pears",OBST,FRISCH,false,,false,
 Banane,"Bananen,Banana,Bananas",OBST,FRISCH,false,,false,längere Verdauung: 45-60 Min
 Orange,"Orangen,Apfelsine,Apfelsinen",OBST,FRISCH,false,,false,
-Zitrone,"Zitronen,Limette,Limetten,Lime,Lemon",OBST,FRISCH,false,,false,wird basisch verstoffwechselt trotz saurem Geschmack. ABER: paar Tropfen Saft als Würzmittel gelten als neutral (wie Essig)
+Zitrone,"Zitronen,Limette,Limetten,Lime,Lemon,Lemon wedge",OBST,FRISCH,true,Als ganze Frucht (Dessert/Obst-Mahlzeit) = OBST. Als Würzmittel/Saft in Kochrezepten = NEUTRAL (wie Essig). Kurs-Rezepte Ofenhähnchen + Ofenfisch enthalten Zitrone als PROTEIN-Beilage → im Kochkontext OK.,false,Zubereitungskontext entscheidend: Kochrezept → neutral; Obst-Mahlzeit → OBST
 Grapefruit,Grapefruits,OBST,FRISCH,false,,false,
 Mandarine,"Mandarinen,Clementine,Clementinen,Mandarin,Tangerine",OBST,FRISCH,false,,false,
 Mango,Mangos,OBST,FRISCH,false,,false,
@@ -111,6 +111,7 @@ Knoblauchpulver,Garlic powder,NEUTRAL,KRAEUTER,false,,false,Gewürz
 Chili,"Chilipulver,Chiliflocken,Cayennepfeffer,Chili flakes,Chili powder",NEUTRAL,KRAEUTER,false,,false,Gewürz
 Senf,"Senfpulver,Dijon-Senf,Mustard",NEUTRAL,KRAEUTER,false,,false,Gewürz
 Essig,"Apfelessig,Balsamico,Weißweinessig,Vinegar,Apple cider vinegar,Balsamic vinegar",NEUTRAL,KRAEUTER,false,,false,Würzmittel
+Zitronensaft,"Zitronen-Saft,Lemon juice,Limettensaft,Lime juice,Zitronenabrieb,Zitronenschale",NEUTRAL,KRAEUTER,false,,false,Als Würzmittel/Zutat in Kochrezepten — wie Essig. Kursrezepte (Ofenhähnchen, Ofenfisch) bestätigen: OK mit PROTEIN
 Sojasauce,"Sojasoße,Tamari,Soy sauce",NEUTRAL,KRAEUTER,false,,false,Würzsauce
 Ketchup,"Tomatenketchup,Tomaten-Ketchup,Ketchup Sauce",NEUTRAL,KRAEUTER,false,,false,Tomatensauce mit Gewürzen - als Würze neutral
 Vanille,"Vanilleextrakt,Vanilleschote,Vanilla",NEUTRAL,KRAEUTER,false,,false,Gewürz
