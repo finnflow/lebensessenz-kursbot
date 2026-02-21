@@ -645,7 +645,15 @@ Erkenne NUR diese spezifische Absicht:
 "recipe_from_ingredients" – Der Nutzer möchte ein Rezept aus verfügbaren/vorhandenen Zutaten.
 Signale: "ich hab nur", "zu Hause", "im Kühlschrank", "aus diesen Zutaten", "mach daraus", "nur das was ich hab", "gerade da", "vorhandene Zutaten", "was kann ich damit machen", "was mach ich damit", "aus dem was ich habe".
 
+PFLICHT-REGEL (mechanisch anwenden, keine Ausnahmen):
+Mindestens EIN konkretes Lebensmittel oder eine konkrete Zutat muss in der Nachricht genannt sein.
+Ohne konkretes Lebensmittel → intent = null, egal was sonst steht.
+Beispiele ohne Lebensmittel → IMMER null:
+  "Was kann ich heute essen?", "Was soll ich zum Abendessen machen?", "Was kann ich kochen?",
+  "Was gibt es zum Frühstück?", "Was essen wir heute Abend?"
+
 NIEMALS "recipe_from_ingredients" bei:
+- Allgemeinen Essensfragen ohne Zutaten: "Was kann ich heute essen?", "Was soll ich abends kochen?"
 - Compliance-Fragen: "Ist X ok?", "Ist X in Ordnung?", "Ist X trennkostkonform?", "Darf ich X?", "Kann ich X essen?"
 - Zeitliche Trennung: "X vor Y", "erst X dann Y", "X 30 Minuten vor Y"
 - Erklärungsfragen: "Warum...?", "Wieso...?", "Was bedeutet...?"
@@ -1351,29 +1359,30 @@ def handle_chat(
         available_ingredients = _extract_available_ingredients(
             normalized_message, recent_messages_for_norm, vision_data.get("vision_extraction")
         )
-        # Guard: too-vague terms (e.g. only "obst", "gemüse") → not actionable as ingredient list
-        _GENERIC_TERMS = {"obst", "gemüse", "lebensmittel", "essen", "zutaten", "früchte", "beeren"}
-        _is_too_vague = (
-            len(available_ingredients) == 0
-            or (len(available_ingredients) == 1
-                and available_ingredients[0].strip().lower() in _GENERIC_TERMS)
-        )
-        if available_ingredients and not _is_too_vague:
-            print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS | ingredients={available_ingredients[:5]}")
-            response = _handle_recipe_from_ingredients(
-                conversation_id, available_ingredients, modifiers.is_breakfast
-            )
-            conv_data_updated = get_conversation(conversation_id)
-            if should_update_summary(conversation_id, conv_data_updated):
-                update_conversation_summary(conversation_id, conv_data_updated)
-            return {"conversationId": conversation_id, "answer": response, "sources": []}
-        elif _is_too_vague:
-            print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS: too vague ({available_ingredients}) → FOOD_ANALYSIS")
-            mode = ChatMode.FOOD_ANALYSIS
-        else:
-            print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS: no ingredients found, falling back to RECIPE_REQUEST")
+        # Guard A: no ingredients at all → general recipe request (misfire of classify_intent)
+        if not available_ingredients:
+            print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS: no ingredients found → RECIPE_REQUEST")
             mode = ChatMode.RECIPE_REQUEST
             modifiers.wants_recipe = True
+        else:
+            # Guard B: only a single generic term (e.g. "obst") → treat as food/modification question
+            _GENERIC_TERMS = {"obst", "gemüse", "lebensmittel", "essen", "zutaten", "früchte", "beeren"}
+            _is_only_generic = (
+                len(available_ingredients) == 1
+                and available_ingredients[0].strip().lower() in _GENERIC_TERMS
+            )
+            if _is_only_generic:
+                print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS: only generic term ({available_ingredients}) → FOOD_ANALYSIS")
+                mode = ChatMode.FOOD_ANALYSIS
+            else:
+                print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS | ingredients={available_ingredients[:5]}")
+                response = _handle_recipe_from_ingredients(
+                    conversation_id, available_ingredients, modifiers.is_breakfast
+                )
+                conv_data_updated = get_conversation(conversation_id)
+                if should_update_summary(conversation_id, conv_data_updated):
+                    update_conversation_summary(conversation_id, conv_data_updated)
+                return {"conversationId": conversation_id, "answer": response, "sources": []}
 
     # 3e. Context reference resolution — "dazu"/"damit"/"zusammen" → enrich FOOD_ANALYSIS query
     # e.g. "kann ich dazu Joghurt essen?" → "Joghurt, Haferflocken, Banane" (from prior messages)
