@@ -57,15 +57,27 @@ WICHTIGE REGELN:
     - Gib dann das finale Verdict basierend auf dieser Schätzung
     - KRITISCH: Verwende NIEMALS "{FALLBACK_SENTENCE}" bei Bild-Referenzen!
     - Wenn der User sagt "keine Ahnung" auf deine Mengen-Frage, ist das eine Bild-Referenz, kein "weiß nicht"!
-12. FOLLOW-UP auf FIX-RICHTUNGEN: Wenn du zuvor gefragt hast "Was möchtest du behalten?" und der User
-    antwortet mit einem Lebensmittel oder einer Gruppe (z.B. "den Rotbarsch", "die Kartoffel", "das Protein",
-    "lieber den Reis"), dann ist das KEINE Kursmaterial-Frage!
+12. FOLLOW-UP auf FIX-RICHTUNGEN: Wenn du zuvor eine Alternative-Offerte gemacht hast ("falls du magst",
+    "was möchtest du behalten", "konforme Variante") und der User antwortet:
+    FALL A — User nennt Lebensmittel/Gruppe (z.B. "den Rotbarsch", "die Kartoffel", "das Protein"):
     - Erkenne dies als ANTWORT auf deine eigene Frage
     - Schlage SOFORT ein konkretes Gericht vor basierend auf der Wahl
     - Beispiel: User wählt "Rotbarsch" → schlage vor: "Rotbarsch mit Brokkoli, Paprika und Zitrone"
     - Das Gericht darf NUR die gewählte Komponente + stärkearmes Gemüse/Salat enthalten
     - KRITISCH: Verwende NIEMALS "{FALLBACK_SENTENCE}" bei Follow-up-Antworten!
-    - Wenn unsicher welche Komponente gemeint ist, frage kurz nach, aber gib NICHT den Fallback-Satz!
+    FALL B — User möchte "möglichst viel behalten" / "so ähnlich wie möglich" / "am liebsten alles":
+    - Prüfe die Zutaten aus dem Chat-Verlauf. Bestimme SELBST die beste konforme Variante.
+    - Schlage BEIDE möglichen Richtungen als konkrete Gerichte vor — OHNE Rückfrage!
+    - Beispiel: Haferflocken-Obstbowl → "Option 1: Obst-Bowl (Banane+Mango ohne Haferflocken) /
+      Option 2: Porridge (Haferflocken+Pflanzenmilch ohne Obst)"
+    - Frage NICHT "welche Zutaten hast du?" — die stehen schon im Chat!
+    FALL C — Bestätigung ("ok", "macht Sinn", "verstanden", "alles klar", "gut zu wissen", "danke"):
+    - Antworte NUR: "Prima, jetzt weißt du Bescheid! Falls du doch eine konforme Alternative möchtest, frag einfach nochmal."
+    FALL D — Ablehnung/Desinteresse ("interessiert mich nicht", "egal", "nicht nötig", "passt so"):
+    - Antworte NUR: "Alles klar! Das Angebot bleibt offen, wenn du es mal brauchst."
+    FALL E — Neue Frage ohne Bezug zu Alternativen: Beantworte DIESE Frage. Vergiss die Alternativfrage.
+    KRITISCH: Stelle die Alternativfrage NIEMALS ein zweites Mal!
+    KRITISCH: Wiederhole das Verdict NICHT nochmal wenn es schon gegeben wurde!
 13. SCHLEIFEN-SCHUTZ & WIEDERHOLUNGSVERBOT:
     a) Wenn du eine Frage gestellt hast und der User antwortet, stelle NIEMALS die GLEICHE Frage nochmal!
     b) Wenn der User nach der SPEISEKARTE/MENÜ fragt ("von der Karte", "auf der Speisekarte"),
@@ -202,6 +214,18 @@ def build_menu_followup_block() -> List[str]:
     ]
 
 
+def build_post_analysis_ack_block() -> List[str]:
+    """Short acknowledgement when user didn't engage with the fix-direction offer."""
+    return [
+        "POST-ANALYSE-BESTÄTIGUNG:",
+        "Der User hat das Trennkost-Verdict erhalten und reagiert ohne eine Fix-Richtung zu wählen.",
+        "Antworte KURZ und FREUNDLICH — maximal 1–2 Sätze. Zum Beispiel:",
+        "  'Prima! Jetzt weißt du, wie es damit aussieht. Falls du doch eine konforme Alternative haben möchtest, frag einfach nochmal!'",
+        "  ODER: 'Alles klar! Das Angebot bleibt offen, wenn du es mal brauchst.'",
+        "Wiederhole NICHT das Verdict. Stelle KEINE erneute Alternativ-Frage. Keine Rückfragen.\n",
+    ]
+
+
 def build_clarification_block(needs_clarification: str) -> List[str]:
     """Add clarification prompt for ambiguous foods."""
     return [
@@ -217,6 +241,7 @@ def build_prompt_food_analysis(
     trennkost_results: List[TrennkostResult],
     user_message: str,
     is_breakfast: bool = False,
+    is_compliance_check: bool = False,
 ) -> str:
     """Answer instructions when engine results are present."""
     # Check if this is a menu analysis (multiple dishes)
@@ -271,8 +296,13 @@ def build_prompt_food_analysis(
         "- Erkläre die Probleme kurz und verständlich (keine nummerierten Listen, kein Fachjargon).\n"
         "- Belege mit Kurs-Snippets, aber baue es natürlich in den Text ein.\n"
         "- Bei NOT_OK mit ALTERNATIVEN-Block:\n"
-        "  Frage den User: 'Was möchtest du behalten — [Gruppe A] oder [Gruppe B]?'\n"
-        "  WICHTIG: Die Richtungen sind EXKLUSIV. 'Behalte KH' heißt: NUR KH + Gemüse, KEIN Protein!\n"
+        "  Erkläre KURZ das Problem. Biete dann OPTIONAL an (kein Fragezeichen-Zwang!):\n"
+        "  'Falls du magst, kann ich dir eine konforme Variante vorschlagen — sag mir einfach,\n"
+        "   was du lieber behalten möchtest: [Gruppe A] oder [Gruppe B].'\n"
+        "  WICHTIG: Das ist ein ANGEBOT, keine Pflichtfrage. Halte es einladend, nicht fordernd.\n"
+        "  Wenn User darauf eingeht (Lebensmittel/Gruppe nennt) → sofort konformes Gericht vorschlagen.\n"
+        "  Wenn User nicht darauf eingeht → kurz bestätigen (Fall C/D in Rule 12), NICHT wiederholen!\n"
+        "  Die Richtungen sind EXKLUSIV. 'Behalte KH' heißt: NUR KH + Gemüse, KEIN Protein!\n"
         "  'Behalte Protein' heißt: NUR Protein + Gemüse, KEINE Kohlenhydrate!\n"
         "- REZEPT-VALIDIERUNG (KRITISCH — lies das!):\n"
         "  Bevor du ein Rezept oder eine Alternative vorschlägst, prüfe JEDE Zutat gegen die Regeln!\n"
@@ -295,6 +325,20 @@ def build_prompt_food_analysis(
         "  3. WICHTIG: Schlage KEINE zusätzlichen Zutaten oder Alternativen vor!\n"
         "  4. Konzentriere dich NUR auf die Klärung der offenen Frage\n"
         "- Verwende AUSSCHLIESSLICH Begriffe aus den Kurs-Snippets.\n"
+        + (
+            "\nCOMPLIANCE-CHECK-MODUS — ZUSÄTZLICHE ANWEISUNGEN:\n"
+            "Der User hat ein eigenes Rezept oder eine Zutatenkombination zur Prüfung eingereicht.\n"
+            "Beantworte ZUERST klar mit einer der folgenden Aussagen:\n"
+            "  ✅ 'Ja, das ist trennkost-konform!' ODER\n"
+            "  ❌ 'Nein, leider nicht konform.' ODER\n"
+            "  ⚠️ 'Bedingt konform — es kommt darauf an...'\n"
+            "Erkläre dann KONKRET welche Zutatenkombination das Problem verursacht.\n"
+            "Gib danach 1–2 konkrete Varianten wie das Rezept angepasst werden kann "
+            "(nutze die Fix-Directions aus dem Engine-Block oben).\n"
+            "Stelle KEINE Rückfragen — alle Zutaten sind bekannt.\n"
+            "Wenn der User explizit fragt wie er es konform machen kann: beantworte das direkt.\n"
+            if is_compliance_check else ""
+        )
     )
 
 

@@ -163,6 +163,42 @@
       "optional_items": ["Erdnüsse", "Sojasprossen", "Frühlingszwiebel", "Limette", "Fischsauce", "Tamarinde"],
       "needs_clarification": "Vegetarisch (mit Ei/Tofu) oder vegan (ohne Ei)?",
       "note": "Standard: NOT_OK wegen KH (Reisnudeln) + PROTEIN (Ei/Tofu). Vegan ohne Ei/Tofu = OK (nur KH + Gemüse + Erdnüsse/Fett)"
+    },
+    "Shakshuka": {
+      "base_items": ["Tomaten", "Eier", "Paprika", "Zwiebeln", "Olivenöl"],
+      "optional_items": ["Spinat", "Harissa", "Koriander"],
+      "needs_clarification": null,
+      "note": "Standard: OK — PROTEIN (Eier) + NEUTRAL (Tomaten, Paprika, Zwiebeln) + kleine Menge FETT (Olivenöl, 1-2 EL OK). ACHTUNG: Mit Feta = NOT_OK (PROTEIN + MILCH). Mit Kichererbsen = CONDITIONAL (HUELSENFRUECHTE + PROTEIN). Mit Brot zum Dippen = NOT_OK (KH + PROTEIN)."
+    },
+    "Rührei": {
+      "base_items": ["Eier"],
+      "optional_items": ["Butter", "Salz", "Schnittlauch"],
+      "needs_clarification": null,
+      "note": "OK — reines PROTEIN. Mit Butter (kleine Menge FETT): CONDITIONAL aber praktisch OK. Mit Brot/Toast: NOT_OK (KH + PROTEIN)."
+    },
+    "Spiegelei": {
+      "base_items": ["Eier", "Olivenöl"],
+      "optional_items": ["Salz", "Pfeffer"],
+      "needs_clarification": null,
+      "note": "OK — PROTEIN + kleine Menge FETT. Mit Brot/Toast: NOT_OK (KH + PROTEIN)."
+    },
+    "Avocadotoast": {
+      "base_items": ["Brot", "Avocado"],
+      "optional_items": ["Zitrone", "Salz", "Chiliflocken"],
+      "needs_clarification": null,
+      "note": "CONDITIONAL — KH (Brot) + FETT (Avocado). Avocado ist eine größere Fettmenge, daher nur bedingt OK. Mit Ei obendrauf: NOT_OK (KH + PROTEIN)."
+    },
+    "Acai Bowl": {
+      "base_items": ["Acai", "Banane"],
+      "optional_items": ["Erdbeeren", "Blaubeeren", "Granola", "Kokosraspeln", "Honig"],
+      "needs_clarification": "Mit Granola/Müsli als Topping?",
+      "note": "Pur (nur Obst): OK — reines OBST. Mit Granola (KH) als Topping: NOT_OK (OBST + KH). Granola weglassen oder separat essen."
+    },
+    "Chia Pudding": {
+      "base_items": ["Chiasamen"],
+      "optional_items": ["Vanille", "Ahornsirup"],
+      "needs_clarification": "Mit Pflanzenmilch (z.B. Mandelmilch) oder Joghurt?",
+      "note": "Mit Pflanzenmilch: KH-nah, CONDITIONAL. Mit Früchten: OBST darf nicht gemischt werden. Mit Joghurt: MILCH-Kombination prüfen."
     }
   }
 }

@@ -44,6 +44,7 @@ from trennkost.analyzer import (
 from trennkost.models import TrennkostResult
 
 from app.chat_modes import ChatMode, ChatModifiers, detect_chat_mode
+from app.recipe_service import find_recipes_by_ingredient_overlap
 from app.prompt_builder import (
     SYSTEM_INSTRUCTIONS,
     FALLBACK_SENTENCE,
@@ -54,6 +55,7 @@ from app.prompt_builder import (
     build_vision_legacy_block,
     build_breakfast_block,
     build_menu_followup_block,
+    build_post_analysis_ack_block,
     build_recipe_context_block,
     build_prompt_food_analysis,
     build_prompt_vision_legacy,
@@ -530,6 +532,310 @@ def update_conversation_summary(conversation_id: str, conv_data: Dict[str, Any])
     update_summary(conversation_id, new_summary, new_cursor)
 
 
+# ── Intent classifier + RECIPE_FROM_INGREDIENTS helpers ──────────────
+
+def classify_intent(
+    user_message: str,
+    context_messages: List[Dict[str, Any]],
+) -> Optional[Dict]:
+    """
+    Parallel intent classifier. Recognizes cases that regex misses.
+    Timeout: 4s. On error: None (graceful degradation).
+    Returns: {"intent": "recipe_from_ingredients" | null, "confidence": "high"|"low"}
+    """
+    # Build compact context from last 3 messages
+    ctx_parts = []
+    for msg in context_messages[-3:]:
+        role = "User" if msg.get("role") == "user" else "Bot"
+        content = msg.get("content", "")[:150]
+        ctx_parts.append(f"{role}: {content}")
+    ctx_str = "\n".join(ctx_parts) if ctx_parts else "(keine Vorgeschichte)"
+
+    prompt = f"""Du klassifizierst eine Nutzerabsicht für einen Trennkost-Bot.
+
+KONTEXT (letzte Nachrichten):
+{ctx_str}
+
+AKTUELLE NACHRICHT:
+{user_message}
+
+Erkenne NUR diese spezifische Absicht:
+"recipe_from_ingredients" – Der Nutzer möchte ein Rezept aus verfügbaren/vorhandenen Zutaten.
+Signale: "ich hab nur", "zu Hause", "im Kühlschrank", "aus diesen Zutaten", "mach daraus", "nur das was ich hab", "gerade da", "vorhandene Zutaten", "was kann ich damit machen", "was mach ich damit", "aus dem was ich habe".
+
+Wenn keines dieser Signale vorhanden → intent = null.
+Wenn Nutzer nach beliebigen Rezepten fragt (ohne Einschränkung auf vorhandene Zutaten) → intent = null.
+
+Antworte NUR mit JSON, kein Kommentar:
+{{"intent": "recipe_from_ingredients" | null, "confidence": "high" | "low"}}"""
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=40,
+            timeout=4,
+            response_format={"type": "json_object"},
+        )
+        raw = response.choices[0].message.content.strip()
+        result = json.loads(raw)
+        # Validate expected keys
+        if "intent" in result and "confidence" in result:
+            print(f"[INTENT] classify_intent → intent={result['intent']!r} confidence={result['confidence']!r}")
+            return result
+        return None
+    except Exception as e:
+        print(f"[INTENT] classify_intent failed (non-fatal): {e}")
+        return None
+
+
+def _llm_extract_ingredients(user_message: str, last_messages: List[Dict[str, Any]]) -> List[str]:
+    """
+    LLM-based ingredient extraction — extracts ONLY explicitly mentioned items.
+    Used instead of ontology substring matching to avoid false positives.
+    Returns: list of ingredient names in German, or [] on failure.
+    """
+    # Include last 2 user messages for context (the user may have listed ingredients earlier)
+    ctx_parts = []
+    for msg in last_messages[-4:]:
+        if msg.get("role") == "user" and msg.get("content", "").strip() != user_message.strip():
+            ctx_parts.append(f"Vorherige Nachricht: {msg.get('content', '')[:200]}")
+    ctx_str = "\n".join(ctx_parts) if ctx_parts else ""
+
+    prompt = f"""Extrahiere alle Lebensmittel/Zutaten die der Nutzer explizit als verfügbar erwähnt.
+{ctx_str + chr(10) if ctx_str else ""}Aktuelle Nachricht: {user_message}
+
+Gib NUR die Zutaten zurück, kommagetrennt, auf Deutsch, keine Erklärungen.
+Nur was explizit erwähnt wird — keine Annahmen, keine Extrapolationen.
+Falls keine Zutaten erwähnt: leere Antwort."""
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=80,
+            timeout=4,
+        )
+        raw = response.choices[0].message.content.strip()
+        if not raw:
+            return []
+        items = [i.strip() for i in raw.replace(" und ", ", ").split(",") if i.strip() and len(i.strip()) >= 2]
+        print(f"[EXTRACT_ING] LLM extracted: {items}")
+        return items
+    except Exception as e:
+        print(f"[EXTRACT_ING] LLM extraction failed: {e}")
+        return []
+
+
+def _extract_available_ingredients(
+    user_message: str,
+    last_messages: List[Dict[str, Any]],
+    vision_extraction: Optional[Dict],
+) -> List[str]:
+    """
+    Extract the list of ingredients available to the user.
+
+    Priority:
+    1. Vision-extracted items (if image present)
+    2. LLM-based extraction from current message + recent history
+       (NOT ontology substring matching — too many false positives)
+
+    Returns: deduplicated list. Falls back to [] if nothing found.
+    """
+    found: List[str] = []
+    seen: set = set()
+
+    def _add(items: List[str]):
+        for item in items:
+            key = item.strip().lower()
+            if key and key not in seen:
+                found.append(item.strip())
+                seen.add(key)
+
+    # 1. Vision extraction (highest priority)
+    if vision_extraction and vision_extraction.get("dishes"):
+        for dish in vision_extraction["dishes"]:
+            _add(dish.get("items", []))
+
+    if len(found) >= 2:
+        return found
+
+    # 2. LLM extraction (accurate for explicit ingredient lists)
+    _add(_llm_extract_ingredients(user_message, last_messages))
+
+    return found
+
+
+def _run_feasibility_check(
+    available_ingredients: List[str],
+    overlap_results: List[Dict],
+) -> Dict:
+    """
+    Call 1: Pure logic — can user cook one of the DB recipes?
+
+    Model: gpt-4o-mini, temperature=0.0, max_tokens=200
+    Returns: {"decision": "use_db"|"create_custom", "recipe_id": str|null, "adapt_notes": str, "reason": str}
+    """
+    if not overlap_results:
+        return {"decision": "create_custom", "recipe_id": None, "adapt_notes": "", "reason": "Keine passenden Rezepte in DB"}
+
+    # Deterministic fallback (no LLM call needed if first result has very high/low overlap)
+    best = overlap_results[0]
+    if best["overlap_score"] >= 0.85 and not best["missing_required"]:
+        return {"decision": "use_db", "recipe_id": best["id"], "adapt_notes": "", "reason": "Sehr guter Match"}
+    if best["overlap_score"] < 0.4:
+        return {"decision": "create_custom", "recipe_id": None, "adapt_notes": "", "reason": "Zu wenig passende Zutaten in DB-Rezepten"}
+
+    # Medium overlap → ask LLM to decide
+    recipes_summary = []
+    for r in overlap_results:
+        missing_req = r["missing_required"]
+        missing_opt = r["missing_optional"]
+        recipes_summary.append(
+            f"- {r['name']} (Overlap: {r['overlap_score']:.0%})\n"
+            f"  Vorhanden: {', '.join(r['matched_ingredients']) or '–'}\n"
+            f"  Fehlt (Pflicht): {', '.join(missing_req) or 'nichts'}\n"
+            f"  Fehlt (Optional): {', '.join(missing_opt) or 'nichts'}"
+        )
+    recipes_text = "\n".join(recipes_summary)
+
+    prompt = f"""Du entscheidest ob ein Rezept aus der Datenbank mit den verfügbaren Zutaten kochbar ist.
+
+Verfügbare Zutaten: {', '.join(available_ingredients)}
+
+Top Rezept-Matches aus DB:
+{recipes_text}
+
+Regeln:
+- "use_db" wenn: Pflicht-Zutaten ≥70% vorhanden UND fehlende Zutaten sind nur Toppings/Dekoration/leicht weglassbar
+- "create_custom" wenn: Mehrere Kern-Zutaten fehlen die das Gericht ausmachen
+- adapt_notes: kurzer Hinweis was weggelassen/ersetzt werden kann (max 1 Satz, leer wenn use_db reibungslos)
+
+Antworte NUR mit JSON:
+{{"decision": "use_db" | "create_custom", "recipe_id": "<id_des_besten_rezepts>" | null, "adapt_notes": "<hinweis>", "reason": "<kurze_begründung>"}}"""
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=200,
+            timeout=5,
+            response_format={"type": "json_object"},
+        )
+        raw = response.choices[0].message.content.strip()
+        result = json.loads(raw)
+        print(f"[RECIPE_FROM_ING] Feasibility → decision={result.get('decision')!r} recipe_id={result.get('recipe_id')!r}")
+        return result
+    except Exception as e:
+        print(f"[RECIPE_FROM_ING] Feasibility check failed (non-fatal): {e}")
+        # Deterministic fallback
+        if best["overlap_score"] >= 0.7:
+            return {"decision": "use_db", "recipe_id": best["id"], "adapt_notes": "", "reason": "Fallback: overlap ≥ 0.7"}
+        return {"decision": "create_custom", "recipe_id": None, "adapt_notes": "", "reason": "Fallback: overlap < 0.7"}
+
+
+def _run_custom_recipe_builder(
+    available_ingredients: List[str],
+    is_breakfast: bool = False,
+) -> str:
+    """
+    Call 2: Creative — builds a custom recipe from available ingredients.
+    Only called when Call 1 → "create_custom".
+
+    Model: gpt-4o-mini, temperature=0.3, max_tokens=800
+    """
+    breakfast_note = ""
+    if is_breakfast:
+        breakfast_note = "\n- Frühstücks-Optionen: NUR Obst-Variante ODER KH-Variante (niemals kombiniert!)"
+
+    prompt = f"""Erstelle ein trennkostkonformes Rezept ausschließlich aus diesen Zutaten:
+{', '.join(available_ingredients)}
+
+REGELN (strikt einhalten):
+- Verwende NUR die oben genannten Zutaten (keine Extras ausser Gewürze/Öl/Salz)
+- Kein KH + PROTEIN kombinieren
+- Obst immer allein, nicht mit anderen Lebensmittelgruppen mischen
+- Hülsenfrüchte nur mit Gemüse (NEUTRAL) kombinieren{breakfast_note}
+
+FORMAT:
+**[Rezeptname]**
+⏱️ [Zeit] Min. | 🍽️ [Portionen]
+
+**Zutaten:**
+- [Zutat mit Menge]
+
+**Zubereitung:**
+1. [Schritt]
+
+Wenn mehrere sinnvolle Varianten möglich sind (z.B. KH- oder Protein-Variante), präsentiere die beste eine Option.
+Halte die Antwort kompakt und praktisch."""
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": SYSTEM_INSTRUCTIONS},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.3,
+            max_tokens=800,
+            timeout=15,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"[RECIPE_FROM_ING] Custom builder failed: {e}")
+        return f"Tut mir leid, ich konnte kein passendes Rezept aus diesen Zutaten erstellen: {', '.join(available_ingredients)}. Bitte versuche es erneut oder frage nach einem konkreten Gericht."
+
+
+def _handle_recipe_from_ingredients(
+    conversation_id: str,
+    available_ingredients: List[str],
+    is_breakfast: bool = False,
+) -> str:
+    """
+    Full handler for RECIPE_FROM_INGREDIENTS mode.
+    Replaces normal LLM call for this mode.
+
+    1. find_recipes_by_ingredient_overlap(available_ingredients, limit=3)
+    2. _run_feasibility_check(available_ingredients, overlap_results)  [Call 1]
+    3. If "use_db": format DB recipe + adapt_notes
+       If "create_custom": _run_custom_recipe_builder(available_ingredients)  [Call 2]
+    4. save + return
+    """
+    print(f"[RECIPE_FROM_ING] Searching overlap for {len(available_ingredients)} ingredients")
+    overlap_results = find_recipes_by_ingredient_overlap(available_ingredients, limit=3)
+    for r in overlap_results:
+        print(f"  → {r['name']} overlap={r['overlap_score']:.0%} missing_req={r['missing_required'][:3]}")
+
+    feasibility = _run_feasibility_check(available_ingredients, overlap_results)
+    decision = feasibility.get("decision", "create_custom")
+
+    if decision == "use_db" and feasibility.get("recipe_id"):
+        # Find the matching recipe from overlap results
+        recipe_id = feasibility["recipe_id"]
+        recipe = next((r for r in overlap_results if r["id"] == recipe_id), None)
+        if recipe is None:
+            # Fallback: use best overlap result
+            recipe = overlap_results[0] if overlap_results else None
+
+        if recipe:
+            adapt_notes = feasibility.get("adapt_notes", "")
+            response = _format_recipe_directly(recipe)
+            if adapt_notes:
+                response += f"\n\n💡 **Hinweis:** {adapt_notes}"
+            create_message(conversation_id, "assistant", response)
+            return response
+
+    # create_custom path (or use_db fallback failed)
+    response = _run_custom_recipe_builder(available_ingredients, is_breakfast)
+    response += "\n\n_Dieses Rezept wurde speziell für deine verfügbaren Zutaten erstellt._"
+    create_message(conversation_id, "assistant", response)
+    return response
+
+
 # ── Pipeline steps ───────────────────────────────────────────────────
 
 def _setup_conversation(
@@ -696,6 +1002,10 @@ def _build_prompt_parts(
     if mode == ChatMode.MENU_FOLLOWUP and not trennkost_results:
         parts.extend(build_menu_followup_block())
 
+    # Post-analysis acknowledgement block
+    if modifiers.is_post_analysis_ack:
+        parts.extend(build_post_analysis_ack_block())
+
     # Recipe context block (injected early, before course snippets)
     if mode == ChatMode.RECIPE_REQUEST and recipe_results:
         parts.extend(build_recipe_context_block(recipe_results))
@@ -703,7 +1013,8 @@ def _build_prompt_parts(
     # Determine answer instructions based on mode
     if trennkost_results:
         answer_instructions = build_prompt_food_analysis(
-            trennkost_results, user_message, modifiers.is_breakfast
+            trennkost_results, user_message, modifiers.is_breakfast,
+            is_compliance_check=modifiers.is_compliance_check,
         )
     elif mode == ChatMode.RECIPE_REQUEST:
         answer_instructions = build_prompt_recipe_request(
@@ -854,24 +1165,32 @@ def handle_chat(
     # 1b. Get recent messages for normalization context
     recent_messages_for_norm = get_last_n_messages(conversation_id, 4)
 
-    # 1c & 2. Parallel: Normalize + Vision (if image present)
+    # 1c & 2. Parallel: Normalize + Intent + Vision (if image present)
     vision_data = {"vision_analysis": None, "food_groups": None,
                    "vision_extraction": None, "vision_is_menu": False,
                    "vision_failed": False}
+    intent_result: Optional[Dict] = None
 
     if image_path:
-        # Parallelize: Run normalization + vision simultaneously
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        # Parallelize: Run normalization + intent classification + vision simultaneously
+        with ThreadPoolExecutor(max_workers=3) as executor:
             normalize_future = executor.submit(normalize_input, user_message, recent_messages_for_norm, is_new)
+            intent_future = executor.submit(classify_intent, user_message, recent_messages_for_norm)
             vision_future = executor.submit(_process_vision, image_path, user_message)
 
-            # Wait for both to complete
             normalized_message = normalize_future.result()
+            intent_result = intent_future.result()
             vision_data = vision_future.result()
-        print(f"[PIPELINE] Parallel execution: normalization + vision completed")
+        print(f"[PIPELINE] Parallel execution: normalization + intent + vision completed")
     else:
-        # No image: just normalize
-        normalized_message = normalize_input(user_message, recent_messages_for_norm, is_new)
+        # No image: parallelize normalization + intent classification
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            normalize_future = executor.submit(normalize_input, user_message, recent_messages_for_norm, is_new)
+            intent_future = executor.submit(classify_intent, user_message, recent_messages_for_norm)
+
+            normalized_message = normalize_future.result()
+            intent_result = intent_future.result()
+        print(f"[PIPELINE] Parallel execution: normalization + intent completed")
 
     # 3. Detect chat mode (use normalized message)
     vision_type = None
@@ -889,9 +1208,40 @@ def handle_chat(
     )
     modifiers.vision_failed = vision_data.get("vision_failed", False)
 
+    # 3b. Intent override — only for ambiguous modes where regex had no strong signal
+    # NEVER override FOOD_ANALYSIS (compliance check, meal photo), MENU_ANALYSIS, MENU_FOLLOWUP
+    if (
+        intent_result
+        and intent_result.get("intent") == "recipe_from_ingredients"
+        and intent_result.get("confidence") == "high"
+        and mode in (ChatMode.KNOWLEDGE, ChatMode.RECIPE_REQUEST)
+    ):
+        mode = ChatMode.RECIPE_FROM_INGREDIENTS
+        modifiers.intent_hint = "recipe_from_ingredients"
+        print(f"[INTENT] Override → RECIPE_FROM_INGREDIENTS")
+
     print(f"[PIPELINE] mode={mode.value} | is_breakfast={modifiers.is_breakfast} | wants_recipe={modifiers.wants_recipe}")
 
-    # 3b. Check for temporal separation (use normalized message)
+    # 3c. Early-exit for RECIPE_FROM_INGREDIENTS
+    if mode == ChatMode.RECIPE_FROM_INGREDIENTS:
+        available_ingredients = _extract_available_ingredients(
+            normalized_message, recent_messages_for_norm, vision_data.get("vision_extraction")
+        )
+        if available_ingredients:
+            print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS | ingredients={available_ingredients[:5]}")
+            response = _handle_recipe_from_ingredients(
+                conversation_id, available_ingredients, modifiers.is_breakfast
+            )
+            conv_data_updated = get_conversation(conversation_id)
+            if should_update_summary(conversation_id, conv_data_updated):
+                update_conversation_summary(conversation_id, conv_data_updated)
+            return {"conversationId": conversation_id, "answer": response, "sources": []}
+        else:
+            print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS: no ingredients found, falling back to RECIPE_REQUEST")
+            mode = ChatMode.RECIPE_REQUEST
+            modifiers.wants_recipe = True
+
+    # 3d. Check for temporal separation (use normalized message)
     temporal_sep = detect_temporal_separation(normalized_message)
     if temporal_sep and temporal_sep["is_temporal"]:
         print(f"[PIPELINE] Temporal separation detected: {temporal_sep}")

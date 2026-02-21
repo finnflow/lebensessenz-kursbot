@@ -241,6 +241,76 @@ def _extract_ingredients_from_query(query_lower: str) -> List[str]:
     return found
 
 
+def extract_ingredients_from_query(query: str) -> List[str]:
+    """Public alias: extract food items from query using ontology."""
+    return _extract_ingredients_from_query(query.lower())
+
+
+def find_recipes_by_ingredient_overlap(
+    available_ingredients: List[str],
+    limit: int = 3,
+) -> List[Dict]:
+    """
+    Find recipes by ingredient overlap — NOT semantic similarity.
+
+    For each recipe, counts how many required ingredients the user has.
+    Uses _ingredient_matches() for ontology-aware fuzzy matching.
+
+    Returns: recipes sorted by overlap DESC, enriched with:
+      overlap_score: float (0.0–1.0)
+      matched_ingredients: List[str]
+      missing_required: List[str]
+      missing_optional: List[str]
+    """
+    all_recipes = load_recipes()
+    if not all_recipes or not available_ingredients:
+        return []
+
+    scored = []
+    for recipe in all_recipes:
+        required = recipe.get("ingredients", [])
+        optional = recipe.get("optional_ingredients", [])
+
+        if not required:
+            continue
+
+        matched = []
+        missing_required = []
+        for req_ing in required:
+            if any(_ingredient_matches(req_ing, avail) for avail in available_ingredients):
+                matched.append(req_ing)
+            else:
+                missing_required.append(req_ing)
+
+        missing_optional = [
+            opt for opt in optional
+            if not any(_ingredient_matches(opt, avail) for avail in available_ingredients)
+        ]
+
+        overlap_score = len(matched) / len(required) if required else 0.0
+
+        scored.append((overlap_score, {
+            "id": recipe["id"],
+            "name": recipe["name"],
+            "section": recipe["section"],
+            "time_minutes": recipe["time_minutes"],
+            "servings": recipe["servings"],
+            "ingredients": required,
+            "optional_ingredients": optional,
+            "trennkost_category": recipe["trennkost_category"],
+            "tags": recipe.get("tags", []),
+            "full_recipe_md": recipe.get("full_recipe_md", ""),
+            "trennkost_hinweis": recipe.get("trennkost_hinweis"),
+            "overlap_score": overlap_score,
+            "matched_ingredients": matched,
+            "missing_required": missing_required,
+            "missing_optional": missing_optional,
+        }))
+
+    scored.sort(key=lambda x: (-x[0], x[1]["name"]))
+    return [r for _, r in scored[:limit]]
+
+
 def _detect_tags_from_query(query_lower: str) -> List[str]:
     """Detect relevant tags from query text."""
     tags = []

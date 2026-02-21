@@ -19,6 +19,7 @@ class ChatMode(str, Enum):
     MENU_ANALYSIS = "MENU_ANALYSIS"
     MENU_FOLLOWUP = "MENU_FOLLOWUP"
     RECIPE_REQUEST = "RECIPE_REQUEST"
+    RECIPE_FROM_INGREDIENTS = "RECIPE_FROM_INGREDIENTS"
 
 
 @dataclass
@@ -28,6 +29,9 @@ class ChatModifiers:
     vision_failed: bool = False
     needs_clarification: Optional[str] = None
     wants_recipe: bool = False
+    is_compliance_check: bool = False
+    is_post_analysis_ack: bool = False
+    intent_hint: Optional[str] = None
 
 
 # ── Menu-reference detection ──────────────────────────────────────────
@@ -83,7 +87,7 @@ _RECIPE_REQUEST_RE = re.compile(
 def is_explanation_question(text: str) -> bool:
     """Check if message is an explanation question, not a recipe request."""
     text_lower = text.lower().strip()
-    explanation_patterns = [
+    prefix_patterns = [
         r"^(und |aber |also )?(warum|wieso|weshalb)",
         r"^ist (das|es|dies)",
         r"^wie (lange|viel|oft|geht)",
@@ -94,13 +98,61 @@ def is_explanation_question(text: str) -> bool:
         r"^soll (ich|man|das)",
         r"^erkläre",
         r"^erklär",
-        r"trennkost\?$",  # Questions ending with just "trennkost?"
-        r"gesund\?$",
-        r"ok\?$",
-        r"erlaubt\?$",
-        r"konform\?$",
     ]
-    return any(re.match(pattern, text_lower) for pattern in explanation_patterns)
+    # Trailing compliance patterns: use re.search() so "folgendes rezept konform?" matches
+    trailing_compliance = [
+        r"trennkost\?",
+        r"gesund\?",
+        r"\bok\?",
+        r"erlaubt\?",
+        r"konform\?",
+    ]
+    if any(re.search(p, text_lower) for p in trailing_compliance):
+        return True
+    return any(re.match(pattern, text_lower) for pattern in prefix_patterns)
+
+
+def detect_recipe_compliance(text: str) -> bool:
+    """
+    Check if user is submitting their own recipe/ingredient list for compliance checking.
+    Has priority over detect_recipe_request() to avoid misclassification.
+    """
+    text_lower = text.lower()
+    compliance_signals = [
+        "konform", "erlaubt", "passt das", "geht das", "ist das ok",
+        "trennkostgerecht", "trennkost-gerecht", "darf ich das", "kann ich das so",
+        "war das trennkost", "war das konform",
+        "war das rezept", "war das ok", "ist das ok so", "ist das rezept ok",
+        "war das in ordnung", "ist das in ordnung",
+    ]
+    fix_signals = [
+        r"was muss ich.*(ändern|anpassen)",
+        r"wie.*(konform|trennkost).*machen",
+        r"etwas konformes",
+    ]
+    has_compliance = any(s in text_lower for s in compliance_signals)
+    has_fix = any(re.search(p, text_lower) for p in fix_signals)
+    if not (has_compliance or has_fix):
+        return False
+    # Signal 1: "folgendes" + compliance
+    if "folgendes" in text_lower:
+        return True
+    # Signal 2: Structured ingredient list (3+ newlines) + compliance question
+    if text_lower.count('\n') >= 3 and (has_compliance or has_fix):
+        return True
+    # Signal 3: Long pasted recipe (>300 chars) + compliance question
+    if len(text) > 300 and has_compliance:
+        return True
+    # Signal 4: "mein rezept" + compliance
+    if "mein rezept" in text_lower and (has_compliance or has_fix):
+        return True
+    # Signal 5: Comma-separated ingredient list (3+ commas = list of items) + compliance
+    if text_lower.count(',') >= 3 and has_compliance:
+        return True
+    # Signal 6: "ich hab gegessen" / "ich habe gegessen" pattern (past eating) + compliance
+    if re.search(r"ich habe? gegessen", text_lower) and has_compliance:
+        return True
+    return False
 
 
 def detect_recipe_request(text: str) -> bool:
@@ -134,6 +186,57 @@ def should_suppress_engine(
         if w.strip() and len(w.strip()) >= 3 and ont.lookup(w.strip())
     )
     return food_count < 2
+
+
+# ── Post-analysis acknowledgement detection ───────────────────────────
+
+_POST_ANALYSIS_ACK_PATTERNS = [
+    r"^(ok|okay)[\s!?.]*$",
+    r"^(klar|alles klar)[\s!?.]*$",
+    r"(macht|macht'?s?) sinn",
+    r"^das (ist |macht )?(mir )?(klar|ok|sinn)",
+    r"^naja[\s!?,.]",
+    r"interessiert mich nicht",
+    r"^egal[\s!?.]*$",
+    r"^(nicht |kein) (nötig|bedarf)",
+    r"^passt[\s!?.]*$",
+    r"^gut zu wissen",
+    r"^verstanden[\s!?.]*$",
+    r"^danke[\s!?.]*$",
+]
+
+
+def detect_post_analysis_followup(
+    user_message: str,
+    last_messages: List[Dict],
+) -> bool:
+    """
+    Detect when user acknowledged a food analysis verdict
+    without picking a fix-direction choice.
+
+    Returns True if:
+    - The last assistant message contained a fix-direction offer
+    - AND the user response matches an acknowledgement/dismissal pattern
+    """
+    if not last_messages:
+        return False
+
+    # Check recent assistant messages for fix-direction indicators
+    for msg in reversed(last_messages[-3:]):
+        if msg.get("role") != "assistant":
+            continue
+        content_lower = msg.get("content", "").lower()
+        fix_indicators = ["behalten", "konforme variante", "falls du magst", "was lieber"]
+        if not any(ind in content_lower for ind in fix_indicators):
+            continue
+
+        # Bot made a fix-direction offer — check if user acknowledged without choosing
+        msg_lower = user_message.lower().strip()
+        if any(re.search(p, msg_lower) for p in _POST_ANALYSIS_ACK_PATTERNS):
+            return True
+        break  # Only check the most recent relevant assistant message
+
+    return False
 
 
 # ── Central mode detection ────────────────────────────────────────────
@@ -226,6 +329,12 @@ def detect_chat_mode(
     if is_menu_ref:
         return ChatMode.MENU_FOLLOWUP, modifiers
 
+    # 3.5. Compliance check: user submitting own recipe for verification
+    # Must run BEFORE recipe-request detection to avoid "rezept" keyword mis-match.
+    if detect_recipe_compliance(user_message):
+        modifiers.is_compliance_check = True
+        return ChatMode.FOOD_ANALYSIS, modifiers
+
     # 4. Recipe request (explicit keywords)
     if detect_recipe_request(user_message):
         modifiers.wants_recipe = True
@@ -235,6 +344,11 @@ def detect_chat_mode(
     if modifiers.is_followup and _is_recipe_followup(user_message, last_messages or []):
         modifiers.wants_recipe = True
         return ChatMode.RECIPE_REQUEST, modifiers
+
+    # 4c. Post-analysis acknowledgement (user got verdict, didn't engage with fix offer)
+    if modifiers.is_followup and detect_post_analysis_followup(user_message, last_messages or []):
+        modifiers.is_post_analysis_ack = True
+        return ChatMode.KNOWLEDGE, modifiers
 
     # 5. Food query detection
     is_food = detect_food_query(user_message)
