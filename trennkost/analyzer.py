@@ -80,10 +80,11 @@ _SKIP_LINE_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Breakfast detection keywords
+# Breakfast detection keywords (explicit + implicit signals like "Haferflocken", "Porridge")
 _BREAKFAST_KEYWORDS = re.compile(
     r"frühstück|fruehstueck|morgens|vormittag|zum\s*frühstück|breakfast"
-    r"|morgenessen|am\s*morgen|in\s*der\s*früh|in\s*der\s*frueh",
+    r"|morgenessen|am\s*morgen|in\s*der\s*früh|in\s*der\s*frueh"
+    r"|haferflocken|porridge|müsli|muesli|overnight|granola|oatmeal",
     re.IGNORECASE,
 )
 

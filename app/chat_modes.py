@@ -352,6 +352,12 @@ def detect_chat_mode(
         modifiers.is_post_analysis_ack = True
         return ChatMode.KNOWLEDGE, modifiers
 
+    # 4d. "zusammen"/"kombinier" with a food → always FOOD_ANALYSIS
+    # e.g. "und mit dem obst zusammen?", "kann ich das kombinieren?"
+    _ZUSAMMEN_RE = re.compile(r'\b(zusammen|mit\s+\S+\s+essen|kombinier)\b', re.IGNORECASE)
+    if _ZUSAMMEN_RE.search(user_message):
+        return ChatMode.FOOD_ANALYSIS, modifiers
+
     # 5. Food query detection
     is_food = detect_food_query(user_message)
     if is_food:

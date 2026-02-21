@@ -260,6 +260,15 @@ def build_prompt_food_analysis(
         "UNKNOWN": "UNKLAR",
     }.get(verdict_str, verdict_str)
 
+    # Check for OBST + KH conflict in engine results (independent of is_breakfast flag)
+    _groups_present: set = set()
+    for r in trennkost_results:
+        for group_name in r.groups_found.keys():
+            _groups_present.add(group_name)
+    _has_obst_kh_conflict = "OBST" in _groups_present and any(
+        g in _groups_present for g in ("KH", "GETREIDE", "HUELSENFRUECHTE", "TROCKENOBST")
+    )
+
     breakfast_section = ""
     if is_breakfast:
         breakfast_section = (
@@ -270,6 +279,13 @@ def build_prompt_food_analysis(
             "  4. Falls User auf fettreiche Option besteht: erlaubt, aber mit freundlichem Hinweis.\n"
             "  5. Konkrete fettarme Empfehlungen: Obst, Grüner Smoothie, Overnight-Oats, Porridge,\n"
             "     Reis-Pudding, Hirse-Grieß, glutenfreies Brot mit Gemüse + max 1-2 TL Avocado.\n"
+        )
+    elif _has_obst_kh_conflict:
+        breakfast_section = (
+            "- OBST+KH KONFLIKT ERKANNT: Empfehle das zweistufige Frühstücks-Konzept:\n"
+            "  → Stufe 1: Erst das Obst (Banane, Mango etc.) ALLEIN essen — 20-30 Min. warten\n"
+            "  → Stufe 2: Dann das KH-Gericht (Porridge/Bowl/Haferflocken) OHNE Obst\n"
+            "  NICHT '3 Stunden Abstand' sagen — die Lösung ist: Obst VORHER essen, kurz warten.\n"
         )
 
     return (

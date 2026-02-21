@@ -1,14 +1,15 @@
 {
-  "timestamp": "2026-02-21T17:16:14.662433",
+  "timestamp": "2026-02-21T19:12:56.496685",
   "summary": {
-    "passed": 5,
-    "failed": 3,
+    "passed": 4,
+    "failed": 4,
     "total": 8
   },
   "results": [
     {
       "id": "trennkost_definition",
-      "status": "PASSED"
+      "status": "FAILED",
+      "reason": "Check details below"
     },
     {
       "id": "kohlenhydrate_protein",

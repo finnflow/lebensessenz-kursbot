@@ -1,4 +1,5 @@
 import os
+import re
 import json
 from typing import Optional, List, Dict, Any, Tuple
 from dotenv import load_dotenv
@@ -42,6 +43,7 @@ from trennkost.analyzer import (
     build_rag_query,
 )
 from trennkost.models import TrennkostResult
+from trennkost.ontology import get_ontology
 
 from app.chat_modes import ChatMode, ChatModifiers, detect_chat_mode
 from app.recipe_service import find_recipes_by_ingredient_overlap
@@ -532,6 +534,86 @@ def update_conversation_summary(conversation_id: str, conv_data: Dict[str, Any])
     update_summary(conversation_id, new_summary, new_cursor)
 
 
+# ── Context reference resolution ─────────────────────────────────────
+
+_REF_PATTERN = re.compile(
+    r'\b(dazu|damit|zusammen|dazu\s+essen|kombinier)\b', re.IGNORECASE
+)
+
+
+def _extract_foods_ontology(text: str) -> List[str]:
+    """
+    Fast ontology-based food extraction from text.
+    Returns canonical names found in text (no LLM, no side effects).
+    """
+    ont = get_ontology()
+    text_lower = text.lower()
+    found: List[str] = []
+    seen: set = set()
+    for entry in ont.entries:
+        names_to_check = [entry.canonical] + entry.synonyms
+        for name in names_to_check:
+            if len(name) < 2:
+                continue
+            pattern = (
+                r'(?<![a-zA-ZäöüÄÖÜß])'
+                + re.escape(name.lower())
+                + r'(?![a-zA-ZäöüÄÖÜß])'
+            )
+            if re.search(pattern, text_lower):
+                key = entry.canonical.lower()
+                if key not in seen:
+                    found.append(entry.canonical)
+                    seen.add(key)
+                break
+    return found
+
+
+def _resolve_context_references(
+    user_message: str,
+    last_messages: List[Dict[str, Any]],
+) -> Optional[str]:
+    """
+    Detects "dazu"/"damit"/"zusammen" in user_message and enriches the query
+    with food items from recent conversation history.
+
+    Example: "kann ich dazu Joghurt essen?" → "Joghurt, Haferflocken, Banane"
+    Returns: enriched query string or None if no context references found.
+    """
+    if not _REF_PATTERN.search(user_message):
+        return None
+
+    # Extract foods mentioned in current message
+    current_foods = _extract_foods_ontology(user_message)
+
+    # Search last 3 messages (skip the current one) for food context
+    prev_foods: List[str] = []
+    recent = [m for m in last_messages if m.get("content", "").strip() != user_message.strip()]
+    for msg in reversed(recent[-3:]):
+        items = _extract_foods_ontology(msg.get("content", ""))
+        if items:
+            prev_foods = items[:5]
+            break
+
+    if not prev_foods:
+        return None
+
+    # Combine current + previous, deduplicate (current first)
+    seen_keys = {f.lower() for f in current_foods}
+    enriched = list(current_foods)
+    for food in prev_foods:
+        if food.lower() not in seen_keys:
+            enriched.append(food)
+            seen_keys.add(food.lower())
+
+    if len(enriched) <= len(current_foods):
+        return None  # No new context foods added
+
+    enriched_str = ", ".join(enriched[:6])
+    print(f"[CONTEXT_REF] Resolved '{user_message[:60]}' → '{enriched_str}'")
+    return enriched_str
+
+
 # ── Intent classifier + RECIPE_FROM_INGREDIENTS helpers ──────────────
 
 def classify_intent(
@@ -568,6 +650,8 @@ NIEMALS "recipe_from_ingredients" bei:
 - Zeitliche Trennung: "X vor Y", "erst X dann Y", "X 30 Minuten vor Y"
 - Erklärungsfragen: "Warum...?", "Wieso...?", "Was bedeutet...?"
 - Rezept-Requests ohne Einschränkung: "Gib mir ein Rezept mit Hähnchen"
+- Modifikationsfragen: "aufpeppen", "verbessern", "ergänzen", "was passt dazu", "kann ich X dazu", "das mit X aufpeppen?", "wie kann ich das ergänzen?"
+- Kombinationsfragen: "kann ich dazu X essen?", "passt X dazu?", "und mit dem X zusammen?"
 
 Wenn keines der positiven Signale eindeutig vorhanden → intent = null.
 
@@ -1267,7 +1351,14 @@ def handle_chat(
         available_ingredients = _extract_available_ingredients(
             normalized_message, recent_messages_for_norm, vision_data.get("vision_extraction")
         )
-        if available_ingredients:
+        # Guard: too-vague terms (e.g. only "obst", "gemüse") → not actionable as ingredient list
+        _GENERIC_TERMS = {"obst", "gemüse", "lebensmittel", "essen", "zutaten", "früchte", "beeren"}
+        _is_too_vague = (
+            len(available_ingredients) == 0
+            or (len(available_ingredients) == 1
+                and available_ingredients[0].strip().lower() in _GENERIC_TERMS)
+        )
+        if available_ingredients and not _is_too_vague:
             print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS | ingredients={available_ingredients[:5]}")
             response = _handle_recipe_from_ingredients(
                 conversation_id, available_ingredients, modifiers.is_breakfast
@@ -1276,14 +1367,25 @@ def handle_chat(
             if should_update_summary(conversation_id, conv_data_updated):
                 update_conversation_summary(conversation_id, conv_data_updated)
             return {"conversationId": conversation_id, "answer": response, "sources": []}
+        elif _is_too_vague:
+            print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS: too vague ({available_ingredients}) → FOOD_ANALYSIS")
+            mode = ChatMode.FOOD_ANALYSIS
         else:
             print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS: no ingredients found, falling back to RECIPE_REQUEST")
             mode = ChatMode.RECIPE_REQUEST
             modifiers.wants_recipe = True
 
-    # 4. Run Trennkost engine (use normalized message)
+    # 3e. Context reference resolution — "dazu"/"damit"/"zusammen" → enrich FOOD_ANALYSIS query
+    # e.g. "kann ich dazu Joghurt essen?" → "Joghurt, Haferflocken, Banane" (from prior messages)
+    analysis_query = normalized_message
+    if mode == ChatMode.FOOD_ANALYSIS:
+        resolved = _resolve_context_references(normalized_message, recent)
+        if resolved:
+            analysis_query = resolved
+
+    # 4. Run Trennkost engine (use analysis_query so context foods are included)
     trennkost_results = _run_engine(
-        normalized_message, vision_data.get("vision_extraction"), mode
+        analysis_query, vision_data.get("vision_extraction"), mode
     )
 
     if DEBUG_RAG and trennkost_results:
@@ -1365,10 +1467,10 @@ def handle_chat(
             "sources": []
         }
 
-    # 8. Build prompt (use normalized message)
+    # 8. Build prompt (use analysis_query — may include resolved context foods)
     prompt_parts, answer_instructions = _build_prompt_parts(
         mode, modifiers, trennkost_results, vision_data,
-        summary, last_messages, normalized_message, recipe_results,
+        summary, last_messages, analysis_query, recipe_results,
     )
     modifiers.needs_clarification = needs_clarification
 
