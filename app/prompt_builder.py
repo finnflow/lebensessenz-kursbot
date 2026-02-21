@@ -507,9 +507,24 @@ def build_prompt_recipe_request(
     if recipes:
         top_score = recipes[0].get("score", 0.0) if recipes else 0.0
         has_clear_match = top_score >= 5.0
+        has_no_match = top_score <= 1.5
 
         score_instruction = ""
-        if has_clear_match:
+        if has_no_match:
+            score_instruction = (
+                "⚠️ KEIN PASSENDES REZEPT IN DATENBANK (Score ≤ 1.5):\n"
+                "Die gefundenen Rezepte passen NICHT zur Anfrage des Users.\n"
+                "VERBOTEN: Eines der obigen Rezepte als passend präsentieren!\n"
+                "\n"
+                "VERHALTEN:\n"
+                "- Sage ehrlich und freundlich, dass kein passendes Rezept in der Datenbank ist\n"
+                "  (z.B. 'Leider haben wir kein klassisches italienisches Rezept in unserer Datenbank.')\n"
+                "- Biete direkt an, ein Trennkost-konformes Rezept zu erstellen\n"
+                "  (z.B. 'Ich kann dir aber ein trennkostkonformes italienisches Gericht zusammenstellen — \n"
+                "   magst du lieber etwas mit Nudeln, Risotto oder Gemüse?')\n"
+                "- NIEMALS ein themenfremdes Rezept aus der Datenbank als Alternative ausgeben!\n\n"
+            )
+        elif has_clear_match:
             score_instruction = (
                 "🚨 KRITISCH — HOHER MATCH-SCORE ERKANNT:\n"
                 f"Das Top-Rezept hat Score {top_score:.1f} — das ist ein KLARER MATCH!\n"
