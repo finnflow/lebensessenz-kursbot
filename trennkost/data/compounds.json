@@ -382,6 +382,162 @@
       "optional_items": ["Aubergine", "Zucchini", "Paprika", "Artischocke", "Oliven", "Käse", "Speck", "Schinken"],
       "needs_clarification": "Welche Zutaten? Nur Gemüse, mit Käse (Mozzarella) oder mit Schinken/Salami?",
       "note": "Nur Gemüse + Oliven: OK (NEUTRAL + kleine Menge FETT). Mit Mozzarella (MILCH) + kein Fleisch: OK. Mit Schinken/Salami (PROTEIN) + Mozzarella (MILCH): NOT_OK (R006: PROTEIN + MILCH). Mit Brot/Bruschetta: KH-Kombination prüfen."
+    },
+
+    "Tomatensuppe": {
+      "base_items": ["Tomate", "Zwiebel", "Knoblauch"],
+      "optional_items": ["Sahne", "Olivenöl", "Basilikum"],
+      "needs_clarification": null,
+      "note": "OK — ausschließlich NEUTRAL (Tomate, Zwiebeln, Knoblauch). Mit Sahne: ebenfalls OK (NEUTRAL + MILCH, kein Kombinationsverbot). Mit Olivenöl (1-2 TL): CONDITIONAL auf Menge."
+    },
+    "Kürbissuppe": {
+      "base_items": ["Kürbis", "Zwiebel", "Ingwer"],
+      "optional_items": ["Sahne", "Kokosmilch", "Olivenöl"],
+      "needs_clarification": "Mit Sahne (MILCH → NOT_OK) oder Kokosmilch (FETT → CONDITIONAL)?",
+      "note": "Pur (ohne Milchprodukte): OK — KH (Kürbis) + NEUTRAL (Zwiebel, Ingwer). Mit Sahne: NOT_OK (KH + MILCH). Mit Kokosmilch (FETT, größere Menge): CONDITIONAL (KH + FETT, kein explizites Verbot, aber Fett-Menge prüfen)."
+    },
+    "Minestrone": {
+      "base_items": ["Pasta", "Weiße Bohnen", "Tomate", "Zucchini", "Möhre", "Sellerie"],
+      "optional_items": ["Parmesan", "Olivenöl", "Basilikum"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Pasta, Möhre) + HUELSENFRUECHTE (Weiße Bohnen). Hülsenfrüchte dürfen nicht mit anderen KH kombiniert werden. Mit Parmesan: zusätzlich MILCH."
+    },
+    "Gazpacho": {
+      "base_items": ["Tomate", "Gurke", "Paprika", "Zwiebel", "Knoblauch"],
+      "optional_items": ["Olivenöl", "Essig", "Brot"],
+      "needs_clarification": null,
+      "note": "OK — ausschließlich NEUTRAL (stärkearmes Gemüse + Kräuter). Klassisch Trennkost-freundlich. Auch mit etwas Brot als Einlage: OK (KH + NEUTRAL ist erlaubt). Mit Olivenöl: CONDITIONAL auf Menge."
+    },
+
+    "Gebratener Reis": {
+      "base_items": ["Reis", "Ei", "Frühlingszwiebel"],
+      "optional_items": ["Hähnchen", "Garnele", "Möhre", "Erbsen", "Sojasoße"],
+      "needs_clarification": "Vegetarisch oder mit Fleisch/Meeresfrüchten?",
+      "note": "NOT_OK: KH (Reis) + PROTEIN (Ei). Mit Hähnchen/Garnelen: zusätzlich PROTEIN. Auch bekannt als Fried Rice."
+    },
+    "Ramen": {
+      "base_items": ["Pasta", "Ei", "Speck"],
+      "optional_items": ["Sojasprossen", "Frühlingszwiebel", "Nori", "Mais", "Sojasoße"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Weizennudeln) + PROTEIN (Ei, Schweinebauch/Chashu). Mit Mais: zusätzlich KH. Mit Sojasprossen/Nori: NEUTRAL, ändert nichts am Verdikt."
+    },
+    "Gyoza": {
+      "base_items": ["Weizenmehl", "Schwein", "Weißkohl", "Ingwer", "Knoblauch"],
+      "optional_items": ["Sojasoße", "Reisessig", "Sesamöl"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Weizenteig) + PROTEIN (Schweinehack). Auch bekannt als Dim Sum, Dumplings oder Jiaozi. Gedämpft, gebraten oder gekocht — immer KH + PROTEIN."
+    },
+    "Pho": {
+      "base_items": ["Reisnudeln", "Rindfleisch"],
+      "optional_items": ["Sojasprossen", "Frühlingszwiebel", "Basilikum", "Limette", "Chili"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Reisnudeln) + PROTEIN (Rindfleisch). Vietnamesische Rindfleischsuppe. Frische Kräuter/Sprossen = NEUTRAL, ändern nichts am Verdikt."
+    },
+    "Nasi Goreng": {
+      "base_items": ["Reis", "Ei", "Hähnchen"],
+      "optional_items": ["Frühlingszwiebel", "Knoblauch", "Sojasoße", "Chili", "Garnele"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Reis) + PROTEIN (Ei, Hähnchen). Indonesisches Gebratenes-Reis-Gericht. Mit Garnelen zusätzlich PROTEIN."
+    },
+
+    "Chili con Carne": {
+      "base_items": ["Kidneybohnen", "Hackfleisch", "Tomate", "Zwiebel", "Mais"],
+      "optional_items": ["Käse", "Sauerrahm", "Avocado", "Paprika"],
+      "needs_clarification": null,
+      "note": "NOT_OK: HUELSENFRUECHTE (Bohnen) + PROTEIN (Hackfleisch) + KH (Mais). Dreifach-Verletzung. Mit Käse/Sauerrahm: zusätzlich MILCH. Mit Brot/Tortilla als Beilage: noch mehr KH."
+    },
+    "Chili sin Carne": {
+      "base_items": ["Kidneybohnen", "Tomate", "Paprika", "Zwiebel"],
+      "optional_items": ["Mais", "Süßkartoffel", "Avocado", "Käse"],
+      "needs_clarification": "Mit Mais oder Süßkartoffel?",
+      "note": "Pur (ohne KH): CONDITIONAL — HUELSENFRUECHTE + NEUTRAL. Mit Mais oder Süßkartoffel: NOT_OK (HUELSENFRUECHTE + KH). Mit Käse: NOT_OK (HUELSENFRUECHTE + MILCH)."
+    },
+    "Poke Bowl": {
+      "base_items": ["Reis", "Lachs"],
+      "optional_items": ["Avocado", "Edamame", "Gurke", "Sesam", "Sojasoße", "Mango"],
+      "needs_clarification": "Welcher Protein? Mit Edamame?",
+      "note": "Standard: NOT_OK — KH (Reis) + PROTEIN (Lachs). Mit Edamame: zusätzlich HUELSENFRUECHTE + KH. Mit Mango: zusätzlich OBST + KH. Vegane Variante ohne Fisch: KH + NEUTRAL/HUELSENFRUECHTE prüfen."
+    },
+    "Buddha Bowl": {
+      "base_items": [],
+      "optional_items": ["Reis", "Kichererbsen", "Avocado", "Spinat", "Süßkartoffel", "Tofu", "Tahini"],
+      "needs_clarification": "Welche Basis und Zutaten? Jede Kombination ergibt ein anderes Verdikt.",
+      "note": "Klassik: Reis (KH) + Kichererbsen (HUELSENFRUECHTE) = NOT_OK. Ohne Getreide: HUELSENFRUECHTE + NEUTRAL = CONDITIONAL. Tofu + Reis: HUELSENFRUECHTE + KH = NOT_OK. Rein gemüsebasiert mit Avocado: NEUTRAL + FETT = CONDITIONAL."
+    },
+
+    "Coleslaw": {
+      "base_items": ["Weißkohl", "Möhre", "Mayonnaise"],
+      "optional_items": ["Essig", "Senf", "Honig", "Schnittlauch"],
+      "needs_clarification": null,
+      "note": "CONDITIONAL: NEUTRAL (Weißkohl) + KH (Möhre) + FETT (Mayonnaise, high_fat). KH + NEUTRAL = OK. Mayonnaise = große Fett-Menge → nur noch mit NEUTRAL empfohlen. Auf Mayonnaise-Menge achten."
+    },
+    "Waldorf Salat": {
+      "base_items": ["Sellerie", "Apfel", "Walnüsse", "Mayonnaise"],
+      "optional_items": ["Joghurt", "Zitrone", "Petersilie"],
+      "needs_clarification": null,
+      "note": "NOT_OK: OBST (Apfel) + FETT (Walnüsse, Mayonnaise). Obst darf nicht mit Fett kombiniert werden (R014). Außerdem OBST + NEUTRAL (Sellerie) = NOT_OK, da nur Blattgrün als Ausnahme gilt (R013). Mit Joghurt: zusätzlich OBST + MILCH."
+    },
+    "Tabbouleh": {
+      "base_items": ["Bulgur", "Petersilie", "Tomate", "Gurke", "Minze"],
+      "optional_items": ["Olivenöl", "Zitrone"],
+      "needs_clarification": null,
+      "note": "CONDITIONAL: KH (Bulgur) + NEUTRAL (Petersilie, Tomate, Gurke, Minze) + kleine Menge FETT (Olivenöl). KH + NEUTRAL = OK. Olivenöl (1-2 TL): OK. Zitronensaft (paar Tropfen) gilt als NEUTRAL. Insgesamt Trennkost-freundlich."
+    },
+    "Baba Ghanoush": {
+      "base_items": ["Aubergine", "Sesam", "Knoblauch", "Olivenöl"],
+      "optional_items": ["Zitrone", "Petersilie"],
+      "needs_clarification": null,
+      "note": "CONDITIONAL: NEUTRAL (Aubergine, Knoblauch) + FETT (Tahini/Sesam, Olivenöl). Kein verbotenes Paar. Fett-Menge beachten: größere Sesam/Öl-Mengen → nur noch NEUTRAL empfohlen."
+    },
+
+    "Butter Chicken": {
+      "base_items": ["Hähnchen", "Butter", "Sahne", "Tomate", "Zwiebel", "Knoblauch"],
+      "optional_items": ["Ingwer", "Garam Masala", "Naan", "Reis"],
+      "needs_clarification": "Mit Naan oder Reis als Beilage?",
+      "note": "NOT_OK: PROTEIN (Hähnchen) + MILCH (Butter, Sahne). Auch bekannt als Murgh Makhani. Mit Naan: zusätzlich KH + PROTEIN. Mit Reis: zusätzlich KH + PROTEIN."
+    },
+    "Sauerbraten": {
+      "base_items": ["Rindfleisch", "Kartoffel", "Rotkohl"],
+      "optional_items": ["Rosinen", "Essig", "Lorbeer", "Zwiebel"],
+      "needs_clarification": null,
+      "note": "Traditionell mit Kartoffelklößen: NOT_OK — PROTEIN (Rindfleisch) + KH (Kartoffel). Rotkohl = NEUTRAL, ändert nichts. Sauerbraten pur (ohne Klöße, nur mit Rotkohl): OK (PROTEIN + NEUTRAL)."
+    },
+    "Tortilla Española": {
+      "base_items": ["Kartoffel", "Ei", "Olivenöl", "Zwiebel"],
+      "optional_items": ["Paprika", "Chorizo"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Kartoffel) + PROTEIN (Ei). Spanisches Kartoffel-Omelett. Mit Chorizo: zusätzlich PROTEIN. Mit kleiner Menge Olivenöl in der Pfanne: CONDITIONAL auf Menge."
+    },
+    "Tom Yum": {
+      "base_items": ["Garnele", "Pilze", "Tomate", "Zitronengras"],
+      "optional_items": ["Kokosmilch", "Chili", "Limette", "Ingwer"],
+      "needs_clarification": "Tom Yum Nam Sai (klar, ohne Kokosmilch) oder Tom Kha (mit Kokosmilch)?",
+      "note": "Klar (ohne Kokosmilch): OK — PROTEIN (Garnelen) + NEUTRAL (Pilze, Gemüse, Kräuter). Mit Kokosmilch: CONDITIONAL — PROTEIN + NEUTRAL + FETT (kein explizites Verbot, Menge prüfen)."
+    },
+    "Miso Suppe": {
+      "base_items": ["Miso", "Tofu", "Frühlingszwiebel"],
+      "optional_items": ["Nori", "Pilze", "Ingwer"],
+      "needs_clarification": null,
+      "note": "CONDITIONAL: HUELSENFRUECHTE (Miso + Tofu = fermentierte/verarbeitete Soja) + NEUTRAL (Frühlingszwiebeln, Algen). Kein verbotenes Paar — HUELSENFRUECHTE dürfen mit NEUTRAL kombiniert werden. Kurs warnt generell vor Soja. Ohne KH oder Protein: Trennkost-konform."
+    },
+
+    "Apfelstrudel": {
+      "base_items": ["Weizenmehl", "Apfel", "Butter", "Zimt"],
+      "optional_items": ["Rosinen", "Walnüsse", "Sahne", "Puderzucker"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Weizenmehl-Teig) + OBST (Apfel). Obst darf nicht mit Kohlenhydraten kombiniert werden (R007). Mit Sahne: zusätzlich MILCH + OBST (R009). Mit Rosinen: zusätzlich TROCKENOBST."
+    },
+    "Käsekuchen": {
+      "base_items": ["Weizenmehl", "Quark", "Ei", "Butter"],
+      "optional_items": ["Sahne", "Zitrone", "Vanille", "Zucker"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Mürbeteig aus Weizenmehl) + MILCH (Quark) + PROTEIN (Ei). Dreifach-Verletzung. Mit Früchten als Belag: zusätzlich OBST."
+    },
+    "Schwarzwälder Kirschtorte": {
+      "base_items": ["Weizenmehl", "Ei", "Sahne", "Kirsche"],
+      "optional_items": ["Butter", "Zucker", "Kakao", "Kirschwasser"],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Biskuit-Teig) + PROTEIN (Ei) + MILCH (Sahne) + OBST (Kirschen). Vierfache Verletzung. Sahne + Kirschen allein = MILCH + OBST = NOT_OK (R009)."
     }
   }
 }
