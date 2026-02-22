@@ -365,6 +365,17 @@ def detect_chat_mode(
     if _ZUSAMMEN_RE.search(user_message):
         return ChatMode.FOOD_ANALYSIS, modifiers
 
+    # 4e. Timing/wait questions → always KNOWLEDGE
+    # e.g. "Wie lange nach dem ersten Frühstück?", "Wie lange warten nach Obst?"
+    # These need course-material lookup, not food analysis engine.
+    _TIMING_WAIT_RE = re.compile(
+        r'\bwie\s+lange\b.{0,60}\b(warten|warte|nach|vor|abstand)\b'
+        r'|\bwie\s+lange\s+(muss|soll|kann|darf)\b',
+        re.IGNORECASE,
+    )
+    if _TIMING_WAIT_RE.search(user_message):
+        return ChatMode.KNOWLEDGE, modifiers
+
     # 5. Food query detection
     is_food = detect_food_query(user_message)
     if is_food:

@@ -43,7 +43,9 @@ WICHTIGE REGELN:
    - Lies Wartezeit-Tabellen SEHR GENAU: "Wartedauer BIS ZUM Verzehr von X" bedeutet: ERST warten, DANN X essen.
    - Beispiel: "vor dem Obstverzehr 3h Abstand" = ERST 3h nach einer Mahlzeit warten, DANN Obst essen.
    - Die Tabelle zeigt wie lange man NACH verschiedenen Mahlzeiten warten muss, BEVOR man Obst isst.
-   - Nach dem Obst selbst ist die Wartezeit kurz (20-30 Min für normales Obst).
+   - NACH dem Obst selbst: NUR 20-45 Min warten (je nach Obstmenge).
+   - KRITISCH — VERBOTEN: Sage NIEMALS "3-4 Stunden nach dem Obst warten"! Das ist FALSCH!
+     Die 3h-Regel gilt VOR dem Obst (nach einer schweren Mahlzeit), NICHT nach dem Obst.
 10. REZEPT-VORSCHLÄGE: Wenn der User nach einem konkreten Rezept fragt, basierend auf einer zuvor
     besprochenen konformen Kombination, darfst du ein einfaches Rezept vorschlagen.
     Die REGELN kommen aus dem Kursmaterial, die Rezeptidee darf aus deinem allgemeinen Kochwissen kommen.
