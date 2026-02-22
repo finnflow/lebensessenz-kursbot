@@ -93,13 +93,13 @@ def is_explanation_question(text: str) -> bool:
     text_lower = text.lower().strip()
     prefix_patterns = [
         r"^(und |aber |also )?(warum|wieso|weshalb)",
-        r"^ist (das|es|dies)",
-        r"^wie (lange|viel|oft|geht)",
-        r"^was (ist|bedeutet|heißt|bringt)",
-        r"^kann (ich|man|das)",
-        r"^darf (ich|man|das)",
-        r"^muss (ich|man|das)",
-        r"^soll (ich|man|das)",
+        r"^(und |aber |also )?ist (das|es|dies)",
+        r"^(und |aber |also )?wie (lange|viel|oft|geht)",
+        r"^(und |aber |also )?was (ist|bedeutet|heißt|bringt|passiert)",
+        r"^(und |aber |also )?kann (ich|man|das)",
+        r"^(und |aber |also )?darf (ich|man|das)",
+        r"^(und |aber |also )?muss (ich|man|das)",
+        r"^(und |aber |also )?soll (ich|man|das)",
         r"^erkläre",
         r"^erklär",
     ]
@@ -264,15 +264,17 @@ def _is_recipe_followup(user_message: str, last_messages: List[Dict]) -> bool:
     # Check if this is an explanation question ABOUT the recipe, not FOR a recipe
     msg_lower = user_message.lower().strip()
     explanation_patterns = [
-        r"^(und |aber )?(warum|wieso|weshalb)",
-        r"^ist (das|es)",
-        r"^wie (lange|viel|oft)",
-        r"^was (ist|bedeutet|heißt)",
-        r"^kann (ich|man)",
-        r"^darf (ich|man)",
+        r"^(und |aber |also )?(warum|wieso|weshalb)",
+        r"^(und |aber |also )?ist (das|es)",
+        r"^(und |aber |also )?wie (lange|viel|oft|geht)",
+        r"^(und |aber |also )?was (ist|bedeutet|heißt|passiert)",
+        r"^(und |aber |also )?kann (ich|man)",
+        r"^(und |aber |also )?darf (ich|man)",
+        r"^(und |aber |also )?muss (ich|man)",
+        r"^(und |aber |also )?soll (ich|man)",
         r"^erkläre",
         r"^erklär",
-        r"trennkost\?$",  # Questions ending with just "trennkost?"
+        r"trennkost\?$",
         r"gesund\?$",
         r"ok\?$",
         r"erlaubt\?$",
