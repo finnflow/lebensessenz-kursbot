@@ -374,6 +374,7 @@ def detect_chat_mode(
         re.IGNORECASE,
     )
     if _TIMING_WAIT_RE.search(user_message):
+        modifiers.is_breakfast = False  # suppress breakfast advice — user wants a timing fact
         return ChatMode.KNOWLEDGE, modifiers
 
     # 5. Food query detection
