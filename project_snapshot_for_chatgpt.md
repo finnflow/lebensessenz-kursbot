@@ -43,7 +43,7 @@ lebensessenz-kursbot/
 ├── app/                                   # FastAPI-Backend
 │   ├── main.py                   (744 Z)  # API-Endpunkte: POST /chat, /chat/image,
 │   │                                      #   /feedback, GET /conversations, DELETE /conversations/{id}
-│   ├── chat_service.py           (628 Z)  # Haupt-Pipeline: handle_chat() ~400 Z
+│   ├── chat_service.py           (729 Z)  # Dispatcher: handle_chat() ~70 Z + 7 private Handler
 │   ├── chat_modes.py             (389 Z)  # ChatMode-Enum + Modifier-Detection
 │   ├── prompt_builder.py         (631 Z)  # SYSTEM_INSTRUCTIONS (14 Regeln) + alle Prompt-Builder
 │   ├── clients.py                 (34 Z)  # Singleton: OpenAI-Client, ChromaDB-Col, MODEL-Konstanten
@@ -128,11 +128,11 @@ Browser/Mobile
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────┐
-│  app/chat_service.py  handle_chat()                     │
+│  app/chat_service.py  handle_chat()  (~70 Zeilen)       │
 │                                                         │
-│  Step 0: Setup Conversation (SQLite)                    │
+│  1. Setup: _setup_conversation() → SQLite               │
 │                                                         │
-│  Step 1 (parallel via ThreadPoolExecutor):              │
+│  2. Parallel (ThreadPoolExecutor):                      │
 │  ├── normalize_input()      [input_service.py]          │
 │  │   LLM-Call: Typos, EN→DE, Zeitformate               │
 │  ├── classify_intent()      [input_service.py]          │
@@ -140,61 +140,59 @@ Browser/Mobile
 │  └── _process_vision()      [vision_service.py]         │
 │      GPT-4o: Foto → strukturierte Zutaten/Gericht-Liste │
 │                                                         │
-│  Step 2: detect_chat_mode()  [chat_modes.py]            │
-│  ├── KNOWLEDGE                                          │
-│  ├── FOOD_ANALYSIS                                      │
-│  ├── MENU_ANALYSIS / MENU_FOLLOWUP                      │
-│  ├── RECIPE_REQUEST                                     │
-│  └── RECIPE_FROM_INGREDIENTS                            │
+│  3. detect_chat_mode()  [chat_modes.py]                 │
+│     → KNOWLEDGE | FOOD_ANALYSIS | MENU_ANALYSIS         │
+│       MENU_FOLLOWUP | RECIPE_REQUEST                    │
+│       RECIPE_FROM_INGREDIENTS                           │
 │                                                         │
-│  Step 3: detect_temporal_separation()                   │
-│  → Shortcut: "Apfel 30 min vor Reis" → determin. Antwort│
+│  3b. _handle_temporal_separation()                      │
+│     → Shortcut: "Apfel 30 min vor Reis" → Early-Return  │
 │                                                         │
-│  Step 4: Intent Override (RECIPE_FROM_INGREDIENTS)      │
+│  3c. _apply_intent_override()                           │
+│     → Ggf. Override → RECIPE_FROM_INGREDIENTS          │
 │                                                         │
-│  Step 5 (bei FOOD_ANALYSIS / MENU_ANALYSIS):            │
-│  trennkost_analyze_text() / trennkost_analyze_vision()  │
-│     │                                                   │
-│     ▼                                                   │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  trennkost/analyzer.py                           │   │
-│  │  ├── normalizer.py (Compound → Ontology → LLM)  │   │
-│  │  └── engine.py (rules.json, DETERMINISTISCH)    │   │
-│  │      → TrennkostResult (verdict, problems, ...)  │   │
-│  └──────────────────────────────────────────────────┘   │
+│  4. Dispatch (ctx-Tuple-Unpacking):                     │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │                                                    │ │
+│  │  RECIPE_FROM_INGREDIENTS                           │ │
+│  │  → _handle_recipe_from_ingredients_mode()          │ │
+│  │    ├── extract_available_ingredients()             │ │
+│  │    ├── handle_recipe_from_ingredients()            │ │
+│  │    │   (feasibility + custom builder, 2 LLM-Calls) │ │
+│  │    └── Fallback → _handle_recipe_request()         │ │
+│  │        oder    → _handle_food_analysis()           │ │
+│  │                                                    │ │
+│  │  FOOD_ANALYSIS / MENU_ANALYSIS / MENU_FOLLOWUP     │ │
+│  │  → _handle_food_analysis()                         │ │
+│  │    ├── resolve_context_references()                │ │
+│  │    ├── _run_engine() → TrennkostResult             │ │
+│  │    │   (analyzer → normalizer → engine, KEIN LLM)  │ │
+│  │    └── → _finalize_response()                      │ │
+│  │                                                    │ │
+│  │  RECIPE_REQUEST                                    │ │
+│  │  → _handle_recipe_request()                        │ │
+│  │    ├── search_recipes() (LLM-Auswahl aus 110)      │ │
+│  │    └── → _finalize_response()                      │ │
+│  │                                                    │ │
+│  │  KNOWLEDGE (+ Fallback)                            │ │
+│  │  → _handle_knowledge_mode()                        │ │
+│  │    └── → _finalize_response()                      │ │
+│  │                                                    │ │
+│  └────────────────────────────────────────────────────┘ │
 │                                                         │
-│  Step 6 (bei RECIPE_REQUEST):                           │
-│  recipe_service.search_recipes()                        │
-│  → LLM wählt aus 110 Rezepten (Fallback: Keyword)       │
-│                                                         │
-│  Step 6b (bei RECIPE_FROM_INGREDIENTS):                 │
-│  recipe_builder.handle_recipe_from_ingredients()        │
-│  → find_recipes_by_ingredient_overlap()                 │
-│  → _run_feasibility_check() (LLM)                       │
-│  → _run_custom_recipe_builder() (LLM, falls nötig)      │
-│                                                         │
-│  Step 7: RAG Query bauen + ChromaDB-Retrieval           │
-│  ├── build_rag_query() aus TrennkostResult              │
-│  │   ODER rewrite_standalone_query() (LLM)              │
-│  ├── retrieve_with_fallback()                           │
-│  │   1. Primary: embed + ChromaDB query                 │
-│  │   2. Fallback: generalize_query() (Regex)            │
-│  │   3. Fallback: expand_alias_terms() (config)         │
-│  └── build_context() (max MAX_CONTEXT_CHARS=9000)       │
-│                                                         │
-│  Step 8: Fallback-Check                                 │
-│  (kein Treffer → FALLBACK_SENTENCE direkt zurück)       │
-│                                                         │
-│  Step 9: Prompt zusammenbauen [prompt_builder.py]       │
-│  ├── build_base_context()  (Summary + letzte N Messages)│
-│  ├── build_engine_block()  (TrennkostResult als Text)   │
-│  ├── build_recipe_context_block()                       │
-│  └── build_prompt_{food_analysis|knowledge|recipe}()   │
-│                                                         │
-│  Step 10: OpenAI-Call (gpt-4o-mini, temperature=0.0)   │
-│  → Antwort speichern (SQLite)                           │
-│                                                         │
-│  Step 11: Rolling Summary aktualisieren (async)         │
+│  _finalize_response()  (Steps 5–11, shared):            │
+│  ├── 5. RAG: build_rag_query() → retrieve_with_fallback()│
+│  │       1. Primary embed + ChromaDB                   │
+│  │       2. Fallback: generalize_query() (Regex)       │
+│  │       3. Fallback: expand_alias_terms() (config)    │
+│  ├── 6. Fallback-Check → ggf. FALLBACK_SENTENCE        │
+│  ├── 7. Prompt bauen  [prompt_builder.py]              │
+│  │       build_base_context() + build_engine_block()   │
+│  │       + build_recipe_context_block()                │
+│  │       + build_prompt_{food_analysis|knowledge|…}()  │
+│  ├── 8. OpenAI-Call (gpt-4o-mini, temp=0.0) + save     │
+│  ├── 9. Rolling Summary aktualisieren                  │
+│  └── 10. Sources aufbereiten                           │
 └─────────────────────────────────────────────────────────┘
                        │
                        ▼
@@ -654,9 +652,12 @@ User-Text → _extract_foods_from_question()
    BLATTGRUEN, KRAEUTER) sind das Herz des Systems. Änderungen an Ontologie oder Regeln
    immer zuerst mit `pytest tests/test_engine.py -v` verifizieren.
 
-3. **Der Pipeline-Einstiegspunkt ist `handle_chat()` in `chat_service.py`.** Alle 10 Schritte
-   sind kommentiert. Wenn du etwas am Request-Flow änderst, denk an die parallele Ausführung
-   (ThreadPoolExecutor) in Schritt 1 und den temporal-separation-Shortcut in Schritt 3b.
+3. **`handle_chat()` ist ein ~70-Zeilen-Dispatcher — keine Logik drin.** Die eigentliche Arbeit
+   steckt in 7 privaten Funktionen: `_handle_temporal_separation()`, `_apply_intent_override()`,
+   `_handle_recipe_from_ingredients_mode()`, `_handle_food_analysis()`, `_handle_recipe_request()`,
+   `_handle_knowledge_mode()` und `_finalize_response()` (Steps 5–11, shared von allen Modes).
+   Wenn du etwas am Flow änderst: parallele ThreadPoolExecutor-Ausführung in Schritt 2 beachten,
+   und `ctx`-Tuple-Unpacking für den Dispatch (Reihenfolge muss mit allen `_handle_*`-Signaturen übereinstimmen).
 
 4. **Prompt-Änderungen sind heikel.** Das System hat viele Schutz-Instructions (R1–R14) die
    über Jahre debuggt wurden. Wenn du SYSTEM_INSTRUCTIONS oder Answer-Instructions änderst,
