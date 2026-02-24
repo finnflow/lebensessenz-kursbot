@@ -834,6 +834,17 @@ Antworte NUR mit JSON:
         return {"decision": "create_custom", "recipe_id": None, "adapt_notes": "", "reason": "Fallback: overlap < 0.7"}
 
 
+def _split_ingredients_by_group(ingredients: List[str]) -> Dict[str, List[str]]:
+    """Categorize ingredients by Trennkost group using the ontology."""
+    ontology = get_ontology()
+    result: Dict[str, List[str]] = {}
+    for ing in ingredients:
+        entry = ontology.lookup(ing)
+        group = entry.group.value if entry else "UNKNOWN"
+        result.setdefault(group, []).append(ing)
+    return result
+
+
 def _run_custom_recipe_builder(
     available_ingredients: List[str],
     is_breakfast: bool = False,
@@ -844,12 +855,45 @@ def _run_custom_recipe_builder(
 
     Model: gpt-4o-mini, temperature=0.3, max_tokens=800
     """
-    breakfast_note = ""
-    if is_breakfast:
-        breakfast_note = "\n- Frühstücks-Optionen: NUR Obst-Variante ODER KH-Variante (niemals kombiniert!)"
+    groups = _split_ingredients_by_group(available_ingredients)
+    obst_items = groups.get("OBST", []) + groups.get("TROCKENOBST", [])
+    kh_items = groups.get("KH", [])
+    neutral_items = groups.get("NEUTRAL", [])
+    fett_items = groups.get("FETT", [])
+    milch_items = groups.get("MILCH", [])
+
+    # Build ingredients block and breakfast constraint
+    two_option_breakfast = is_breakfast and bool(obst_items) and bool(kh_items or neutral_items or milch_items)
+
+    if two_option_breakfast:
+        kh_cluster = kh_items + neutral_items + fett_items + milch_items
+        ingredients_block = (
+            f"Zutaten Gruppe A (Obst-Frühstück): {', '.join(obst_items)}\n"
+            f"Zutaten Gruppe B (KH-Frühstück): {', '.join(kh_cluster)}"
+        )
+        breakfast_note = f"""
+
+FRÜHSTÜCK — GENAU 2 GETRENNTE REZEPTE PFLICHT (NIEMALS kombinieren!):
+OPTION A – Obst-Frühstück: Verwende AUSSCHLIESSLICH: {', '.join(obst_items)}
+OPTION B – KH-Frühstück: Verwende AUSSCHLIESSLICH: {', '.join(kh_cluster) if kh_cluster else 'keine KH-Zutaten verfügbar'}
+Obst darf NICHT in Option B erscheinen. KH/Milch darf NICHT in Option A erscheinen.
+Erstelle GENAU ZWEI Rezepte: Option A (Obst) und Option B (KH). Kein drittes Rezept."""
+        single_option_note = "Erstelle GENAU ZWEI Rezepte wie oben angegeben."
+    elif is_breakfast and obst_items:
+        ingredients_block = ', '.join(available_ingredients)
+        breakfast_note = f"\n- Frühstück Obst-Variante: Verwende NUR Obst: {', '.join(obst_items)}"
+        single_option_note = "Wenn mehrere sinnvolle Varianten möglich sind, präsentiere die beste eine Option."
+    elif is_breakfast:
+        ingredients_block = ', '.join(available_ingredients)
+        breakfast_note = "\n- Frühstück: Nur KH-Variante (kein Obst vorhanden)"
+        single_option_note = "Wenn mehrere sinnvolle Varianten möglich sind, präsentiere die beste eine Option."
+    else:
+        ingredients_block = ', '.join(available_ingredients)
+        breakfast_note = ""
+        single_option_note = "Wenn mehrere sinnvolle Varianten möglich sind (z.B. KH- oder Protein-Variante), präsentiere die beste eine Option."
 
     prompt = f"""Erstelle ein trennkostkonformes Rezept ausschließlich aus diesen Zutaten:
-{', '.join(available_ingredients)}
+{ingredients_block}
 
 REGELN (strikt einhalten):
 - Verwende NUR die oben genannten Zutaten (keine Extras ausser Gewürze/Öl/Salz)
@@ -867,7 +911,7 @@ FORMAT:
 **Zubereitung:**
 1. [Schritt]
 
-Wenn mehrere sinnvolle Varianten möglich sind (z.B. KH- oder Protein-Variante), präsentiere die beste eine Option.
+{single_option_note}
 Halte die Antwort kompakt und praktisch."""
 
     try:
