@@ -1,8 +1,4 @@
 import os
-import json
-import shutil
-import re
-from datetime import datetime
 from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
@@ -15,10 +11,10 @@ from app.database import (
     get_messages,
     get_conversations_by_guest,
     conversation_belongs_to_guest,
-    export_conversation_for_feedback,
 )
 from app.chat_service import handle_chat
 from app.image_handler import save_image, ImageValidationError
+from app.feedback_service import export_feedback
 from trennkost.analyzer import analyze_text as trennkost_analyze_text, format_results_for_llm
 
 load_dotenv()
@@ -227,78 +223,11 @@ def submit_feedback(request: FeedbackRequest):
     if request.guestId and not conversation_belongs_to_guest(request.conversationId, request.guestId):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    data = export_conversation_for_feedback(request.conversationId)
-    if not data:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    conv = data["conversation"]
-    messages = data["messages"]
-
-    # Build folder name: 2026-02-09_15-30_title-slug
-    now = datetime.now()
-    title = conv.get("title") or "Untitled"
-    slug = re.sub(r"[^a-zA-Z0-9äöüÄÖÜß]+", "-", title).strip("-").lower()[:40]
-    folder_name = f"{now.strftime('%Y-%m-%d_%H-%M')}_{slug}"
-    folder_path = os.path.join(FEEDBACK_DIR, folder_name)
-    os.makedirs(folder_path, exist_ok=True)
-    images_dir = os.path.join(folder_path, "images")
-
-    # Build Markdown chat export
-    md_lines = [f"# Chat: {title}\n"]
-    md_lines.append(f"**Conversation ID:** `{request.conversationId}`")
-    md_lines.append(f"**Erstellt:** {conv.get('created_at', '?')}")
-    md_lines.append(f"**Exportiert:** {now.isoformat()}\n")
-    md_lines.append("---\n")
-
-    for msg in messages:
-        role_label = "Du" if msg["role"] == "user" else "Kursbot"
-        md_lines.append(f"### {role_label}")
-        md_lines.append(f"{msg['content']}\n")
-
-        # Copy image if present
-        if msg.get("image_path"):
-            src_path = msg["image_path"]
-            if os.path.exists(src_path):
-                os.makedirs(images_dir, exist_ok=True)
-                filename = os.path.basename(src_path)
-                dst_path = os.path.join(images_dir, filename)
-                shutil.copy2(src_path, dst_path)
-                md_lines.append(f"![Bild](images/{filename})\n")
-
-        md_lines.append("")
-
-    # Write chat.md
-    chat_md_path = os.path.join(folder_path, "chat.md")
-    with open(chat_md_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(md_lines))
-
-    # Write feedback.md
-    feedback_path = os.path.join(folder_path, "feedback.md")
-    with open(feedback_path, "w", encoding="utf-8") as f:
-        f.write(f"# Feedback\n\n")
-        f.write(f"**Datum:** {now.strftime('%d.%m.%Y %H:%M')}\n")
-        f.write(f"**Chat:** {title}\n\n")
-        f.write("---\n\n")
-        f.write(request.feedback.strip())
-        f.write("\n")
-
-    # Write metadata.json
-    meta_path = os.path.join(folder_path, "metadata.json")
-    with open(meta_path, "w", encoding="utf-8") as f:
-        json.dump({
-            "conversation_id": request.conversationId,
-            "title": title,
-            "feedback": request.feedback.strip(),
-            "exported_at": now.isoformat(),
-            "message_count": len(messages),
-            "image_count": len([m for m in messages if m.get("image_path")]),
-        }, f, ensure_ascii=False, indent=2)
-
-    return {
-        "status": "saved",
-        "folder": folder_name,
-        "message_count": len(messages),
-    }
+    try:
+        result = export_feedback(request.conversationId, request.feedback.strip(), FEEDBACK_DIR)
+        return {"status": "saved", **result}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @app.get("/", response_class=HTMLResponse)

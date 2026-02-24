@@ -4,27 +4,13 @@ Recipe search service.
 Loads curated Trennkost-compliant recipes from recipes.json
 and provides filtered search with ranking.
 """
-import os
 import json
 import re
 from pathlib import Path
 from typing import List, Dict, Optional
 
-from dotenv import load_dotenv
-from openai import OpenAI
 from trennkost.ontology import get_ontology
-
-load_dotenv()
-
-_openai_client: Optional[OpenAI] = None
-
-def _get_client() -> OpenAI:
-    global _openai_client
-    if _openai_client is None:
-        _openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    return _openai_client
-
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+from app.clients import client as _openai_client, MODEL
 
 DATA_PATH = Path(__file__).parent / "data" / "recipes.json"
 
@@ -132,7 +118,7 @@ Antworte NUR mit JSON, kein Kommentar:
 {{"ids": ["id1", "id2", "id3"]}}"""
 
     try:
-        response = _get_client().chat.completions.create(
+        response = _openai_client.chat.completions.create(
             model=MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,

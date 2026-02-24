@@ -7,7 +7,7 @@ SYSTEM_INSTRUCTIONS lives here; mode-specific builders compose the user-side pro
 from typing import Optional, List, Dict, Any
 
 from trennkost.models import TrennkostResult, Verdict
-from trennkost.analyzer import format_results_for_llm
+from trennkost.formatter import format_results_for_llm
 
 
 FALLBACK_SENTENCE = "Diese Information steht nicht im bereitgestellten Kursmaterial."
@@ -239,41 +239,9 @@ def build_clarification_block(needs_clarification: str) -> List[str]:
 
 # ── Answer instructions per mode ─────────────────────────────────────
 
-def build_prompt_food_analysis(
-    trennkost_results: List[TrennkostResult],
-    user_message: str,
-    is_breakfast: bool = False,
-    is_compliance_check: bool = False,
-) -> str:
-    """Answer instructions when engine results are present."""
-    # Check if this is a menu analysis (multiple dishes)
-    is_menu = len(trennkost_results) > 1
-
-    if is_menu:
-        # Menu analysis: overview of all dishes
-        return build_prompt_menu_overview(trennkost_results, user_message)
-
-    # Single dish analysis
-    verdict_str = trennkost_results[0].verdict.value if trennkost_results else "UNKNOWN"
-    verdict_display = {
-        "OK": "OK",
-        "NOT_OK": "NICHT OK",
-        "CONDITIONAL": "BEDINGT OK",
-        "UNKNOWN": "UNKLAR",
-    }.get(verdict_str, verdict_str)
-
-    # Check for OBST + KH conflict in engine results (independent of is_breakfast flag)
-    _groups_present: set = set()
-    for r in trennkost_results:
-        for group_name in r.groups_found.keys():
-            _groups_present.add(group_name)
-    _has_obst_kh_conflict = "OBST" in _groups_present and any(
-        g in _groups_present for g in ("KH", "GETREIDE", "HUELSENFRUECHTE", "TROCKENOBST")
-    )
-
-    breakfast_section = ""
+def _breakfast_section(is_breakfast: bool, has_obst_kh: bool) -> str:
     if is_breakfast:
-        breakfast_section = (
+        return (
             "- FRÜHSTÜCK-SPEZIFISCH (User fragt nach Frühstück!):\n"
             "  1. Empfehle ZUERST die fettarme Option aus dem FRÜHSTÜCKS-HINWEIS oben.\n"
             "  2. Erkläre KURZ warum: Entgiftung läuft bis mittags, fettarme Kost optimal.\n"
@@ -282,13 +250,58 @@ def build_prompt_food_analysis(
             "  5. Konkrete fettarme Empfehlungen: Obst, Grüner Smoothie, Overnight-Oats, Porridge,\n"
             "     Reis-Pudding, Hirse-Grieß, glutenfreies Brot mit Gemüse + max 1-2 TL Avocado.\n"
         )
-    elif _has_obst_kh_conflict:
-        breakfast_section = (
+    if has_obst_kh:
+        return (
             "- OBST+KH KONFLIKT ERKANNT: Empfehle das zweistufige Frühstücks-Konzept:\n"
             "  → Stufe 1: Erst das Obst (Banane, Mango etc.) ALLEIN essen — 20-30 Min. warten\n"
             "  → Stufe 2: Dann das KH-Gericht (Porridge/Bowl/Haferflocken) OHNE Obst\n"
             "  NICHT '3 Stunden Abstand' sagen — die Lösung ist: Obst VORHER essen, kurz warten.\n"
         )
+    return ""
+
+
+def _compliance_section(is_compliance_check: bool) -> str:
+    if not is_compliance_check:
+        return ""
+    return (
+        "\nCOMPLIANCE-CHECK-MODUS — ZUSÄTZLICHE ANWEISUNGEN:\n"
+        "Der User hat ein eigenes Rezept oder eine Zutatenkombination zur Prüfung eingereicht.\n"
+        "Beantworte ZUERST klar mit einer der folgenden Aussagen:\n"
+        "  ✅ 'Ja, das ist trennkost-konform!' ODER\n"
+        "  ❌ 'Nein, leider nicht konform.' ODER\n"
+        "  ⚠️ 'Bedingt konform — es kommt darauf an...'\n"
+        "Erkläre dann KONKRET welche Zutatenkombination das Problem verursacht.\n"
+        "Gib danach 1–2 konkrete Varianten wie das Rezept angepasst werden kann "
+        "(nutze die Fix-Directions aus dem Engine-Block oben).\n"
+        "Stelle KEINE Rückfragen — alle Zutaten sind bekannt.\n"
+        "Wenn der User explizit fragt wie er es konform machen kann: beantworte das direkt.\n"
+    )
+
+
+def build_prompt_food_analysis(
+    trennkost_results: List[TrennkostResult],
+    user_message: str,
+    is_breakfast: bool = False,
+    is_compliance_check: bool = False,
+) -> str:
+    """Answer instructions when engine results are present."""
+    if len(trennkost_results) > 1:
+        return build_prompt_menu_overview(trennkost_results, user_message)
+
+    verdict_str = trennkost_results[0].verdict.value if trennkost_results else "UNKNOWN"
+    verdict_display = {
+        "OK": "OK",
+        "NOT_OK": "NICHT OK",
+        "CONDITIONAL": "BEDINGT OK",
+        "UNKNOWN": "UNKLAR",
+    }.get(verdict_str, verdict_str)
+
+    groups_present: set = set()
+    for r in trennkost_results:
+        groups_present.update(r.groups_found.keys())
+    has_obst_kh = "OBST" in groups_present and any(
+        g in groups_present for g in ("KH", "GETREIDE", "HUELSENFRUECHTE", "TROCKENOBST")
+    )
 
     return (
         f"USER'S ORIGINAL MESSAGE: {user_message}\n\n"
@@ -336,27 +349,14 @@ def build_prompt_food_analysis(
         "  'Behalte MILCH' → NUR Milchprodukte + Gemüse. KEIN Ei, KEIN Fleisch, KEIN Brot!\n"
         "  'Behalte PROTEIN' → NUR Fleisch/Fisch/Ei + Gemüse. KEINE KH, KEINE Milch!\n"
         "  'Behalte KH' → NUR Brot/Reis/Pasta + Gemüse. KEIN Protein, KEINE Milch!\n"
-        + breakfast_section +
-        "- Bei BEDINGT OK:\n"
+        + _breakfast_section(is_breakfast, has_obst_kh)
+        + "- Bei BEDINGT OK:\n"
         "  1. Erkläre kurz, warum es bedingt ist\n"
         "  2. Stelle die offene Frage aus 'Offene Fragen' (z.B. 'Wie viel Fett ist enthalten?')\n"
         "  3. WICHTIG: Schlage KEINE zusätzlichen Zutaten oder Alternativen vor!\n"
         "  4. Konzentriere dich NUR auf die Klärung der offenen Frage\n"
         "- Verwende AUSSCHLIESSLICH Begriffe aus den Kurs-Snippets.\n"
-        + (
-            "\nCOMPLIANCE-CHECK-MODUS — ZUSÄTZLICHE ANWEISUNGEN:\n"
-            "Der User hat ein eigenes Rezept oder eine Zutatenkombination zur Prüfung eingereicht.\n"
-            "Beantworte ZUERST klar mit einer der folgenden Aussagen:\n"
-            "  ✅ 'Ja, das ist trennkost-konform!' ODER\n"
-            "  ❌ 'Nein, leider nicht konform.' ODER\n"
-            "  ⚠️ 'Bedingt konform — es kommt darauf an...'\n"
-            "Erkläre dann KONKRET welche Zutatenkombination das Problem verursacht.\n"
-            "Gib danach 1–2 konkrete Varianten wie das Rezept angepasst werden kann "
-            "(nutze die Fix-Directions aus dem Engine-Block oben).\n"
-            "Stelle KEINE Rückfragen — alle Zutaten sind bekannt.\n"
-            "Wenn der User explizit fragt wie er es konform machen kann: beantworte das direkt.\n"
-            if is_compliance_check else ""
-        )
+        + _compliance_section(is_compliance_check)
     )
 
 

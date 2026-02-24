@@ -1,16 +1,23 @@
-import os
 import re
-import json
 from typing import Optional, List, Dict, Any, Tuple
-from dotenv import load_dotenv
-from openai import OpenAI
-import chromadb
-from chromadb.config import Settings
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
-# Load environment variables
-load_dotenv()
+from app.clients import client, MODEL, LAST_N, SUMMARY_THRESHOLD, DISTANCE_THRESHOLD, DEBUG_RAG
+from app.rag_service import (
+    retrieve_with_fallback,
+    build_context,
+    rewrite_standalone_query,
+    expand_alias_terms,
+)
+from app.input_service import (
+    normalize_input,
+    classify_intent,
+    classify_food_items,
+    extract_available_ingredients,
+    resolve_context_references,
+    llm_call,
+)
+from app.recipe_builder import handle_recipe_from_ingredients, format_recipe_directly
 
 from app.database import (
     create_conversation,
@@ -39,14 +46,11 @@ from trennkost.analyzer import (
     detect_temporal_separation,
     analyze_text as trennkost_analyze_text,
     analyze_vision as trennkost_analyze_vision,
-    format_results_for_llm,
-    build_rag_query,
 )
+from trennkost.formatter import format_results_for_llm, build_rag_query
 from trennkost.models import TrennkostResult
-from trennkost.ontology import get_ontology
 
 from app.chat_modes import ChatMode, ChatModifiers, detect_chat_mode
-from app.recipe_service import find_recipes_by_ingredient_overlap
 from app.prompt_builder import (
     SYSTEM_INSTRUCTIONS,
     FALLBACK_SENTENCE,
@@ -66,421 +70,8 @@ from app.prompt_builder import (
     assemble_prompt,
 )
 
-# Config
-CHROMA_DIR = os.getenv("CHROMA_DIR", "storage/chroma")
-COLLECTION_NAME = os.getenv("COLLECTION_NAME", "kursmaterial_v1")
-DEBUG_RAG = os.getenv("DEBUG_RAG", "0").lower() in ("1", "true", "yes")
 
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-EMBED_MODEL = os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")
-TOP_K = int(os.getenv("TOP_K", "10"))
-LAST_N = int(os.getenv("LAST_N", "8"))
-MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "9000"))
-SUMMARY_THRESHOLD = int(os.getenv("SUMMARY_THRESHOLD", "6"))
-DISTANCE_THRESHOLD = float(os.getenv("DISTANCE_THRESHOLD", "1.0"))
-
-# Initialize clients
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-chroma = chromadb.PersistentClient(path=CHROMA_DIR, settings=Settings(anonymized_telemetry=False))
-col = chroma.get_or_create_collection(name=COLLECTION_NAME)
-
-
-# ── Helper functions (unchanged) ─────────────────────────────────────
-
-def embed_one(text: str) -> List[float]:
-    """Generate embedding for text."""
-    resp = client.embeddings.create(model=EMBED_MODEL, input=[text])
-    return resp.data[0].embedding
-
-
-def _llm_call(system_prompt: str, user_msg: str) -> str:
-    """
-    Thin LLM wrapper passed to normalizer for extraction/classification.
-    Used ONLY for unknown item classification, never for verdicts.
-    """
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_msg},
-        ],
-        temperature=0.1,
-        max_tokens=500,
-    )
-    return response.choices[0].message.content.strip()
-
-def build_context(docs: List[str], metas: List[Dict]) -> str:
-    """Build context string from retrieved documents."""
-    parts = []
-    total = 0
-    for doc, meta in zip(docs, metas):
-        label = f"[{meta.get('path','?')}#{meta.get('chunk','?')}]"
-        piece = f"{label}\n{doc}\n"
-        if total + len(piece) > MAX_CONTEXT_CHARS:
-            break
-        parts.append(piece)
-        total += len(piece)
-    return "\n".join(parts).strip()
-
-def rewrite_standalone_query(
-    summary: Optional[str],
-    last_messages: List[Dict[str, Any]],
-    user_message: str
-) -> str:
-    """
-    Rewrite user message into a standalone query for retrieval.
-    Uses summary + last messages to resolve references.
-    """
-    if not summary and not last_messages:
-        return user_message
-
-    context_parts = []
-    if summary:
-        context_parts.append(f"ZUSAMMENFASSUNG:\n{summary}\n")
-
-    if last_messages:
-        context_parts.append("LETZTE NACHRICHTEN:")
-        for msg in last_messages[-4:]:
-            role = "User" if msg["role"] == "user" else "Assistant"
-            context_parts.append(f"{role}: {msg['content']}")
-
-    context_parts.append(f"\nAKTUELLE NACHRICHT:\n{user_message}")
-
-    prompt = f"""{chr(10).join(context_parts)}
-
-Schreibe die aktuelle Nachricht in eine eigenständige Suchanfrage um, die alle nötigen Informationen enthält.
-Falls sie bereits eigenständig ist, gib sie unverändert zurück.
-Wenn Begriffe vorkommen, die im Kursmaterial evtl. anders heißen (z.B. "Trennkost"),
-ergänze passende Kurs-Begriffe als Synonyme, z.B. "Lebensmittelkombinationen", "Kohlenhydrate", "Protein", "Milieu", "Verdauung".
-Antworte NUR mit der umgeschriebenen Anfrage, ohne Erklärung.
-
-STANDALONE QUERY:"""
-
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.0,
-        max_tokens=200
-    )
-
-    return response.choices[0].message.content.strip()
-
-def load_alias_terms() -> Dict[str, List[str]]:
-    """Load alias terms from config file."""
-    config_path = Path(__file__).parent.parent / "config" / "alias_terms.json"
-    try:
-        if config_path.exists():
-            with open(config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-    except Exception as e:
-        print(f"Warning: Could not load alias_terms.json: {e}")
-    return {}
-
-
-ALIAS_TERMS = load_alias_terms()
-
-
-def expand_alias_terms(query: str) -> str:
-    """
-    Deterministically expand query with course-specific alias terms from config.
-    No LLM call - just adds search keywords for concepts that may use different terminology.
-    """
-    query_lower = query.lower()
-    expanded = query
-
-    for key, aliases in ALIAS_TERMS.items():
-        if key in query_lower:
-            alias_str = " | " + " | ".join(aliases)
-            expanded += alias_str
-            break
-    return expanded
-
-def retrieve_course_snippets(query: str) -> Tuple[List[str], List[Dict], List[float]]:
-    """Retrieve relevant course snippets using vector search."""
-    qvec = embed_one(query)
-    res = col.query(
-        query_embeddings=[qvec],
-        n_results=TOP_K,
-        include=["documents", "metadatas", "distances"],
-    )
-
-    docs = res.get("documents", [[]])[0]
-    metas = res.get("metadatas", [[]])[0]
-    dists = res.get("distances", [[]])[0]
-
-    return docs, metas, dists
-
-
-def deduplicate_by_source(docs: List[str], metas: List[Dict], dists: List[float], max_per_source: int = 2) -> Tuple[List[str], List[Dict], List[float]]:
-    """Deduplicate chunks by source file to ensure diverse retrieval."""
-    seen_sources = {}
-    deduped_docs = []
-    deduped_metas = []
-    deduped_dists = []
-
-    for doc, meta, dist in zip(docs, metas, dists):
-        source = meta.get("path", "unknown")
-        count = seen_sources.get(source, 0)
-
-        if count < max_per_source:
-            deduped_docs.append(doc)
-            deduped_metas.append(meta)
-            deduped_dists.append(dist)
-            seen_sources[source] = count + 1
-
-    return deduped_docs, deduped_metas, deduped_dists
-
-
-def normalize_input(
-    user_message: str,
-    recent_messages: List[Dict[str, Any]],
-    is_new_conversation: bool
-) -> str:
-    """
-    Normalize user input to create canonical format for deterministic logic.
-
-    Handles:
-    - Language translation to German
-    - Time format standardization ("30 minuten" → "30 min")
-    - Food name standardization
-    - Typo fixing
-    - Punctuation cleanup
-    - Abbreviation expansion
-
-    Special handling for follow-ups:
-    - Short messages (<5 words) with recent context are marked as potential follow-ups
-    - LLM preserves or minimally expands follow-ups with context reference
-    - Prevents incorrect expansion of context-dependent messages like "den Fisch"
-    """
-    # Skip normalization for very long messages (already well-formed)
-    if len(user_message) > 200:
-        return user_message
-
-    # Detect potential follow-up context
-    is_potential_followup = False
-    previous_context = ""
-
-    if not is_new_conversation and recent_messages:
-        # Check if message is short (likely a follow-up)
-        word_count = len(user_message.strip().split())
-        if word_count <= 5:
-            is_potential_followup = True
-
-            # Extract last 2-3 messages for context
-            context_messages = []
-            for msg in recent_messages[-4:]:
-                role = "User" if msg.get("role") == "user" else "Assistant"
-                content = msg.get("content", "")[:200]  # Truncate long messages
-                context_messages.append(f"{role}: {content}")
-            previous_context = "\n".join(context_messages)
-
-    # Build normalization prompt
-    normalization_prompt = f"""Du normalisierst Benutzereingaben für ein Trennkost-Ernährungsberatungs-System.
-
-**Deine Aufgaben:**
-1. **Sprache:** Übersetze alle Texte ins Deutsche (falls nicht bereits Deutsch)
-2. **Zeitangaben:** Standardisiere zu "X min" Format (z.B. "30 minuten" → "30 min", "eine halbe Stunde" → "30 min")
-3. **Lebensmittel:** Verwende deutsche Standardnamen (z.B. "chicken" → "Hähnchen", "rice" → "Reis")
-4. **Tippfehler:** Korrigiere offensichtliche Tippfehler (z.B. "danm" → "dann", "Resi" → "Reis")
-5. **Interpunktion:** Bereinige und vervollständige
-6. **Abkürzungen:** Expandiere gängige Abkürzungen (z.B. "z.B." bleibt, aber "min" → "Minuten" nur bei Mehrdeutigkeit)
-
-**WICHTIG - Follow-up Nachrichten:**
-- Wenn die Nachricht sehr kurz ist (<5 Wörter) UND vorheriger Kontext existiert, ist es wahrscheinlich eine Follow-up-Nachricht
-- Follow-ups sollten NICHT erweitert werden, wenn sie klar kontextabhängig sind
-- Beispiele:
-  * "den Fisch" (im Kontext einer Wahlsituation) → "den Fisch" (NICHT erweitern!)
-  * "ok" (als Bestätigung) → "ok" (NICHT erweitern!)
-  * "egal" (als Antwort) → "egal" (NICHT erweitern!)
-  * "danm" (als Standalone) → "dann" (Tippfehler korrigieren ist OK)
-
-"""
-
-    if is_potential_followup and previous_context:
-        normalization_prompt += f"""
-**VORHERIGER KONTEXT (Follow-up-Erkennung):**
-{previous_context}
-
-Die aktuelle Nachricht ist wahrscheinlich eine Follow-up-Antwort. Bewahre ihre Bedeutung, erweitere sie NICHT zu einer vollständigen Frage, außer sie ist offensichtlich unvollständig.
-"""
-
-    normalization_prompt += f"""
-**Aktuelle Nachricht:**
-{user_message}
-
-**Normalisierte Nachricht:**"""
-
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": normalization_prompt}],
-            temperature=0.0,
-            max_tokens=150,
-            timeout=5
-        )
-        normalized = response.choices[0].message.content.strip()
-
-        # Safety check: if normalization is wildly different in length, use original
-        original_len = len(user_message)
-        normalized_len = len(normalized)
-        if normalized_len > original_len * 3:  # More than 3x longer → likely over-expanded
-            print(f"[NORMALIZE] Warning: normalized message too long ({normalized_len} vs {original_len}), using original")
-            return user_message
-
-        if normalized != user_message:
-            print(f"[NORMALIZE] '{user_message}' → '{normalized}'")
-
-        return normalized
-
-    except Exception as e:
-        print(f"[NORMALIZE] Failed: {e}, using original message")
-        return user_message
-
-
-def classify_food_items(user_message: str, standalone_query: str) -> Optional[Dict[str, Any]]:
-    """
-    LLM-basierte Analyse von Lebensmitteln in der Frage.
-    Extrahiert und klassifiziert automatisch in Kurskategorien.
-    """
-    classification_prompt = f"""Analysiere die folgende Frage über Lebensmittel und klassifiziere die Komponenten
-in diese Kategorien aus unserem Ernährungskurs:
-- Protein (Fleisch, Fisch, Eier, Käse, Hülsenfrüchte)
-- Komplexe Kohlenhydrate (Reis, Vollkornbrot, Kartoffeln, Hülsenfrüchte)
-- Obst (frisch, Säfte)
-- Gemüse / Salat
-- Fette / Öle
-- Zucker / Süßes
-
-WICHTIG:
-1. Bei zusammengesetzten Lebensmitteln (Döner, Burger, Pizza, etc.):
-   - Zerlege sie in ihre Standard-Komponenten
-   - Beispiele:
-     * Pizza → Teig (Kohlenhydrate), Käse (Protein), Sauce (Gemüse/Zucker)
-     * Döner (Standard) → Fleisch (Protein), Brot (Kohlenhydrate), Salat (Gemüse), Sauce (Fett)
-     * Burger (Standard) → Fleisch (Protein), Brötchen (Kohlenhydrate)
-
-2. Bei MEHRDEUTIGEN Lebensmitteln:
-   - Wenn wichtige Details fehlen (z.B. "Burger" - vegan oder Fleisch?)
-   - Oder wenn Varianten die Kombination ändern (z.B. "Pizza" - welcher Belag?)
-   - Markiere dies mit "NEEDS_CLARIFICATION: [konkrete Frage]"
-
-3. Bei Wartezeit-Fragen:
-   - Erkenne Richtung (VOR oder NACH dem Verzehr)
-   - Füge Keywords hinzu: "Wartedauer", "zeitlicher Abstand", "Obstverzehr"
-
-Frage: {user_message}
-
-Antworte im Format:
-1. Erkannte Lebensmittel: [...]
-2. Klassifikation: [...]
-3. Falls mehrdeutig: NEEDS_CLARIFICATION: [konkrete Frage an Nutzer]
-"""
-
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": classification_prompt}],
-            temperature=0.1,
-            max_tokens=200,
-            timeout=5
-        )
-        result = response.choices[0].message.content.strip()
-
-        needs_clarification = None
-        if "NEEDS_CLARIFICATION:" in result:
-            parts = result.split("NEEDS_CLARIFICATION:")
-            classification = parts[0].strip()
-            needs_clarification = parts[1].strip()
-        else:
-            classification = result
-
-        return {
-            "classification": classification,
-            "needs_clarification": needs_clarification
-        }
-    except Exception:
-        return None
-
-
-def generalize_query(query: str) -> str:
-    """
-    DEPRECATED: Legacy function for regex-based query generalization.
-    Kept for fallback in retrieve_with_fallback().
-    """
-    generalization_map = {
-        r"\bburger\b": "Fleisch und Kohlenhydrate",
-        r"\bpommes\b": "Kohlenhydrate",
-        r"\bfisch\b": "Protein",
-        r"\bhähnchen\b": "Protein",
-        r"\bsalat\b": "Gemüse",
-        r"\bbrot\b": "Kohlenhydrate",
-        r"\breis\b": "Kohlenhydrate",
-        r"\bnudeln\b": "Kohlenhydrate",
-        r"\beier?\b": "Protein",
-        r"\bkäse\b": "Protein",
-        r"\bbanane?n?\b": "Obst",
-        r"\beis\b": "Süßigkeiten",
-        r"\bsahne\b": "Fett",
-        r"\bschokolade\b": "Süßigkeiten",
-        r"\bpudding\b": "Süßigkeiten",
-        r"\bkuchen\b": "Kohlenhydrate und Zucker",
-    }
-
-    import re
-    generalized = query.lower()
-
-    for pattern, replacement in generalization_map.items():
-        if re.search(pattern, generalized):
-            generalized = re.sub(pattern, replacement, generalized)
-
-    if generalized != query.lower():
-        return generalized
-    return None
-
-
-def retrieve_with_fallback(query: str, user_message: str) -> Tuple[List[str], List[Dict], List[float], bool]:
-    """Multi-step retrieval with fallback strategies."""
-    docs, metas, dists = retrieve_course_snippets(query)
-    docs, metas, dists = deduplicate_by_source(docs, metas, dists, max_per_source=2)
-
-    best_dist = min(dists) if dists else 999.0
-
-    if len(docs) >= 2 and best_dist <= DISTANCE_THRESHOLD:
-        if DEBUG_RAG:
-            print(f"[RAG] Primary retrieval successful (distance: {best_dist:.3f})")
-        return docs, metas, dists, False
-
-    if best_dist > DISTANCE_THRESHOLD or len(docs) < 2:
-        generalized = generalize_query(user_message)
-        if generalized and generalized != query.lower():
-            if DEBUG_RAG:
-                print(f"[RAG] Trying generalized query: {generalized}")
-            docs_gen, metas_gen, dists_gen = retrieve_course_snippets(generalized)
-            docs_gen, metas_gen, dists_gen = deduplicate_by_source(docs_gen, metas_gen, dists_gen, max_per_source=2)
-
-            best_dist_gen = min(dists_gen) if dists_gen else 999.0
-            if len(docs_gen) >= 1 and best_dist_gen <= (DISTANCE_THRESHOLD + 0.3):
-                if DEBUG_RAG:
-                    print(f"[RAG] Fallback retrieval successful (distance: {best_dist_gen:.3f})")
-                return docs_gen, metas_gen, dists_gen, True
-
-    if best_dist > DISTANCE_THRESHOLD or len(docs) < 1:
-        expanded_query = expand_alias_terms(query)
-        if expanded_query != query and expanded_query not in [q for q, _, _ in [(query, None, None)]]:
-            if DEBUG_RAG:
-                print(f"[RAG] Trying alias-expanded query")
-            docs_exp, metas_exp, dists_exp = retrieve_course_snippets(expanded_query)
-            docs_exp, metas_exp, dists_exp = deduplicate_by_source(docs_exp, metas_exp, dists_exp, max_per_source=2)
-
-            best_dist_exp = min(dists_exp) if dists_exp else 999.0
-            if len(docs_exp) >= 1 and best_dist_exp <= (DISTANCE_THRESHOLD + 0.2):
-                if DEBUG_RAG:
-                    print(f"[RAG] Alias fallback successful (distance: {best_dist_exp:.3f})")
-                return docs_exp, metas_exp, dists_exp, True
-
-    if DEBUG_RAG:
-        print(f"[RAG] All retrieval strategies exhausted (best distance: {best_dist:.3f})")
-    return docs, metas, dists, False
+# ── Summary helpers ───────────────────────────────────────────────────
 
 def generate_summary(old_summary: Optional[str], new_messages: List[Dict[str, Any]]) -> str:
     """Generate or update rolling summary."""
@@ -508,10 +99,11 @@ ZUSAMMENFASSUNG:"""
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0,
-        max_tokens=300
+        max_tokens=300,
     )
 
     return response.choices[0].message.content.strip()
+
 
 def should_update_summary(conversation_id: str, conv_data: Dict[str, Any]) -> bool:
     """Check if summary should be updated."""
@@ -521,6 +113,7 @@ def should_update_summary(conversation_id: str, conv_data: Dict[str, Any]) -> bo
     cursor = conv_data.get("summary_message_cursor", 0)
     new_msg_count = count_messages_since_cursor(conversation_id, cursor)
     return new_msg_count >= SUMMARY_THRESHOLD
+
 
 def update_conversation_summary(conversation_id: str, conv_data: Dict[str, Any]):
     """Update the rolling summary for a conversation."""
@@ -534,450 +127,7 @@ def update_conversation_summary(conversation_id: str, conv_data: Dict[str, Any])
     update_summary(conversation_id, new_summary, new_cursor)
 
 
-# ── Context reference resolution ─────────────────────────────────────
-
-_REF_PATTERN = re.compile(
-    r'\b(dazu|damit|zusammen|dazu\s+essen|kombinier)\b', re.IGNORECASE
-)
-
-
-def _extract_foods_ontology(text: str) -> List[str]:
-    """
-    Fast ontology-based food extraction from text.
-    Returns canonical names found in text (no LLM, no side effects).
-    """
-    ont = get_ontology()
-    text_lower = text.lower()
-    found: List[str] = []
-    seen: set = set()
-    for entry in ont.entries:
-        names_to_check = [entry.canonical] + entry.synonyms
-        for name in names_to_check:
-            if len(name) < 2:
-                continue
-            pattern = (
-                r'(?<![a-zA-ZäöüÄÖÜß])'
-                + re.escape(name.lower())
-                + r'(?![a-zA-ZäöüÄÖÜß])'
-            )
-            if re.search(pattern, text_lower):
-                key = entry.canonical.lower()
-                if key not in seen:
-                    found.append(entry.canonical)
-                    seen.add(key)
-                break
-    return found
-
-
-def _resolve_context_references(
-    user_message: str,
-    last_messages: List[Dict[str, Any]],
-) -> Optional[str]:
-    """
-    Detects "dazu"/"damit"/"zusammen" in user_message and enriches the query
-    with food items from recent conversation history.
-
-    Example: "kann ich dazu Joghurt essen?" → "Joghurt, Haferflocken, Banane"
-    Returns: enriched query string or None if no context references found.
-    """
-    if not _REF_PATTERN.search(user_message):
-        return None
-
-    # Extract foods mentioned in current message
-    current_foods = _extract_foods_ontology(user_message)
-
-    # Search last 3 messages (skip the current one) for food context
-    prev_foods: List[str] = []
-    recent = [m for m in last_messages if m.get("content", "").strip() != user_message.strip()]
-    for msg in reversed(recent[-3:]):
-        items = _extract_foods_ontology(msg.get("content", ""))
-        if items:
-            prev_foods = items[:5]
-            break
-
-    if not prev_foods:
-        return None
-
-    # Combine current + previous, deduplicate (current first)
-    seen_keys = {f.lower() for f in current_foods}
-    enriched = list(current_foods)
-    for food in prev_foods:
-        if food.lower() not in seen_keys:
-            enriched.append(food)
-            seen_keys.add(food.lower())
-
-    if len(enriched) <= len(current_foods):
-        return None  # No new context foods added
-
-    enriched_str = ", ".join(enriched[:6])
-    print(f"[CONTEXT_REF] Resolved '{user_message[:60]}' → '{enriched_str}'")
-    return enriched_str
-
-
-# ── Intent classifier + RECIPE_FROM_INGREDIENTS helpers ──────────────
-
-def classify_intent(
-    user_message: str,
-    context_messages: List[Dict[str, Any]],
-) -> Optional[Dict]:
-    """
-    Parallel intent classifier. Recognizes cases that regex misses.
-    Timeout: 4s. On error: None (graceful degradation).
-    Returns: {"intent": "recipe_from_ingredients" | null, "confidence": "high"|"low"}
-    """
-    # Build compact context from last 3 messages
-    ctx_parts = []
-    for msg in context_messages[-3:]:
-        role = "User" if msg.get("role") == "user" else "Bot"
-        content = msg.get("content", "")[:150]
-        ctx_parts.append(f"{role}: {content}")
-    ctx_str = "\n".join(ctx_parts) if ctx_parts else "(keine Vorgeschichte)"
-
-    prompt = f"""Du klassifizierst eine Nutzerabsicht für einen Trennkost-Bot.
-
-KONTEXT (letzte Nachrichten):
-{ctx_str}
-
-AKTUELLE NACHRICHT:
-{user_message}
-
-Erkenne NUR diese spezifische Absicht:
-"recipe_from_ingredients" – Der Nutzer möchte ein Rezept aus verfügbaren/vorhandenen Zutaten.
-Signale: "ich hab nur", "zu Hause", "im Kühlschrank", "aus diesen Zutaten", "mach daraus", "nur das was ich hab", "gerade da", "vorhandene Zutaten", "was kann ich damit machen", "was mach ich damit", "aus dem was ich habe".
-
-PFLICHT-REGEL (mechanisch anwenden, keine Ausnahmen):
-Mindestens EIN konkretes Lebensmittel oder eine konkrete Zutat muss in der Nachricht genannt sein.
-Ohne konkretes Lebensmittel → intent = null, egal was sonst steht.
-Beispiele ohne Lebensmittel → IMMER null:
-  "Was kann ich heute essen?", "Was soll ich zum Abendessen machen?", "Was kann ich kochen?",
-  "Was gibt es zum Frühstück?", "Was essen wir heute Abend?"
-
-NIEMALS "recipe_from_ingredients" bei:
-- Allgemeinen Essensfragen ohne Zutaten: "Was kann ich heute essen?", "Was soll ich abends kochen?"
-- Compliance-Fragen: "Ist X ok?", "Ist X in Ordnung?", "Ist X trennkostkonform?", "Darf ich X?", "Kann ich X essen?"
-- Zeitliche Trennung: "X vor Y", "erst X dann Y", "X 30 Minuten vor Y"
-- Erklärungsfragen: "Warum...?", "Wieso...?", "Was bedeutet...?"
-- Rezept-Requests ohne Einschränkung: "Gib mir ein Rezept mit Hähnchen"
-- Modifikationsfragen: "aufpeppen", "verbessern", "ergänzen", "was passt dazu", "kann ich X dazu", "das mit X aufpeppen?", "wie kann ich das ergänzen?"
-- Kombinationsfragen: "kann ich dazu X essen?", "passt X dazu?", "und mit dem X zusammen?"
-
-Wenn keines der positiven Signale eindeutig vorhanden → intent = null.
-
-Antworte NUR mit JSON, kein Kommentar:
-{{"intent": "recipe_from_ingredients" | null, "confidence": "high" | "low"}}"""
-
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
-            max_tokens=40,
-            timeout=4,
-            response_format={"type": "json_object"},
-        )
-        raw = response.choices[0].message.content.strip()
-        result = json.loads(raw)
-        # Validate expected keys
-        if "intent" in result and "confidence" in result:
-            print(f"[INTENT] classify_intent → intent={result['intent']!r} confidence={result['confidence']!r}")
-            return result
-        return None
-    except Exception as e:
-        print(f"[INTENT] classify_intent failed (non-fatal): {e}")
-        return None
-
-
-def _llm_extract_ingredients(user_message: str, last_messages: List[Dict[str, Any]]) -> List[str]:
-    """
-    LLM-based ingredient extraction — extracts ONLY explicitly mentioned items.
-    Used instead of ontology substring matching to avoid false positives.
-    Returns: list of ingredient names in German, or [] on failure.
-    """
-    # Include last 2 user messages for context (the user may have listed ingredients earlier)
-    ctx_parts = []
-    for msg in last_messages[-4:]:
-        if msg.get("role") == "user" and msg.get("content", "").strip() != user_message.strip():
-            ctx_parts.append(f"Vorherige Nachricht: {msg.get('content', '')[:200]}")
-    ctx_str = "\n".join(ctx_parts) if ctx_parts else ""
-
-    prompt = f"""Extrahiere alle Lebensmittel/Zutaten die der Nutzer explizit als verfügbar erwähnt.
-{ctx_str + chr(10) if ctx_str else ""}Aktuelle Nachricht: {user_message}
-
-Gib NUR die Zutaten zurück, kommagetrennt, auf Deutsch, keine Erklärungen.
-Nur was explizit erwähnt wird — keine Annahmen, keine Extrapolationen.
-Falls keine Zutaten erwähnt: leere Antwort."""
-
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
-            max_tokens=80,
-            timeout=4,
-        )
-        raw = response.choices[0].message.content.strip()
-        if not raw:
-            return []
-        items = [i.strip() for i in raw.replace(" und ", ", ").split(",") if i.strip() and len(i.strip()) >= 2]
-        print(f"[EXTRACT_ING] LLM extracted: {items}")
-        return items
-    except Exception as e:
-        print(f"[EXTRACT_ING] LLM extraction failed: {e}")
-        return []
-
-
-def _extract_available_ingredients(
-    user_message: str,
-    last_messages: List[Dict[str, Any]],
-    vision_extraction: Optional[Dict],
-) -> List[str]:
-    """
-    Extract the list of ingredients available to the user.
-
-    Priority:
-    1. Vision-extracted items (if image present)
-    2. LLM-based extraction from current message + recent history
-       (NOT ontology substring matching — too many false positives)
-
-    Returns: deduplicated list. Falls back to [] if nothing found.
-    """
-    found: List[str] = []
-    seen: set = set()
-
-    def _add(items: List[str]):
-        for item in items:
-            key = item.strip().lower()
-            if key and key not in seen:
-                found.append(item.strip())
-                seen.add(key)
-
-    # 1. Vision extraction (highest priority)
-    if vision_extraction and vision_extraction.get("dishes"):
-        for dish in vision_extraction["dishes"]:
-            _add(dish.get("items", []))
-
-    if len(found) >= 2:
-        return found
-
-    # 2. LLM extraction (accurate for explicit ingredient lists)
-    _add(_llm_extract_ingredients(user_message, last_messages))
-
-    return found
-
-
-def _run_feasibility_check(
-    available_ingredients: List[str],
-    overlap_results: List[Dict],
-) -> Dict:
-    """
-    Call 1: Pure logic — can user cook one of the DB recipes?
-
-    Model: gpt-4o-mini, temperature=0.0, max_tokens=200
-    Returns: {"decision": "use_db"|"create_custom", "recipe_id": str|null, "adapt_notes": str, "reason": str}
-    """
-    if not overlap_results:
-        return {"decision": "create_custom", "recipe_id": None, "adapt_notes": "", "reason": "Keine passenden Rezepte in DB"}
-
-    # Deterministic fallback (no LLM call needed if first result has very high/low overlap)
-    best = overlap_results[0]
-    if best["overlap_score"] >= 0.85 and not best["missing_required"]:
-        return {"decision": "use_db", "recipe_id": best["id"], "adapt_notes": "", "reason": "Sehr guter Match"}
-    if best["overlap_score"] < 0.4:
-        return {"decision": "create_custom", "recipe_id": None, "adapt_notes": "", "reason": "Zu wenig passende Zutaten in DB-Rezepten"}
-
-    # Medium overlap → ask LLM to decide
-    recipes_summary = []
-    for r in overlap_results:
-        missing_req = r["missing_required"]
-        missing_opt = r["missing_optional"]
-        recipes_summary.append(
-            f"- {r['name']} (Overlap: {r['overlap_score']:.0%})\n"
-            f"  Vorhanden: {', '.join(r['matched_ingredients']) or '–'}\n"
-            f"  Fehlt (Pflicht): {', '.join(missing_req) or 'nichts'}\n"
-            f"  Fehlt (Optional): {', '.join(missing_opt) or 'nichts'}"
-        )
-    recipes_text = "\n".join(recipes_summary)
-
-    prompt = f"""Du entscheidest ob ein Rezept aus der Datenbank mit den verfügbaren Zutaten kochbar ist.
-
-Verfügbare Zutaten: {', '.join(available_ingredients)}
-
-Top Rezept-Matches aus DB:
-{recipes_text}
-
-Regeln:
-- "use_db" wenn: Pflicht-Zutaten ≥70% vorhanden UND fehlende Zutaten sind nur Toppings/Dekoration/leicht weglassbar
-- "create_custom" wenn: Mehrere Kern-Zutaten fehlen die das Gericht ausmachen
-- adapt_notes: kurzer Hinweis was weggelassen/ersetzt werden kann (max 1 Satz, leer wenn use_db reibungslos)
-
-Antworte NUR mit JSON:
-{{"decision": "use_db" | "create_custom", "recipe_id": "<id_des_besten_rezepts>" | null, "adapt_notes": "<hinweis>", "reason": "<kurze_begründung>"}}"""
-
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
-            max_tokens=200,
-            timeout=5,
-            response_format={"type": "json_object"},
-        )
-        raw = response.choices[0].message.content.strip()
-        result = json.loads(raw)
-        print(f"[RECIPE_FROM_ING] Feasibility → decision={result.get('decision')!r} recipe_id={result.get('recipe_id')!r}")
-        return result
-    except Exception as e:
-        print(f"[RECIPE_FROM_ING] Feasibility check failed (non-fatal): {e}")
-        # Deterministic fallback
-        if best["overlap_score"] >= 0.7:
-            return {"decision": "use_db", "recipe_id": best["id"], "adapt_notes": "", "reason": "Fallback: overlap ≥ 0.7"}
-        return {"decision": "create_custom", "recipe_id": None, "adapt_notes": "", "reason": "Fallback: overlap < 0.7"}
-
-
-def _split_ingredients_by_group(ingredients: List[str]) -> Dict[str, List[str]]:
-    """Categorize ingredients by Trennkost group using the ontology."""
-    ontology = get_ontology()
-    result: Dict[str, List[str]] = {}
-    for ing in ingredients:
-        entry = ontology.lookup(ing)
-        group = entry.group.value if entry else "UNKNOWN"
-        result.setdefault(group, []).append(ing)
-    return result
-
-
-def _run_custom_recipe_builder(
-    available_ingredients: List[str],
-    is_breakfast: bool = False,
-) -> str:
-    """
-    Call 2: Creative — builds a custom recipe from available ingredients.
-    Only called when Call 1 → "create_custom".
-
-    Model: gpt-4o-mini, temperature=0.3, max_tokens=800
-    """
-    groups = _split_ingredients_by_group(available_ingredients)
-    obst_items = groups.get("OBST", []) + groups.get("TROCKENOBST", [])
-    kh_items = groups.get("KH", [])
-    neutral_items = groups.get("NEUTRAL", [])
-    fett_items = groups.get("FETT", [])
-    milch_items = groups.get("MILCH", [])
-
-    # Build ingredients block and breakfast constraint
-    two_option_breakfast = is_breakfast and bool(obst_items) and bool(kh_items or neutral_items or milch_items)
-
-    if two_option_breakfast:
-        kh_cluster = kh_items + neutral_items + fett_items + milch_items
-        ingredients_block = (
-            f"Zutaten Gruppe A (Obst-Frühstück): {', '.join(obst_items)}\n"
-            f"Zutaten Gruppe B (KH-Frühstück): {', '.join(kh_cluster)}"
-        )
-        breakfast_note = f"""
-
-FRÜHSTÜCK — GENAU 2 GETRENNTE REZEPTE PFLICHT (NIEMALS kombinieren!):
-OPTION A – Obst-Frühstück: Verwende AUSSCHLIESSLICH: {', '.join(obst_items)}
-OPTION B – KH-Frühstück: Verwende AUSSCHLIESSLICH: {', '.join(kh_cluster) if kh_cluster else 'keine KH-Zutaten verfügbar'}
-Obst darf NICHT in Option B erscheinen. KH/Milch darf NICHT in Option A erscheinen.
-Erstelle GENAU ZWEI Rezepte: Option A (Obst) und Option B (KH). Kein drittes Rezept."""
-        single_option_note = "Erstelle GENAU ZWEI Rezepte wie oben angegeben."
-    elif is_breakfast and obst_items:
-        ingredients_block = ', '.join(available_ingredients)
-        breakfast_note = f"\n- Frühstück Obst-Variante: Verwende NUR Obst: {', '.join(obst_items)}"
-        single_option_note = "Wenn mehrere sinnvolle Varianten möglich sind, präsentiere die beste eine Option."
-    elif is_breakfast:
-        ingredients_block = ', '.join(available_ingredients)
-        breakfast_note = "\n- Frühstück: Nur KH-Variante (kein Obst vorhanden)"
-        single_option_note = "Wenn mehrere sinnvolle Varianten möglich sind, präsentiere die beste eine Option."
-    else:
-        ingredients_block = ', '.join(available_ingredients)
-        breakfast_note = ""
-        single_option_note = "Wenn mehrere sinnvolle Varianten möglich sind (z.B. KH- oder Protein-Variante), präsentiere die beste eine Option."
-
-    prompt = f"""Erstelle ein trennkostkonformes Rezept ausschließlich aus diesen Zutaten:
-{ingredients_block}
-
-REGELN (strikt einhalten):
-- Verwende NUR die oben genannten Zutaten (keine Extras ausser Gewürze/Öl/Salz)
-- Kein KH + PROTEIN kombinieren
-- Obst immer allein, nicht mit anderen Lebensmittelgruppen mischen
-- Hülsenfrüchte nur mit Gemüse (NEUTRAL) kombinieren{breakfast_note}
-
-FORMAT:
-**[Rezeptname]**
-⏱️ [Zeit] Min. | 🍽️ [Portionen]
-
-**Zutaten:**
-- [Zutat mit Menge]
-
-**Zubereitung:**
-1. [Schritt]
-
-{single_option_note}
-Halte die Antwort kompakt und praktisch."""
-
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_INSTRUCTIONS},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.3,
-            max_tokens=800,
-            timeout=15,
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"[RECIPE_FROM_ING] Custom builder failed: {e}")
-        return f"Tut mir leid, ich konnte kein passendes Rezept aus diesen Zutaten erstellen: {', '.join(available_ingredients)}. Bitte versuche es erneut oder frage nach einem konkreten Gericht."
-
-
-def _handle_recipe_from_ingredients(
-    conversation_id: str,
-    available_ingredients: List[str],
-    is_breakfast: bool = False,
-) -> str:
-    """
-    Full handler for RECIPE_FROM_INGREDIENTS mode.
-    Replaces normal LLM call for this mode.
-
-    1. find_recipes_by_ingredient_overlap(available_ingredients, limit=3)
-    2. _run_feasibility_check(available_ingredients, overlap_results)  [Call 1]
-    3. If "use_db": format DB recipe + adapt_notes
-       If "create_custom": _run_custom_recipe_builder(available_ingredients)  [Call 2]
-    4. save + return
-    """
-    print(f"[RECIPE_FROM_ING] Searching overlap for {len(available_ingredients)} ingredients")
-    overlap_results = find_recipes_by_ingredient_overlap(available_ingredients, limit=3)
-    for r in overlap_results:
-        print(f"  → {r['name']} overlap={r['overlap_score']:.0%} missing_req={r['missing_required'][:3]}")
-
-    feasibility = _run_feasibility_check(available_ingredients, overlap_results)
-    decision = feasibility.get("decision", "create_custom")
-
-    if decision == "use_db" and feasibility.get("recipe_id"):
-        # Find the matching recipe from overlap results
-        recipe_id = feasibility["recipe_id"]
-        recipe = next((r for r in overlap_results if r["id"] == recipe_id), None)
-        if recipe is None:
-            # Fallback: use best overlap result
-            recipe = overlap_results[0] if overlap_results else None
-
-        if recipe:
-            adapt_notes = feasibility.get("adapt_notes", "")
-            response = _format_recipe_directly(recipe)
-            if adapt_notes:
-                response += f"\n\n💡 **Hinweis:** {adapt_notes}"
-            create_message(conversation_id, "assistant", response)
-            return response
-
-    # create_custom path (or use_db fallback failed)
-    response = _run_custom_recipe_builder(available_ingredients, is_breakfast)
-    response += "\n\n_Dieses Rezept wurde speziell für deine verfügbaren Zutaten erstellt._"
-    create_message(conversation_id, "assistant", response)
-    return response
-
-
-# ── Pipeline steps ───────────────────────────────────────────────────
+# ── Pipeline steps ────────────────────────────────────────────────────
 
 def _setup_conversation(
     conversation_id: Optional[str],
@@ -1052,13 +202,13 @@ def _run_engine(
         if vision_extraction and vision_extraction.get("dishes"):
             return trennkost_analyze_vision(
                 vision_extraction["dishes"],
-                llm_fn=_llm_call,
+                llm_fn=llm_call,
                 mode="strict",
             )
         else:
             return trennkost_analyze_text(
                 user_message,
-                llm_fn=_llm_call,
+                llm_fn=llm_call,
                 mode="strict",
             )
     except Exception as e:
@@ -1120,38 +270,30 @@ def _build_prompt_parts(
     """Build all prompt parts and answer instructions based on mode."""
     parts = build_base_context(summary, last_messages)
 
-    # Engine results block
     if trennkost_results:
         parts.extend(build_engine_block(trennkost_results, modifiers.is_breakfast))
         if vision_data.get("vision_is_menu"):
             parts.extend(build_menu_injection(trennkost_results))
 
-    # Vision failed block
     image_path = bool(vision_data.get("vision_extraction") or vision_data.get("vision_failed"))
     if image_path and vision_data.get("vision_failed") and not trennkost_results:
         parts.extend(build_vision_failed_block())
 
-    # Legacy vision block
     if vision_data.get("vision_analysis") and not trennkost_results and not vision_data.get("vision_failed"):
         parts.extend(build_vision_legacy_block(vision_data["vision_analysis"]))
 
-    # Breakfast block (standalone, when no engine results)
     if modifiers.is_breakfast and not trennkost_results:
         parts.extend(build_breakfast_block())
 
-    # Menu followup block
     if mode == ChatMode.MENU_FOLLOWUP and not trennkost_results:
         parts.extend(build_menu_followup_block())
 
-    # Post-analysis acknowledgement block
     if modifiers.is_post_analysis_ack:
         parts.extend(build_post_analysis_ack_block())
 
-    # Recipe context block (injected early, before course snippets)
     if mode == ChatMode.RECIPE_REQUEST and recipe_results:
         parts.extend(build_recipe_context_block(recipe_results))
 
-    # Determine answer instructions based on mode
     if trennkost_results:
         answer_instructions = build_prompt_food_analysis(
             trennkost_results, user_message, modifiers.is_breakfast,
@@ -1171,56 +313,6 @@ def _build_prompt_parts(
     return parts, answer_instructions
 
 
-def _format_recipe_directly(recipe: Dict) -> str:
-    """
-    Format recipe directly without LLM, for high-score matches (≥7.0).
-    Guarantees immediate output without follow-up questions.
-    """
-    name = recipe['name']
-    time = recipe.get('time_minutes', '?')
-    servings = recipe.get('servings', '?')
-    full_md = recipe.get('full_recipe_md', '')
-
-    # Remove #### headers, add bold **, skip duplicate Zeit/Portionen line
-    lines = []
-    skip_next_time_line = False
-    for line in full_md.split('\n'):
-        stripped = line.strip()
-
-        # Skip recipe title (we add our own)
-        if line.startswith('### '):
-            skip_next_time_line = True  # Next line is usually Zeit: ... | Portionen:
-            continue
-
-        # Skip Zeit/Portionen line (we add our own in header)
-        if skip_next_time_line and ('Zeit:' in stripped or 'Portionen:' in stripped or 'Ergibt:' in stripped):
-            skip_next_time_line = False
-            continue
-
-        skip_next_time_line = False
-
-        # Convert #### headers to **bold**
-        if line.startswith('#### '):
-            lines.append('**' + line[5:] + '**')
-        else:
-            lines.append(line)
-
-    formatted_body = '\n'.join(lines)
-
-    # Build final message
-    intro = f"Hier ist das perfekte Rezept für dich:\n\n"
-    header = f"**{name}**  \n⏱️ {time} Min. | 🍽️ {servings}\n\n"
-
-    # Add Mandeldrink hint if present
-    hint = ""
-    if recipe.get('trennkost_hinweis'):
-        hint = f"\n\n💡 **Hinweis:** {recipe['trennkost_hinweis']}\n"
-
-    footer = "\n\nDieses Rezept stammt aus unserer kuratierten Rezeptdatenbank."
-
-    return intro + header + formatted_body + hint + footer
-
-
 def _generate_and_save(
     conversation_id: str,
     llm_input: str,
@@ -1233,16 +325,13 @@ def _generate_and_save(
     Special case: For recipe requests with high-score matches (≥7.0),
     bypass LLM and format recipe directly to avoid unwanted follow-up questions.
     """
-    # Direct recipe output for high-score matches (bypass LLM)
     if mode and recipe_results:
-        from app.chat_modes import ChatMode
         if mode == ChatMode.RECIPE_REQUEST and recipe_results[0].get('score', 0.0) >= 7.0:
-            assistant_message = _format_recipe_directly(recipe_results[0])
+            assistant_message = format_recipe_directly(recipe_results[0])
             create_message(conversation_id, "assistant", assistant_message)
             print(f"[PIPELINE] High-score recipe (≥7.0) → direct output bypass")
             return assistant_message
 
-    # Normal LLM call
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -1274,7 +363,7 @@ def _prepare_sources(metas: List[Dict], dists: List[float]) -> List[Dict]:
     return sources
 
 
-# ── Main pipeline ────────────────────────────────────────────────────
+# ── Main pipeline ─────────────────────────────────────────────────────
 
 def handle_chat(
     conversation_id: Optional[str],
@@ -1313,7 +402,6 @@ def handle_chat(
     intent_result: Optional[Dict] = None
 
     if image_path:
-        # Parallelize: Run normalization + intent classification + vision simultaneously
         with ThreadPoolExecutor(max_workers=3) as executor:
             normalize_future = executor.submit(normalize_input, user_message, recent_messages_for_norm, is_new)
             intent_future = executor.submit(classify_intent, user_message, recent_messages_for_norm)
@@ -1324,7 +412,6 @@ def handle_chat(
             vision_data = vision_future.result()
         print(f"[PIPELINE] Parallel execution: normalization + intent + vision completed")
     else:
-        # No image: parallelize normalization + intent classification
         with ThreadPoolExecutor(max_workers=2) as executor:
             normalize_future = executor.submit(normalize_input, user_message, recent_messages_for_norm, is_new)
             intent_future = executor.submit(classify_intent, user_message, recent_messages_for_norm)
@@ -1378,13 +465,10 @@ def handle_chat(
         return {"answer": response_text, "conversationId": conversation_id}
 
     # 3c. Intent override — for modes where regex had no strong signal
-    # Also override FOOD_ANALYSIS when it's not a compliance check (e.g. "Ich hab nur X, Y.
-    # Mach daraus was" — food items get detected but the intent is really a recipe request).
-    # NEVER override: MENU_ANALYSIS, MENU_FOLLOWUP, or compliance checks.
     _can_override_food_analysis = (
         mode == ChatMode.FOOD_ANALYSIS
         and not modifiers.is_compliance_check
-        and not image_path  # real meal photo → always food analysis
+        and not image_path
     )
     if (
         intent_result
@@ -1400,16 +484,14 @@ def handle_chat(
 
     # 3d. Early-exit for RECIPE_FROM_INGREDIENTS
     if mode == ChatMode.RECIPE_FROM_INGREDIENTS:
-        available_ingredients = _extract_available_ingredients(
+        available_ingredients = extract_available_ingredients(
             normalized_message, recent_messages_for_norm, vision_data.get("vision_extraction")
         )
-        # Guard A: no ingredients at all → general recipe request (misfire of classify_intent)
         if not available_ingredients:
             print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS: no ingredients found → RECIPE_REQUEST")
             mode = ChatMode.RECIPE_REQUEST
             modifiers.wants_recipe = True
         else:
-            # Guard B: only a single generic term (e.g. "obst") → treat as food/modification question
             _GENERIC_TERMS = {"obst", "gemüse", "lebensmittel", "essen", "zutaten", "früchte", "beeren"}
             _is_only_generic = (
                 len(available_ingredients) == 1
@@ -1420,7 +502,7 @@ def handle_chat(
                 mode = ChatMode.FOOD_ANALYSIS
             else:
                 print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS | ingredients={available_ingredients[:5]}")
-                response = _handle_recipe_from_ingredients(
+                response = handle_recipe_from_ingredients(
                     conversation_id, available_ingredients, modifiers.is_breakfast
                 )
                 conv_data_updated = get_conversation(conversation_id)
@@ -1428,15 +510,14 @@ def handle_chat(
                     update_conversation_summary(conversation_id, conv_data_updated)
                 return {"conversationId": conversation_id, "answer": response, "sources": []}
 
-    # 3e. Context reference resolution — "dazu"/"damit"/"zusammen" → enrich FOOD_ANALYSIS query
-    # e.g. "kann ich dazu Joghurt essen?" → "Joghurt, Haferflocken, Banane" (from prior messages)
+    # 3e. Context reference resolution
     analysis_query = normalized_message
     if mode == ChatMode.FOOD_ANALYSIS:
-        resolved = _resolve_context_references(normalized_message, recent)
+        resolved = resolve_context_references(normalized_message, recent)
         if resolved:
             analysis_query = resolved
 
-    # 4. Run Trennkost engine (use analysis_query so context foods are included)
+    # 4. Run Trennkost engine
     trennkost_results = _run_engine(
         analysis_query, vision_data.get("vision_extraction"), mode
     )
@@ -1452,10 +533,8 @@ def handle_chat(
         try:
             from app.recipe_service import search_recipes
 
-            # For short follow-up messages (e.g. "egal", "ok"), use previous user query
             search_query = normalized_message
             if modifiers.is_followup and len(normalized_message.strip()) <= 20:
-                # Extract previous substantial user message from chat history
                 for msg in reversed(recent):
                     if msg.get("role") == "user":
                         content = msg.get("content", "").strip()
@@ -1472,7 +551,7 @@ def handle_chat(
             print(f"[PIPELINE] recipe search failed: {e}")
             recipe_results = []
 
-    # 6. Load context + build RAG query + retrieve (use normalized message)
+    # 6. Load context + build RAG query + retrieve
     summary = conv_data.get("summary_text")
     last_messages = get_last_n_messages(conversation_id, LAST_N)
 
@@ -1482,7 +561,6 @@ def handle_chat(
         modifiers.is_breakfast,
     )
 
-    # LLM food classification for better retrieval (skip if engine already ran, use normalized message)
     needs_clarification = None
     is_followup = not is_new and len(last_messages) >= 2
     if not trennkost_results:
@@ -1520,7 +598,7 @@ def handle_chat(
             "sources": []
         }
 
-    # 8. Build prompt (use analysis_query — may include resolved context foods)
+    # 8. Build prompt
     prompt_parts, answer_instructions = _build_prompt_parts(
         mode, modifiers, trennkost_results, vision_data,
         summary, last_messages, analysis_query, recipe_results,
@@ -1546,5 +624,5 @@ def handle_chat(
     return {
         "conversationId": conversation_id,
         "answer": assistant_message,
-        "sources": sources
+        "sources": sources,
     }
