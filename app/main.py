@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import List, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse
@@ -33,13 +33,28 @@ class ChatRequest(BaseModel):
     conversationId: Optional[str] = None
     message: str
     guestId: Optional[str] = None
+    userId: Optional[str] = None    # reserved for future auth; not passed to handle_chat
+    courseId: Optional[str] = None  # reserved for future multi-course support
 
 class ChatResponse(BaseModel):
     conversationId: str
     answer: str
     sources: list
 
-@app.get("/health")
+class HealthResponse(BaseModel):
+    ok: bool
+
+class ConversationItem(BaseModel):
+    id: str
+    title: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    guest_id: Optional[str] = None
+
+class ConversationsResponse(BaseModel):
+    conversations: List[ConversationItem]
+
+@app.get("/health", response_model=HealthResponse)
 def health():
     return {"ok": True}
 
@@ -150,7 +165,7 @@ def analyze_food(request: AnalyzeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis error: {str(e)}")
 
-@app.get("/conversations")
+@app.get("/conversations", response_model=ConversationsResponse)
 def get_conversations(guest_id: Optional[str] = None):
     """
     Get all conversations for a guest.
