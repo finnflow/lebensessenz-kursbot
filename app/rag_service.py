@@ -5,6 +5,7 @@ Handles vector search, context building, query rewriting and alias expansion.
 """
 import json
 import re
+from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional, Any
 
@@ -139,50 +140,112 @@ def deduplicate_by_source(
     return deduped_docs, deduped_metas, deduped_dists
 
 
+@dataclass
+class RetrievalAttempt:
+    """Debug record for a single retrieval attempt inside retrieve_with_fallback."""
+    variant: str                   # "PRIMARY" | "GENERALIZED_FALLBACK" | "ALIAS_FALLBACK"
+    query: str                     # Actual query sent to ChromaDB
+    threshold: Optional[float]     # Distance threshold used for acceptance
+    n_results: int                 # Number of snippets returned after dedup
+    best_distance: Optional[float] # Distance of the closest result (None if empty)
+    accepted: bool                 # True iff this attempt produced the final output
+    notes: Optional[str]           # Extra context (deprecation warnings, special cases)
+
+
+def _log_rag_debug(
+    user_message: str,
+    attempts: List[RetrievalAttempt],
+    metas: List[Dict],
+    dists: List[float],
+    chosen_variant: Optional[str],
+) -> None:
+    """Emit one structured [RAG_DEBUG] log line when DEBUG_RAG is active."""
+    if not DEBUG_RAG:
+        return
+
+    used_docs = [
+        {"path": m.get("path"), "chunk": m.get("chunk"), "distance": round(d, 4)}
+        for m, d in zip(metas[:5], dists[:5])
+    ]
+    payload = {
+        "user_message": user_message[:120],
+        "chosen_variant": chosen_variant,
+        "attempts": [asdict(a) for a in attempts],
+        "used_docs": used_docs,
+    }
+    print(f"[RAG_DEBUG] {json.dumps(payload, ensure_ascii=False)}")
+
+
 def retrieve_with_fallback(
     query: str, user_message: str
 ) -> Tuple[List[str], List[Dict], List[float], bool]:
     """Multi-step retrieval with fallback strategies."""
+    attempts: List[RetrievalAttempt] = []
+
+    # --- PRIMARY ---
     docs, metas, dists = retrieve_course_snippets(query)
     docs, metas, dists = deduplicate_by_source(docs, metas, dists, max_per_source=2)
-
     best_dist = min(dists) if dists else 999.0
+    primary_accepted = len(docs) >= 2 and best_dist <= DISTANCE_THRESHOLD
+    attempts.append(RetrievalAttempt(
+        variant="PRIMARY",
+        query=query,
+        threshold=DISTANCE_THRESHOLD,
+        n_results=len(docs),
+        best_distance=best_dist if dists else None,
+        accepted=primary_accepted,
+        notes=None,
+    ))
 
-    if len(docs) >= 2 and best_dist <= DISTANCE_THRESHOLD:
-        if DEBUG_RAG:
-            print(f"[RAG] Primary retrieval successful (distance: {best_dist:.3f})")
+    if primary_accepted:
+        _log_rag_debug(user_message, attempts, metas, dists, "PRIMARY")
         return docs, metas, dists, False
 
+    # --- GENERALIZED_FALLBACK ---
     if best_dist > DISTANCE_THRESHOLD or len(docs) < 2:
         generalized = generalize_query(user_message)
         if generalized and generalized != query.lower():
-            if DEBUG_RAG:
-                print(f"[RAG] Trying generalized query: {generalized}")
+            gen_threshold = DISTANCE_THRESHOLD + 0.3
             docs_gen, metas_gen, dists_gen = retrieve_course_snippets(generalized)
             docs_gen, metas_gen, dists_gen = deduplicate_by_source(docs_gen, metas_gen, dists_gen, max_per_source=2)
-
             best_dist_gen = min(dists_gen) if dists_gen else 999.0
-            if len(docs_gen) >= 1 and best_dist_gen <= (DISTANCE_THRESHOLD + 0.3):
-                if DEBUG_RAG:
-                    print(f"[RAG] Fallback retrieval successful (distance: {best_dist_gen:.3f})")
+            gen_accepted = len(docs_gen) >= 1 and best_dist_gen <= gen_threshold
+            attempts.append(RetrievalAttempt(
+                variant="GENERALIZED_FALLBACK",
+                query=generalized,
+                threshold=gen_threshold,
+                n_results=len(docs_gen),
+                best_distance=best_dist_gen if dists_gen else None,
+                accepted=gen_accepted,
+                notes="deprecated generalize_query; threshold +0.3",
+            ))
+            if gen_accepted:
+                _log_rag_debug(user_message, attempts, metas_gen, dists_gen, "GENERALIZED_FALLBACK")
                 return docs_gen, metas_gen, dists_gen, True
 
+    # --- ALIAS_FALLBACK ---
     if best_dist > DISTANCE_THRESHOLD or len(docs) < 1:
         expanded_query = expand_alias_terms(query)
         if expanded_query != query and expanded_query not in [q for q, _, _ in [(query, None, None)]]:
-            if DEBUG_RAG:
-                print(f"[RAG] Trying alias-expanded query")
+            exp_threshold = DISTANCE_THRESHOLD + 0.2
             docs_exp, metas_exp, dists_exp = retrieve_course_snippets(expanded_query)
             docs_exp, metas_exp, dists_exp = deduplicate_by_source(docs_exp, metas_exp, dists_exp, max_per_source=2)
-
             best_dist_exp = min(dists_exp) if dists_exp else 999.0
-            if len(docs_exp) >= 1 and best_dist_exp <= (DISTANCE_THRESHOLD + 0.2):
-                if DEBUG_RAG:
-                    print(f"[RAG] Alias fallback successful (distance: {best_dist_exp:.3f})")
+            exp_accepted = len(docs_exp) >= 1 and best_dist_exp <= exp_threshold
+            attempts.append(RetrievalAttempt(
+                variant="ALIAS_FALLBACK",
+                query=expanded_query,
+                threshold=exp_threshold,
+                n_results=len(docs_exp),
+                best_distance=best_dist_exp if dists_exp else None,
+                accepted=exp_accepted,
+                notes=None,
+            ))
+            if exp_accepted:
+                _log_rag_debug(user_message, attempts, metas_exp, dists_exp, "ALIAS_FALLBACK")
                 return docs_exp, metas_exp, dists_exp, True
 
-    if DEBUG_RAG:
-        print(f"[RAG] All retrieval strategies exhausted (best distance: {best_dist:.3f})")
+    _log_rag_debug(user_message, attempts, metas, dists, "NO_RESULTS")
     return docs, metas, dists, False
 
 
