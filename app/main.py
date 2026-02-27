@@ -24,11 +24,12 @@ from trennkost.analyzer import analyze_text as trennkost_analyze_text, format_re
 
 load_dotenv()
 
-# Initialize database on startup
-init_db()
-run_migrations()
-
 app = FastAPI(title="Lebensessenz Kursbot Chat")
+
+@app.on_event("startup")
+async def startup_event():
+    init_db()
+    run_migrations()
 
 origins = [
     "http://localhost:4321",  # Astro dev
