@@ -263,12 +263,15 @@ def analyze_food(request: AnalyzeRequest):
 
 @app.get("/conversations", response_model=ConversationsResponse)
 @app.get("/api/v1/conversations", response_model=ConversationsResponse)
-def get_conversations(guest_id: Optional[str] = None):
+def get_conversations(request: Request, guest_id: Optional[str] = None):
     """
     Get all conversations for a guest.
-    Returns empty list if no guest_id provided (backwards compat).
+    v1: guest_id is required. v0: returns empty list if omitted (backwards compat).
     """
+    is_v1 = request.url.path.startswith("/api/v1/")
     if not guest_id:
+        if is_v1:
+            raise HTTPException(status_code=400, detail="guest_id is required")
         return {"conversations": []}
 
     try:
@@ -279,14 +282,19 @@ def get_conversations(guest_id: Optional[str] = None):
 
 @app.get("/conversations/{conversation_id}/messages")
 @app.get("/api/v1/conversations/{conversation_id}/messages")
-def get_conversation_messages(conversation_id: str, guest_id: Optional[str] = None):
+def get_conversation_messages(request: Request, conversation_id: str, guest_id: Optional[str] = None):
     """
     Get all messages for a conversation.
-    Validates guest access if guest_id provided.
+    v1: guest_id required, strict ownership. v0: ownership check only when guest_id provided.
     """
+    is_v1 = request.url.path.startswith("/api/v1/")
     try:
-        # Validate guest access
-        if guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
+        if is_v1:
+            if not guest_id:
+                raise HTTPException(status_code=400, detail="guest_id is required")
+            if not conversation_belongs_to_guest(conversation_id, guest_id, allow_legacy_open=False):
+                raise HTTPException(status_code=403, detail="Access denied")
+        elif guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
             raise HTTPException(status_code=403, detail="Access denied")
 
         messages = get_messages(conversation_id)
@@ -298,14 +306,19 @@ def get_conversation_messages(conversation_id: str, guest_id: Optional[str] = No
 
 @app.delete("/conversations/{conversation_id}")
 @app.delete("/api/v1/conversations/{conversation_id}")
-def delete_conversation(conversation_id: str, guest_id: Optional[str] = None):
+def delete_conversation(request: Request, conversation_id: str, guest_id: Optional[str] = None):
     """
     Delete a conversation.
-    Validates guest ownership before deletion.
+    v1: guest_id required, strict ownership. v0: ownership check only when guest_id provided.
     """
+    is_v1 = request.url.path.startswith("/api/v1/")
     try:
-        # Validate guest access
-        if guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
+        if is_v1:
+            if not guest_id:
+                raise HTTPException(status_code=400, detail="guest_id is required")
+            if not conversation_belongs_to_guest(conversation_id, guest_id, allow_legacy_open=False):
+                raise HTTPException(status_code=403, detail="Access denied")
+        elif guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
             raise HTTPException(status_code=403, detail="Access denied")
 
         from app.database import delete_conversation
@@ -325,21 +338,28 @@ FEEDBACK_DIR = os.getenv("FEEDBACK_DIR", "storage/feedback")
 
 @app.post("/feedback")
 @app.post("/api/v1/feedback")
-def submit_feedback(request: FeedbackRequest):
+def submit_feedback(http_request: Request, body: FeedbackRequest):
     """
     Save feedback for a conversation.
 
     Exports the full chat as readable Markdown + copies images + saves feedback text
     to storage/feedback/{timestamp}_{sanitized_title}/.
+    v1: guestId required, strict ownership. v0: ownership check only when guestId provided.
     """
-    if not request.feedback.strip():
+    is_v1 = http_request.url.path.startswith("/api/v1/")
+    if not body.feedback.strip():
         raise HTTPException(status_code=400, detail="Feedback cannot be empty")
 
-    if request.guestId and not conversation_belongs_to_guest(request.conversationId, request.guestId):
+    if is_v1:
+        if not body.guestId:
+            raise HTTPException(status_code=400, detail="guestId is required")
+        if not conversation_belongs_to_guest(body.conversationId, body.guestId, allow_legacy_open=False):
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif body.guestId and not conversation_belongs_to_guest(body.conversationId, body.guestId):
         raise HTTPException(status_code=403, detail="Access denied")
 
     try:
-        result = export_feedback(request.conversationId, request.feedback.strip(), FEEDBACK_DIR)
+        result = export_feedback(body.conversationId, body.feedback.strip(), FEEDBACK_DIR)
         return {"status": "saved", **result}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

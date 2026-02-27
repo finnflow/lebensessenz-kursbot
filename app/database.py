@@ -233,23 +233,30 @@ def generate_title_from_message(message: str, max_words: int = 10) -> str:
         return message.strip()
     return ' '.join(words[:max_words]) + '...'
 
-def conversation_belongs_to_guest(conversation_id: str, guest_id: Optional[str]) -> bool:
-    """Check if conversation belongs to guest (or has no guest_id for backwards compat)."""
+def conversation_belongs_to_guest(
+    conversation_id: str,
+    guest_id: Optional[str],
+    allow_legacy_open: bool = True,
+) -> bool:
+    """Check if conversation belongs to guest.
+
+    allow_legacy_open=True  → conversations without a guest_id are accessible by anyone (v0 compat).
+    allow_legacy_open=False → conversations without a guest_id are treated as inaccessible (v1 strict).
+    """
     with get_db() as conn:
-        cursor = conn.execute("""
-            SELECT guest_id FROM conversations WHERE id = ?
-        """, (conversation_id,))
+        cursor = conn.execute(
+            "SELECT guest_id FROM conversations WHERE id = ?",
+            (conversation_id,),
+        )
         row = cursor.fetchone()
         if not row:
             return False
 
         conv_guest_id = row["guest_id"]
 
-        # Backwards compatibility: if conversation has no guest_id, allow access
         if conv_guest_id is None:
-            return True
+            return allow_legacy_open
 
-        # Otherwise, check if guest_id matches
         return conv_guest_id == guest_id
 
 def export_conversation_for_feedback(conversation_id: str) -> Optional[Dict[str, Any]]:
