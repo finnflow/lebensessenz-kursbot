@@ -191,8 +191,7 @@ Browser/Mobile
 │  _finalize_response()  (Steps 5–11, shared):            │
 │  ├── 5. RAG: build_rag_query() → retrieve_with_fallback()│
 │  │       1. Primary embed + ChromaDB                   │
-│  │       2. Fallback: generalize_query() (Regex)       │
-│  │       3. Fallback: expand_alias_terms() (config)    │
+│  │       2. Fallback: expand_alias_terms() (config)    │
 │  ├── 6. Fallback-Check → ggf. FALLBACK_SENTENCE        │
 │  ├── 7. Prompt bauen  [prompt_builder.py]              │
 │  │       build_base_context() + build_engine_block()   │
@@ -247,7 +246,7 @@ Browser/Mobile
 - Chunk-Size: 1200 Zeichen, Overlap: 200
 - Metadata pro Chunk: `path`, `source`, `page`, `chunk`, `module_id`, `module_label`,
   `submodule_id`, `submodule_label`
-- 3-stufige Retrieval-Strategie: Primary → Regex-Generalization → Alias-Expansion
+- 2-stufige Retrieval-Strategie: Primary → Alias-Expansion
 - Deduplication: max 2 Chunks pro Source-Datei
 - Distance Threshold: 1.0 (ChromaDB L2-Distanz)
 - `TOP_K=10`, `MAX_CONTEXT_CHARS=9000`
@@ -269,7 +268,7 @@ Browser/Mobile
 - `print()` mit `[PIPELINE]`, `[RECIPE_LLM]`, `[RECIPE_FROM_ING]` Prefixes
 - `storage/trennkost_unknowns.log`: Unbekannte Lebensmittel werden automatisch geloggt
 - `DEBUG_RAG=1` env var: Strukturiertes `[RAG_DEBUG]` JSON-Log pro `retrieve_with_fallback()`-Aufruf
-  - Felder: `user_message`, `chosen_variant`, `attempts` (PRIMARY/GENERALIZED_FALLBACK/ALIAS_FALLBACK), `used_docs`
+  - Felder: `user_message`, `chosen_variant`, `attempts` (PRIMARY/ALIAS_FALLBACK/NO_RESULTS), `used_docs`
   - `RetrievalAttempt` dataclass: `variant`, `query`, `threshold`, `n_results`, `best_distance`, `accepted`, `notes`
 - Kein strukturiertes Logging-Framework, kein externes Monitoring
 
@@ -377,16 +376,15 @@ expand_alias_terms(query)          ← deterministisch, config/alias_terms.json
        │
        ▼
 retrieve_with_fallback(query, user_message)
-  ├── 1. Primary: embed_one() → col.query(n_results=TOP_K)
+  ├── 1. PRIMARY: embed_one() → col.query(n_results=TOP_K)
   │         + deduplicate_by_source(max_per_source=2)
   │         → OK wenn best_dist ≤ DISTANCE_THRESHOLD(1.0) und ≥2 Ergebnisse
   │
-  ├── 2. Fallback A: generalize_query(user_message) [Regex-Map, deprecated]
-  │         z.B. "burger" → "Fleisch und Kohlenhydrate"
-  │         → Threshold: DISTANCE_THRESHOLD + 0.3
+  ├── 2. ALIAS_FALLBACK: expand_alias_terms(query) [alias_terms.json]
+  │         → Threshold: DISTANCE_THRESHOLD + 0.2
+  │         → Nur wenn expanded_query != query
   │
-  └── 3. Fallback B: expand_alias_terms(query) [alias_terms.json]
-              → Threshold: DISTANCE_THRESHOLD + 0.2
+  └── 3. NO_RESULTS: leerer RetrievalAttempt, FALLBACK_SENTENCE greift
        │
        ▼
 build_context(docs, metas)
@@ -415,7 +413,7 @@ assemble_prompt(parts, course_context, answer_instructions)
 
 1. **Kein Re-Ranking:** Reihenfolge ist pure L2-Distanz, kein Cross-Encoder
 2. **Distance Threshold 1.0 sehr weit:** Kann irrelevante Snippets einschließen
-3. **`generalize_query()` deprecated:** Regex-Map veraltet, selten getroffen
+3. **`generalize_query()` LEGACY:** Regex-Map, nicht mehr aufgerufen — safe to delete
 4. **Alias-Terms nur 1 Match:** Schleife bricht bei erstem Treffer ab (`break`)
 5. **Kein separater Test für RAG-Qualität:** `test_rag_quality.py` existiert, ist aber nur eine Funktion
 6. **Kein Caching der Embeddings:** Jede Anfrage embeddet neu
@@ -621,7 +619,7 @@ User-Text → _extract_foods_from_question()
 3. **Compounds**: Singleton wird bei Import gecacht → JSON-Änderungen brauchen Server-Restart
    (workaround: `.py`-Datei anfassen für uvicorn `--reload`)
 4. **Kakao/Schokolade**: Noch `UNKNOWN` — unklare Kategorisierung aus Kursmaterial
-5. **`generalize_query()`**: Deprecated, aber noch im Code als Fallback B
+5. **`generalize_query()`**: LEGACY, nicht mehr aufgerufen — safe to delete
 
 ---
 
@@ -645,7 +643,7 @@ User-Text → _extract_foods_from_question()
 
 - [ ] **Re-Ranking**: Cross-Encoder für bessere Retrieval-Präzision?
 - [ ] **Distance Threshold**: 1.0 ist sehr tolerant — Analyse ob härterer Threshold (0.7?) besser wäre
-- [ ] **`generalize_query()`**: Komplett entfernen oder durch LLM-Rewrite ersetzen?
+- [ ] **`generalize_query()`**: LEGACY-Funktion, safe to delete (nicht mehr aufgerufen)
 - [ ] **Recipe-Count-Diskrepanz**: CLAUDE.md sagt 86, tatsächliche JSON enthält 110 — Dokumentation anpassen
 
 ## Technische Schulden
