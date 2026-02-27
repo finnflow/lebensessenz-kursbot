@@ -32,8 +32,10 @@ async def startup_event():
     run_migrations()
 
 origins = [
-    "http://localhost:4321",  # Astro dev
-    "https://lebensessenz.de",  # future production
+    "http://localhost:4321",   # Astro dev
+    "http://localhost:5173",   # Vite dev (RicsSite)
+    "http://127.0.0.1:5173",   # Vite dev via IP
+    "https://lebensessenz.de", # production
 ]
 
 app.add_middleware(
