@@ -219,7 +219,7 @@ Browser/Mobile
 
 ### Backend / API
 - FastAPI mit Pydantic-Validierung
-- CORS: `http://localhost:4321` (Astro dev) + `https://lebensessenz.de` (production)
+- CORS: `http://localhost:4321` (Astro dev) + `http://localhost:5173` + `http://127.0.0.1:5173` (Vite dev / RicsSite) + `https://lebensessenz.de` (production)
 - Zentrales JSON-Error-Handling: `{"error": {"code": ..., "message": ...}}` für 422/4xx/500
 - **API-Versionierung:** Alle Endpunkte sind sowohl unter dem Legacy-Pfad als auch unter `/api/v1/...` registriert (je zwei `@app.*`-Dekoratoren, kein Router-Split, vollständig backwards-kompatibel)
 - **Exception-Handling:** Endpoints werfen ausschließlich 4xx aktiv (`HTTPException` mit 400/403/404). Kein `except Exception as e: raise HTTPException(500, ...)` — unerwartete Fehler fallen automatisch durch zum globalen Handler (`INTERNAL_ERROR`, kein Leak interner Details). Einzige Ausnahmen: `ValueError → 404` (domain error) und `ImageValidationError → 400` (client error).
