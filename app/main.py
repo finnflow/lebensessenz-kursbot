@@ -15,6 +15,7 @@ from app.database import (
     get_conversations_by_guest,
     conversation_belongs_to_guest,
 )
+from app.migrations import run_migrations
 from app.clients import MODEL, TOP_K, LAST_N, SUMMARY_THRESHOLD
 from app.chat_service import handle_chat
 from app.image_handler import save_image, ImageValidationError
@@ -25,6 +26,7 @@ load_dotenv()
 
 # Initialize database on startup
 init_db()
+run_migrations()
 
 app = FastAPI(title="Lebensessenz Kursbot Chat")
 

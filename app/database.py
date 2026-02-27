@@ -20,6 +20,8 @@ def init_db():
             id TEXT PRIMARY KEY,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
+            guest_id TEXT,
+            title TEXT,
             summary_text TEXT,
             summary_updated_at TEXT,
             summary_message_cursor INTEGER DEFAULT 0
@@ -34,6 +36,7 @@ def init_db():
             role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
             content TEXT NOT NULL,
             created_at TEXT NOT NULL,
+            image_path TEXT,
             FOREIGN KEY (conversation_id) REFERENCES conversations(id)
         )
     """)
@@ -42,6 +45,11 @@ def init_db():
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_messages_conversation
         ON messages(conversation_id, created_at)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_conversations_guest_id
+        ON conversations(guest_id, updated_at DESC)
     """)
 
     conn.commit()
