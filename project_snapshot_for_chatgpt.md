@@ -1,5 +1,5 @@
 # Lebensessenz Kursbot — Vollständiger Projekt-Snapshot
-**Erstellt:** 2026-02-24
+**Erstellt:** 2026-02-27
 **Zweck:** Übergabedokument für ChatGPT-Zusammenarbeit. Enthält alle architektonischen,
 technischen und inhaltlichen Details des Projekts, sodass ChatGPT ohne weiteres Onboarding
 produktiv mitarbeiten kann.
@@ -41,13 +41,16 @@ Speisekarten-Fotos und schlägt Rezepte vor.
 lebensessenz-kursbot/
 │
 ├── app/                                   # FastAPI-Backend
-│   ├── main.py                   (744 Z)  # API-Endpunkte: POST /chat, /chat/image,
-│   │                                      #   /feedback, GET /conversations, DELETE /conversations/{id}
+│   ├── main.py                   (747 Z)  # API-Endpunkte: POST /chat, /chat/image, /feedback,
+│   │                                      #   GET /conversations, /config, /health,
+│   │                                      #   DELETE /conversations/{id}
+│   │                                      #   CORS, zentrales JSON-Error-Handling
 │   ├── chat_service.py           (729 Z)  # Dispatcher: handle_chat() ~70 Z + 7 private Handler
 │   ├── chat_modes.py             (389 Z)  # ChatMode-Enum + Modifier-Detection
-│   ├── prompt_builder.py         (631 Z)  # SYSTEM_INSTRUCTIONS (14 Regeln) + alle Prompt-Builder
+│   ├── prompt_builder.py         (631 Z)  # SYSTEM_INSTRUCTIONS (5 Meta-Regeln M1–M5) + alle Prompt-Builder
 │   ├── clients.py                 (34 Z)  # Singleton: OpenAI-Client, ChromaDB-Col, MODEL-Konstanten
-│   ├── rag_service.py            (230 Z)  # Vector-Retrieval + Query-Rewrite + Alias-Expansion
+│   ├── rag_service.py            (294 Z)  # Vector-Retrieval + Query-Rewrite + Alias-Expansion
+│   │                                      #   RetrievalAttempt dataclass + _log_rag_debug() (DEBUG_RAG=1)
 │   ├── input_service.py          (429 Z)  # Normalisierung, Intent-Klassifikation, Ingredient-Extraktion
 │   ├── recipe_service.py         (408 Z)  # Rezept-Suche (LLM-basiert primär + Keyword-Fallback)
 │   ├── recipe_builder.py         (265 Z)  # RECIPE_FROM_INGREDIENTS: Feasibility-Check + Custom-Builder
@@ -212,10 +215,22 @@ Browser/Mobile
 
 ### Backend / API
 - FastAPI mit Pydantic-Validierung
-- Endpunkte: `POST /chat`, `POST /chat/image`, `GET /conversations/{id}/messages`,
-  `DELETE /conversations/{id}`, `POST /feedback`, `GET /` (SPA), `GET /health`
+- CORS: `http://localhost:4321` (Astro dev) + `https://lebensessenz.de` (production)
+- Zentrales JSON-Error-Handling: `{"error": {"code": ..., "message": ...}}` für 422/4xx/500
+- Endpunkte:
+  - `POST /chat` — Request: `{conversationId?, message, guestId?, userId?, courseId?}`
+  - `POST /chat/image` — multipart mit optionalem Image
+  - `GET /conversations` — Response: `ConversationsResponse`
+  - `GET /conversations/{id}/messages`
+  - `DELETE /conversations/{id}`
+  - `POST /feedback`
+  - `GET /config` — Response: `{model, rag: {top_k, max_history_messages, summary_threshold}, features: {vision_enabled, feedback_enabled}}`
+  - `GET /health` — Response: `{"ok": true}`
+  - `GET /` — SPA
+- `userId` und `courseId` in `ChatRequest` reserviert (noch nicht an `handle_chat()` weitergegeben)
 - Guest-ID-System: Conversations gehören einem Browser (localStorage UUID)
-- SQLite über `app/database.py`: `conversations` + `messages` + rolling summary
+- SQLite über `app/database.py`: `conversations` (inkl. `guest_id`, `title`) + `messages` (inkl. `image_path`) + rolling summary
+- `init_db()` + `run_migrations()` bei App-Start (idempotent, Reihenfolge garantiert)
 - Bild-Hosting: `/uploads/` als StaticFiles gemountet, auto-cleanup nach 24h
 
 ### Embeddings + Retrieval (ChromaDB)
@@ -242,9 +257,11 @@ Browser/Mobile
 - Rezept-Spezialfälle: _llm_select_recipe_ids() + _run_feasibility_check() + _run_custom_recipe_builder()
 
 ### Logging / Monitoring
-- `print()` mit `[PIPELINE]`, `[RECIPE_LLM]`, `[RAG]`, `[RECIPE_FROM_ING]` Prefixes
+- `print()` mit `[PIPELINE]`, `[RECIPE_LLM]`, `[RECIPE_FROM_ING]` Prefixes
 - `storage/trennkost_unknowns.log`: Unbekannte Lebensmittel werden automatisch geloggt
-- `DEBUG_RAG=1` env var: Verbose RAG-Retrieval-Logging
+- `DEBUG_RAG=1` env var: Strukturiertes `[RAG_DEBUG]` JSON-Log pro `retrieve_with_fallback()`-Aufruf
+  - Felder: `user_message`, `chosen_variant`, `attempts` (PRIMARY/GENERALIZED_FALLBACK/ALIAS_FALLBACK), `used_docs`
+  - `RetrievalAttempt` dataclass: `variant`, `query`, `threshold`, `n_results`, `best_distance`, `accepted`, `notes`
 - Kein strukturiertes Logging-Framework, kein externes Monitoring
 
 ---
@@ -401,24 +418,17 @@ assemble_prompt(parts, course_context, answer_instructions)
 
 ## SYSTEM_INSTRUCTIONS (app/prompt_builder.py)
 
-14 Regeln, die für ALLE Modi gelten:
+5 Meta-Regeln (M1–M5), die für ALLE Modi gelten. Domänen-spezifische Details (Zeitwerte,
+Lebensmittelbeispiele, Rule-IDs) wurden bewusst entfernt — sie stecken in den mode-spezifischen
+Buildern (`build_prompt_food_analysis()`, `build_prompt_knowledge()` etc.).
 
 | Regel | Inhalt |
 |-------|--------|
-| R1 | Faktenbasis: Nur Kurs-Snippets verwenden |
-| R2 | Chat-Kontext: Nur für Referenzen, keine neuen Fakten |
-| R3 | Grenzen + Ausnahmen: Fallback-Satz wenn nicht im Kurs (außer: Follow-ups, Bilder, Rezepte, Korrekturen) |
-| R4 | Begriffs-Alias: "Trennkost" nicht im Kurs → Konzept erklären, einmal hinweisen |
-| R5 | Teilantworten: Belegbaren Teil antworten, Rest mit Fallback |
-| R6 | Keine Spekulationen |
-| R7 | Keine Medizin/Diagnose |
-| R8 | Keine Quellen im Text (werden automatisch angezeigt) |
-| R9 | Zeitliche Regeln KRITISCH: "3h nach Obst" VERBOTEN — 3h gilt VOR Obst (nach schwerer Mahlzeit) |
-| R10 | Rezept-Vorschläge erlaubt wenn Trennkost-konform |
-| R11 | Bild-Referenzen: NIEMALS Fallback, stattdessen realistische Schätzungen für Mengen |
-| R12 | Fix-Direction Follow-ups: 5 Fälle (A=Wahl nennen, B=am liebsten alles, C=Bestätigung, D=Ablehnung, E=neue Frage) |
-| R13 | Schleifen-Schutz: Gleiche Frage NIEMALS wiederholen, Speisekarte → nur Karten-Gerichte |
-| R14 | Korrektur-Erkennung: "aber ich hab doch X gesagt" → re-analysieren, NIEMALS Fallback |
+| M1 | Quellenbindung: Nur Kurs-Snippets + Engine-Ergebnis + explizite Metadaten — kein externes Allgemeinwissen |
+| M2 | Zahlen & konkrete Angaben: Nur Werte aus Snippets/Engine — niemals neue Zahlen erfinden |
+| M3 | Engine-Verdicts respektieren: Unveränderlich — erklären ja, überschreiben/abschwächen nein |
+| M4 | Keine Spekulationen: Keine erfundenen Fakten/Regeln, keine Medizin, keine Quellenlabels im Text, gleiche Frage nie zweimal |
+| M5 | Lücken ehrlich kommunizieren: Fallback-Satz wenn Material keine Aussage hat; Ausnahme: Follow-ups, Bilder, Rezepte |
 
 **FALLBACK_SENTENCE:** `"Diese Information steht nicht im bereitgestellten Kursmaterial."`
 
@@ -635,9 +645,9 @@ User-Text → _extract_foods_from_question()
 - Keine CI/CD-Pipeline
 - Kein Health-Monitoring / Alert-System
 - CLAUDE.md-Angabe "86 Rezepte" veraltet (aktuell 110)
-- `app/migrations.py` existiert aber unklar ob alle Migrations sauber getrackt sind
+- `app/migrations.py` wird beim Start via `run_migrations()` (nach `init_db()`) automatisch ausgeführt
 - `scripts/import_*.py` Skripte ohne Dokumentation über ihren aktuellen Zweck
-- `app/main.py` noch 744 Zeilen trotz Extraktionen — weiteres Splitting möglich
+- `app/main.py` noch 747 Zeilen trotz Extraktionen — weiteres Splitting möglich
 
 ---
 
@@ -659,10 +669,10 @@ User-Text → _extract_foods_from_question()
    Wenn du etwas am Flow änderst: parallele ThreadPoolExecutor-Ausführung in Schritt 2 beachten,
    und `ctx`-Tuple-Unpacking für den Dispatch (Reihenfolge muss mit allen `_handle_*`-Signaturen übereinstimmen).
 
-4. **Prompt-Änderungen sind heikel.** Das System hat viele Schutz-Instructions (R1–R14) die
-   über Jahre debuggt wurden. Wenn du SYSTEM_INSTRUCTIONS oder Answer-Instructions änderst,
-   teste die kritischen Flows aus `known-issues.md § Test Queries` manuell. Temperature=0.0
-   ist bewusst — nicht erhöhen.
+4. **Prompt-Änderungen sind heikel.** Die globalen SYSTEM_INSTRUCTIONS enthalten jetzt nur 5
+   Meta-Regeln (M1–M5) — domänenspezifische Details stecken in den mode-spezifischen Buildern.
+   Wenn du Answer-Instructions änderst, teste kritische Flows manuell. Temperature=0.0 ist
+   bewusst — nicht erhöhen.
 
 5. **Ontologie-Änderungen brauchen Server-Restart.** Der Ontologie-Singleton wird bei Import
    gecacht. Nach Änderungen an `ontology.csv` oder `compounds.json` den Server neu starten
