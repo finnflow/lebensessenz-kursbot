@@ -15,6 +15,7 @@ from app.database import (
     get_conversations_by_guest,
     conversation_belongs_to_guest,
 )
+from app.clients import MODEL, TOP_K, LAST_N, SUMMARY_THRESHOLD
 from app.chat_service import handle_chat
 from app.image_handler import save_image, ImageValidationError
 from app.feedback_service import export_feedback
@@ -113,9 +114,38 @@ class ConversationItem(BaseModel):
 class ConversationsResponse(BaseModel):
     conversations: List[ConversationItem]
 
+class RagConfig(BaseModel):
+    top_k: int
+    max_history_messages: int
+    summary_threshold: Optional[int] = None
+
+class FeaturesConfig(BaseModel):
+    vision_enabled: bool
+    feedback_enabled: bool
+
+class ConfigResponse(BaseModel):
+    model: str
+    rag: RagConfig
+    features: FeaturesConfig
+
 @app.get("/health", response_model=HealthResponse)
 def health():
     return {"ok": True}
+
+@app.get("/config", response_model=ConfigResponse)
+def get_config():
+    return ConfigResponse(
+        model=MODEL,
+        rag=RagConfig(
+            top_k=TOP_K,
+            max_history_messages=LAST_N,
+            summary_threshold=SUMMARY_THRESHOLD,
+        ),
+        features=FeaturesConfig(
+            vision_enabled=True,
+            feedback_enabled=True,
+        ),
+    )
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
