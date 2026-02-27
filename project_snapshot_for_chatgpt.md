@@ -41,11 +41,12 @@ Speisekarten-Fotos und schlägt Rezepte vor.
 lebensessenz-kursbot/
 │
 ├── app/                                   # FastAPI-Backend
-│   ├── main.py                   (859 Z)  # API-Endpunkte: POST /chat, /chat/image, /feedback,
+│   ├── main.py                   (879 Z)  # API-Endpunkte: POST /chat, /chat/image, /feedback,
 │   │                                      #   GET /conversations, /config, /health,
 │   │                                      #   DELETE /conversations/{id}
 │   │                                      #   CORS, zentrales JSON-Error-Handling
 │   │                                      #   Alle Endpoints auch unter /api/v1/... (Versionierung)
+│   │                                      #   /api/v1: guest_id Pflichtfeld + strikte Ownership
 │   ├── chat_service.py           (729 Z)  # Dispatcher: handle_chat() ~70 Z + 7 private Handler
 │   ├── chat_modes.py             (389 Z)  # ChatMode-Enum + Modifier-Detection
 │   ├── prompt_builder.py         (631 Z)  # SYSTEM_INSTRUCTIONS (5 Meta-Regeln M1–M5) + alle Prompt-Builder
@@ -57,7 +58,8 @@ lebensessenz-kursbot/
 │   ├── recipe_builder.py         (265 Z)  # RECIPE_FROM_INGREDIENTS: Feasibility-Check + Custom-Builder
 │   ├── vision_service.py         (367 Z)  # GPT-4o Mahlzeit-/Speisekarten-Analyse
 │   ├── feedback_service.py        (95 Z)  # Export: chat.md + feedback.md + metadata.json + images/
-│   ├── database.py               (277 Z)  # SQLite: Conversations, Messages, Summary, Title
+│   ├── database.py               (292 Z)  # SQLite: Conversations, Messages, Summary, Title
+│   │                                      #   conversation_belongs_to_guest(allow_legacy_open=True)
 │   ├── image_handler.py          (175 Z)  # Upload-Validierung, Base64-Encoding, Cleanup-Job
 │   ├── migrations.py              (69 Z)  # DB-Schema-Migrationen
 │   ├── main_frontend.html         (73 KB) # Single-File-SPA: gesamte UI (CSS + JS embedded)
@@ -220,6 +222,8 @@ Browser/Mobile
 - CORS: `http://localhost:4321` (Astro dev) + `https://lebensessenz.de` (production)
 - Zentrales JSON-Error-Handling: `{"error": {"code": ..., "message": ...}}` für 422/4xx/500
 - **API-Versionierung:** Alle Endpunkte sind sowohl unter dem Legacy-Pfad als auch unter `/api/v1/...` registriert (je zwei `@app.*`-Dekoratoren, kein Router-Split, vollständig backwards-kompatibel)
+- **v1-Ownership-Enforcement:** `/api/v1/conversations`, `/api/v1/conversations/{id}/messages`, `DELETE /api/v1/conversations/{id}`, `/api/v1/feedback` erfordern `guest_id`/`guestId` (sonst 400) und prüfen Ownership strikt (`allow_legacy_open=False`). Legacy-Routen (`/conversations/...`) verhalten sich unverändert — Ownership-Check nur wenn `guest_id` mitgeschickt wird.
+- **`conversation_belongs_to_guest(allow_legacy_open: bool = True)`:** `True` = Legacy-Conversations ohne guest_id sind offen (v0 compat); `False` = werden als unzugänglich behandelt (v1 strict)
 - Endpunkte:
   - `POST /chat` — Request: `{conversationId?, message, guestId?, userId?, courseId?}`
   - `POST /chat/image` — multipart mit optionalem Image
