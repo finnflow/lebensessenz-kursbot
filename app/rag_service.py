@@ -67,10 +67,11 @@ def expand_alias_terms(query: str) -> str:
     return expanded
 
 
+# LEGACY: currently unused; safe to delete
 def generalize_query(query: str) -> str:
     """
     DEPRECATED: Legacy function for regex-based query generalization.
-    Kept for fallback in retrieve_with_fallback().
+    No longer called by retrieve_with_fallback().
     """
     generalization_map = {
         r"\bburger\b": "Fleisch und Kohlenhydrate",
@@ -143,7 +144,7 @@ def deduplicate_by_source(
 @dataclass
 class RetrievalAttempt:
     """Debug record for a single retrieval attempt inside retrieve_with_fallback."""
-    variant: str                   # "PRIMARY" | "GENERALIZED_FALLBACK" | "ALIAS_FALLBACK"
+    variant: str                   # "PRIMARY" | "ALIAS_FALLBACK" | "NO_RESULTS"
     query: str                     # Actual query sent to ChromaDB
     threshold: Optional[float]     # Distance threshold used for acceptance
     n_results: int                 # Number of snippets returned after dedup
@@ -179,7 +180,7 @@ def _log_rag_debug(
 def retrieve_with_fallback(
     query: str, user_message: str
 ) -> Tuple[List[str], List[Dict], List[float], bool]:
-    """Multi-step retrieval with fallback strategies."""
+    """Two-step retrieval: PRIMARY → ALIAS_FALLBACK → NO_RESULTS."""
     attempts: List[RetrievalAttempt] = []
 
     # --- PRIMARY ---
@@ -201,50 +202,37 @@ def retrieve_with_fallback(
         _log_rag_debug(user_message, attempts, metas, dists, "PRIMARY")
         return docs, metas, dists, False
 
-    # --- GENERALIZED_FALLBACK ---
-    if best_dist > DISTANCE_THRESHOLD or len(docs) < 2:
-        generalized = generalize_query(user_message)
-        if generalized and generalized != query.lower():
-            gen_threshold = DISTANCE_THRESHOLD + 0.3
-            docs_gen, metas_gen, dists_gen = retrieve_course_snippets(generalized)
-            docs_gen, metas_gen, dists_gen = deduplicate_by_source(docs_gen, metas_gen, dists_gen, max_per_source=2)
-            best_dist_gen = min(dists_gen) if dists_gen else 999.0
-            gen_accepted = len(docs_gen) >= 1 and best_dist_gen <= gen_threshold
-            attempts.append(RetrievalAttempt(
-                variant="GENERALIZED_FALLBACK",
-                query=generalized,
-                threshold=gen_threshold,
-                n_results=len(docs_gen),
-                best_distance=best_dist_gen if dists_gen else None,
-                accepted=gen_accepted,
-                notes="deprecated generalize_query; threshold +0.3",
-            ))
-            if gen_accepted:
-                _log_rag_debug(user_message, attempts, metas_gen, dists_gen, "GENERALIZED_FALLBACK")
-                return docs_gen, metas_gen, dists_gen, True
-
     # --- ALIAS_FALLBACK ---
-    if best_dist > DISTANCE_THRESHOLD or len(docs) < 1:
-        expanded_query = expand_alias_terms(query)
-        if expanded_query != query and expanded_query not in [q for q, _, _ in [(query, None, None)]]:
-            exp_threshold = DISTANCE_THRESHOLD + 0.2
-            docs_exp, metas_exp, dists_exp = retrieve_course_snippets(expanded_query)
-            docs_exp, metas_exp, dists_exp = deduplicate_by_source(docs_exp, metas_exp, dists_exp, max_per_source=2)
-            best_dist_exp = min(dists_exp) if dists_exp else 999.0
-            exp_accepted = len(docs_exp) >= 1 and best_dist_exp <= exp_threshold
-            attempts.append(RetrievalAttempt(
-                variant="ALIAS_FALLBACK",
-                query=expanded_query,
-                threshold=exp_threshold,
-                n_results=len(docs_exp),
-                best_distance=best_dist_exp if dists_exp else None,
-                accepted=exp_accepted,
-                notes=None,
-            ))
-            if exp_accepted:
-                _log_rag_debug(user_message, attempts, metas_exp, dists_exp, "ALIAS_FALLBACK")
-                return docs_exp, metas_exp, dists_exp, True
+    expanded_query = expand_alias_terms(query)
+    if expanded_query != query:
+        exp_threshold = DISTANCE_THRESHOLD + 0.2
+        docs_exp, metas_exp, dists_exp = retrieve_course_snippets(expanded_query)
+        docs_exp, metas_exp, dists_exp = deduplicate_by_source(docs_exp, metas_exp, dists_exp, max_per_source=2)
+        best_dist_exp = min(dists_exp) if dists_exp else 999.0
+        exp_accepted = len(docs_exp) >= 1 and best_dist_exp <= exp_threshold
+        attempts.append(RetrievalAttempt(
+            variant="ALIAS_FALLBACK",
+            query=expanded_query,
+            threshold=exp_threshold,
+            n_results=len(docs_exp),
+            best_distance=best_dist_exp if dists_exp else None,
+            accepted=exp_accepted,
+            notes=None,
+        ))
+        if exp_accepted:
+            _log_rag_debug(user_message, attempts, metas_exp, dists_exp, "ALIAS_FALLBACK")
+            return docs_exp, metas_exp, dists_exp, True
 
+    # --- NO_RESULTS ---
+    attempts.append(RetrievalAttempt(
+        variant="NO_RESULTS",
+        query=query,
+        threshold=DISTANCE_THRESHOLD,
+        n_results=0,
+        best_distance=best_dist if dists else None,
+        accepted=False,
+        notes=None,
+    ))
     _log_rag_debug(user_message, attempts, metas, dists, "NO_RESULTS")
     return docs, metas, dists, False
 
