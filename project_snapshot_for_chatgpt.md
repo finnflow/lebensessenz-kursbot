@@ -41,12 +41,13 @@ Speisekarten-Fotos und schlägt Rezepte vor.
 lebensessenz-kursbot/
 │
 ├── app/                                   # FastAPI-Backend
-│   ├── main.py                   (879 Z)  # API-Endpunkte: POST /chat, /chat/image, /feedback,
+│   ├── main.py                   (857 Z)  # API-Endpunkte: POST /chat, /chat/image, /feedback,
 │   │                                      #   GET /conversations, /config, /health,
 │   │                                      #   DELETE /conversations/{id}
 │   │                                      #   CORS, zentrales JSON-Error-Handling
 │   │                                      #   Alle Endpoints auch unter /api/v1/... (Versionierung)
 │   │                                      #   /api/v1: guest_id Pflichtfeld + strikte Ownership
+│   │                                      #   Keine Exception-Leaks: 500er nur via globalem Handler
 │   ├── chat_service.py           (729 Z)  # Dispatcher: handle_chat() ~70 Z + 7 private Handler
 │   ├── chat_modes.py             (389 Z)  # ChatMode-Enum + Modifier-Detection
 │   ├── prompt_builder.py         (631 Z)  # SYSTEM_INSTRUCTIONS (5 Meta-Regeln M1–M5) + alle Prompt-Builder
@@ -222,6 +223,7 @@ Browser/Mobile
 - CORS: `http://localhost:4321` (Astro dev) + `https://lebensessenz.de` (production)
 - Zentrales JSON-Error-Handling: `{"error": {"code": ..., "message": ...}}` für 422/4xx/500
 - **API-Versionierung:** Alle Endpunkte sind sowohl unter dem Legacy-Pfad als auch unter `/api/v1/...` registriert (je zwei `@app.*`-Dekoratoren, kein Router-Split, vollständig backwards-kompatibel)
+- **Exception-Handling:** Endpoints werfen ausschließlich 4xx aktiv (`HTTPException` mit 400/403/404). Kein `except Exception as e: raise HTTPException(500, ...)` — unerwartete Fehler fallen automatisch durch zum globalen Handler (`INTERNAL_ERROR`, kein Leak interner Details). Einzige Ausnahmen: `ValueError → 404` (domain error) und `ImageValidationError → 400` (client error).
 - **v1-Ownership-Enforcement:** `/api/v1/conversations`, `/api/v1/conversations/{id}/messages`, `DELETE /api/v1/conversations/{id}`, `/api/v1/feedback` erfordern `guest_id`/`guestId` (sonst 400) und prüfen Ownership strikt (`allow_legacy_open=False`). Legacy-Routen (`/conversations/...`) verhalten sich unverändert — Ownership-Check nur wenn `guest_id` mitgeschickt wird.
 - **`conversation_belongs_to_guest(allow_legacy_open: bool = True)`:** `True` = Legacy-Conversations ohne guest_id sind offen (v0 compat); `False` = werden als unzugänglich behandelt (v1 strict)
 - Endpunkte:
