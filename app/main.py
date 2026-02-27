@@ -2,6 +2,7 @@ import os
 from typing import List, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -23,6 +24,19 @@ load_dotenv()
 init_db()
 
 app = FastAPI(title="Lebensessenz Kursbot Chat")
+
+origins = [
+    "http://localhost:4321",  # Astro dev
+    "https://lebensessenz.de",  # future production
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Mount uploads directory for serving images
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "storage/uploads")
