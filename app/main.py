@@ -131,10 +131,12 @@ class ConfigResponse(BaseModel):
     features: FeaturesConfig
 
 @app.get("/health", response_model=HealthResponse)
+@app.get("/api/v1/health", response_model=HealthResponse)
 def health():
     return {"ok": True}
 
 @app.get("/config", response_model=ConfigResponse)
+@app.get("/api/v1/config", response_model=ConfigResponse)
 def get_config():
     return ConfigResponse(
         model=MODEL,
@@ -150,6 +152,7 @@ def get_config():
     )
 
 @app.post("/chat", response_model=ChatResponse)
+@app.post("/api/v1/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
     """
     Main chat endpoint with rolling summary (JSON-based).
@@ -174,6 +177,7 @@ def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 @app.post("/chat/image", response_model=ChatResponse)
+@app.post("/api/v1/chat/image", response_model=ChatResponse)
 async def chat_with_image(
     message: str = Form(...),
     conversationId: Optional[str] = Form(None),
@@ -222,6 +226,7 @@ class AnalyzeRequest(BaseModel):
     mode: str = "strict"  # "strict" or "assumption"
 
 @app.post("/analyze")
+@app.post("/api/v1/analyze")
 def analyze_food(request: AnalyzeRequest):
     """
     Standalone Trennkost analysis endpoint (no chat context needed).
@@ -257,6 +262,7 @@ def analyze_food(request: AnalyzeRequest):
         raise HTTPException(status_code=500, detail=f"Analysis error: {str(e)}")
 
 @app.get("/conversations", response_model=ConversationsResponse)
+@app.get("/api/v1/conversations", response_model=ConversationsResponse)
 def get_conversations(guest_id: Optional[str] = None):
     """
     Get all conversations for a guest.
@@ -272,6 +278,7 @@ def get_conversations(guest_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/conversations/{conversation_id}/messages")
+@app.get("/api/v1/conversations/{conversation_id}/messages")
 def get_conversation_messages(conversation_id: str, guest_id: Optional[str] = None):
     """
     Get all messages for a conversation.
@@ -290,6 +297,7 @@ def get_conversation_messages(conversation_id: str, guest_id: Optional[str] = No
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/conversations/{conversation_id}")
+@app.delete("/api/v1/conversations/{conversation_id}")
 def delete_conversation(conversation_id: str, guest_id: Optional[str] = None):
     """
     Delete a conversation.
@@ -316,6 +324,7 @@ class FeedbackRequest(BaseModel):
 FEEDBACK_DIR = os.getenv("FEEDBACK_DIR", "storage/feedback")
 
 @app.post("/feedback")
+@app.post("/api/v1/feedback")
 def submit_feedback(request: FeedbackRequest):
     """
     Save feedback for a conversation.
