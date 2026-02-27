@@ -41,10 +41,11 @@ Speisekarten-Fotos und schlägt Rezepte vor.
 lebensessenz-kursbot/
 │
 ├── app/                                   # FastAPI-Backend
-│   ├── main.py                   (747 Z)  # API-Endpunkte: POST /chat, /chat/image, /feedback,
+│   ├── main.py                   (859 Z)  # API-Endpunkte: POST /chat, /chat/image, /feedback,
 │   │                                      #   GET /conversations, /config, /health,
 │   │                                      #   DELETE /conversations/{id}
 │   │                                      #   CORS, zentrales JSON-Error-Handling
+│   │                                      #   Alle Endpoints auch unter /api/v1/... (Versionierung)
 │   ├── chat_service.py           (729 Z)  # Dispatcher: handle_chat() ~70 Z + 7 private Handler
 │   ├── chat_modes.py             (389 Z)  # ChatMode-Enum + Modifier-Detection
 │   ├── prompt_builder.py         (631 Z)  # SYSTEM_INSTRUCTIONS (5 Meta-Regeln M1–M5) + alle Prompt-Builder
@@ -82,6 +83,7 @@ lebensessenz-kursbot/
 │   └── import_uebergang_und_rest.py
 │
 ├── tests/
+│   ├── test_api_contract.py              # API-Contract-Tests: /api/v1/health, /config, /chat (TestClient)
 │   ├── test_engine.py                    # 66 Tests: Ontology, Rules, 22 Fixture-Dishes
 │   ├── test_normalization.py             # Input-Normalisierung Unit-Tests
 │   ├── test_normalization_e2e.py         # E2E-Normalisierung
@@ -217,6 +219,7 @@ Browser/Mobile
 - FastAPI mit Pydantic-Validierung
 - CORS: `http://localhost:4321` (Astro dev) + `https://lebensessenz.de` (production)
 - Zentrales JSON-Error-Handling: `{"error": {"code": ..., "message": ...}}` für 422/4xx/500
+- **API-Versionierung:** Alle Endpunkte sind sowohl unter dem Legacy-Pfad als auch unter `/api/v1/...` registriert (je zwei `@app.*`-Dekoratoren, kein Router-Split, vollständig backwards-kompatibel)
 - Endpunkte:
   - `POST /chat` — Request: `{conversationId?, message, guestId?, userId?, courseId?}`
   - `POST /chat/image` — multipart mit optionalem Image
@@ -647,7 +650,7 @@ User-Text → _extract_foods_from_question()
 - CLAUDE.md-Angabe "86 Rezepte" veraltet (aktuell 110)
 - `app/migrations.py` wird beim Start via `run_migrations()` (nach `init_db()`) automatisch ausgeführt
 - `scripts/import_*.py` Skripte ohne Dokumentation über ihren aktuellen Zweck
-- `app/main.py` noch 747 Zeilen trotz Extraktionen — weiteres Splitting möglich
+- `app/main.py` 859 Zeilen — weiteres Splitting möglich (aktuell: Models + Handler + Routes in einer Datei)
 
 ---
 
