@@ -239,7 +239,7 @@ Browser/Mobile
 - `userId` und `courseId` in `ChatRequest` reserviert (noch nicht an `handle_chat()` weitergegeben)
 - Guest-ID-System: Conversations gehören einem Browser (localStorage UUID)
 - SQLite über `app/database.py`: `conversations` (inkl. `guest_id`, `title`) + `messages` (inkl. `image_path`) + rolling summary
-- `init_db()` + `run_migrations()` bei App-Start (idempotent, Reihenfolge garantiert)
+- `init_db()` + `run_migrations()` im `@app.on_event("startup")`-Hook (idempotent, kein DB-Seiteneffekt beim Import)
 - Bild-Hosting: `/uploads/` als StaticFiles gemountet, auto-cleanup nach 24h
 
 ### Embeddings + Retrieval (ChromaDB)
