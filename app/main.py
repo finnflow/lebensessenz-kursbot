@@ -173,8 +173,6 @@ def chat(request: ChatRequest):
         return ChatResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 @app.post("/chat/image", response_model=ChatResponse)
 @app.post("/api/v1/chat/image", response_model=ChatResponse)
@@ -210,16 +208,12 @@ async def chat_with_image(
             image_path = save_image(file_content, image.filename)
         except ImageValidationError as e:
             raise HTTPException(status_code=400, detail=str(e))
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Image processing error: {str(e)}")
 
     try:
         result = handle_chat(conversationId, message, guestId, image_path)
         return ChatResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 class AnalyzeRequest(BaseModel):
     text: str
@@ -238,28 +232,25 @@ def analyze_food(request: AnalyzeRequest):
     if not text:
         raise HTTPException(status_code=400, detail="Text cannot be empty")
 
-    try:
-        results = trennkost_analyze_text(text, mode=request.mode)
-        return {
-            "results": [
-                {
-                    "dish_name": r.dish_name,
-                    "verdict": r.verdict.value,
-                    "summary": r.summary,
-                    "groups": dict(r.groups_found),
-                    "problems": [
-                        {"rule_id": p.rule_id, "description": p.description, "explanation": p.explanation}
-                        for p in r.problems
-                    ],
-                    "questions": [q.question for q in r.required_questions],
-                    "ok_combinations": r.ok_combinations,
-                }
-                for r in results
-            ],
-            "formatted": format_results_for_llm(results),
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Analysis error: {str(e)}")
+    results = trennkost_analyze_text(text, mode=request.mode)
+    return {
+        "results": [
+            {
+                "dish_name": r.dish_name,
+                "verdict": r.verdict.value,
+                "summary": r.summary,
+                "groups": dict(r.groups_found),
+                "problems": [
+                    {"rule_id": p.rule_id, "description": p.description, "explanation": p.explanation}
+                    for p in r.problems
+                ],
+                "questions": [q.question for q in r.required_questions],
+                "ok_combinations": r.ok_combinations,
+            }
+            for r in results
+        ],
+        "formatted": format_results_for_llm(results),
+    }
 
 @app.get("/conversations", response_model=ConversationsResponse)
 @app.get("/api/v1/conversations", response_model=ConversationsResponse)
@@ -274,11 +265,8 @@ def get_conversations(request: Request, guest_id: Optional[str] = None):
             raise HTTPException(status_code=400, detail="guest_id is required")
         return {"conversations": []}
 
-    try:
-        conversations = get_conversations_by_guest(guest_id)
-        return {"conversations": conversations}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    conversations = get_conversations_by_guest(guest_id)
+    return {"conversations": conversations}
 
 @app.get("/conversations/{conversation_id}/messages")
 @app.get("/api/v1/conversations/{conversation_id}/messages")
@@ -288,21 +276,16 @@ def get_conversation_messages(request: Request, conversation_id: str, guest_id: 
     v1: guest_id required, strict ownership. v0: ownership check only when guest_id provided.
     """
     is_v1 = request.url.path.startswith("/api/v1/")
-    try:
-        if is_v1:
-            if not guest_id:
-                raise HTTPException(status_code=400, detail="guest_id is required")
-            if not conversation_belongs_to_guest(conversation_id, guest_id, allow_legacy_open=False):
-                raise HTTPException(status_code=403, detail="Access denied")
-        elif guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
+    if is_v1:
+        if not guest_id:
+            raise HTTPException(status_code=400, detail="guest_id is required")
+        if not conversation_belongs_to_guest(conversation_id, guest_id, allow_legacy_open=False):
             raise HTTPException(status_code=403, detail="Access denied")
+    elif guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
+        raise HTTPException(status_code=403, detail="Access denied")
 
-        messages = get_messages(conversation_id)
-        return {"messages": messages}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    messages = get_messages(conversation_id)
+    return {"messages": messages}
 
 @app.delete("/conversations/{conversation_id}")
 @app.delete("/api/v1/conversations/{conversation_id}")
@@ -312,22 +295,17 @@ def delete_conversation(request: Request, conversation_id: str, guest_id: Option
     v1: guest_id required, strict ownership. v0: ownership check only when guest_id provided.
     """
     is_v1 = request.url.path.startswith("/api/v1/")
-    try:
-        if is_v1:
-            if not guest_id:
-                raise HTTPException(status_code=400, detail="guest_id is required")
-            if not conversation_belongs_to_guest(conversation_id, guest_id, allow_legacy_open=False):
-                raise HTTPException(status_code=403, detail="Access denied")
-        elif guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
+    if is_v1:
+        if not guest_id:
+            raise HTTPException(status_code=400, detail="guest_id is required")
+        if not conversation_belongs_to_guest(conversation_id, guest_id, allow_legacy_open=False):
             raise HTTPException(status_code=403, detail="Access denied")
+    elif guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
+        raise HTTPException(status_code=403, detail="Access denied")
 
-        from app.database import delete_conversation
-        delete_conversation(conversation_id)
-        return {"status": "deleted"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    from app.database import delete_conversation
+    delete_conversation(conversation_id)
+    return {"status": "deleted"}
 
 class FeedbackRequest(BaseModel):
     conversationId: str
