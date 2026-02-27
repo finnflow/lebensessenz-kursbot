@@ -275,7 +275,7 @@ Returns current runtime configuration. Intended for frontend capability discover
 {
   "model": "gpt-4o-mini",
   "rag": {
-    "top_k": 10,
+    "top_k": 6,
     "max_history_messages": 8,
     "summary_threshold": 6
   },
@@ -286,7 +286,7 @@ Returns current runtime configuration. Intended for frontend capability discover
 }
 ```
 
-All values reflect active env-var overrides (see `.env`).
+All values reflect the active runtime configuration (env-driven).
 
 ## Error Format
 
