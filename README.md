@@ -103,44 +103,95 @@ python test_chat_sidebar.py
                      │
 ┌────────────────────▼────────────────────────────────────────┐
 │                   SQLite Database                            │
-│  - conversations (id, summary, cursor, timestamps)           │
-│  - messages (id, conversation_id, role, content, timestamp)  │
+│  - conversations (id, guest_id, title, summary, timestamps)  │
+│  - messages (id, conversation_id, role, content, image_path) │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ## API Endpoints
 
 ### POST /chat
+
 ```json
+// Request
 {
-  "conversationId": "uuid-optional",
-  "message": "user question",
-  "guestId": "uuid-optional"
+  "conversationId": "uuid",         // optional – omit to start a new conversation
+  "message": "Wie war das mit Obst vor der Mahlzeit?",
+  "guestId": "browser-uuid",        // controls conversation ownership
+  "userId": "user-uuid",            // reserved – not yet forwarded to pipeline
+  "courseId": "trennkost-basis-1"   // reserved – not yet forwarded to pipeline
 }
 ```
 
-Response:
 ```json
+// Response
 {
   "conversationId": "uuid",
-  "answer": "bot response",
+  "answer": "string",
   "sources": [
-    {
-      "path": "modul-1-.../page-004.md",
-      "chunk": "0",
-      "distance": 0.234
-    }
+    { "path": "modul-1.1/.../page-004.md", "chunk": "0", "distance": 0.234 }
   ]
 }
 ```
 
-### GET /conversations
+`guestId` binds the conversation to a browser session (stored in `localStorage`).
+`userId` and `courseId` are accepted but currently ignored — reserved for future auth and multi-course support.
+
+---
+
+### POST /chat/image
+
+Multipart form upload for meal or menu photo analysis.
+
 ```
-GET /conversations?guest_id=uuid
+POST /chat/image
+Content-Type: multipart/form-data
+
+message=<string>
+conversationId=<uuid>   (optional)
+guestId=<uuid>          (optional)
+image=<file>            (JPG, PNG, HEIC, WebP — optional)
 ```
 
-Response:
+Response: same shape as `POST /chat`.
+
+---
+
+### POST /analyze
+
+Standalone Trennkost analysis without chat context.
+
 ```json
+// Request
+{ "text": "Reis, Hähnchen, Brokkoli", "mode": "strict" }
+```
+
+```json
+// Response (abbreviated)
+{
+  "results": [
+    {
+      "dish_name": "Reis, Hähnchen, Brokkoli",
+      "verdict": "NOT_OK",
+      "summary": "KH + Protein-Kombination",
+      "groups": { "KH": ["Reis"], "PROTEIN": ["Hähnchen"] },
+      "problems": [ { "rule_id": "R001", "description": "..." } ]
+    }
+  ],
+  "formatted": "string"
+}
+```
+
+---
+
+### GET /conversations
+
+```
+GET /conversations?guest_id=<uuid>
+```
+
+```json
+// Response
 {
   "conversations": [
     {
@@ -154,13 +205,18 @@ Response:
 }
 ```
 
-### GET /conversations/:id/messages
+Returns `{ "conversations": [] }` when `guest_id` is absent (backwards-compatible).
+
+---
+
+### GET /conversations/{conversation_id}/messages
+
 ```
-GET /conversations/:id/messages?guest_id=uuid
+GET /conversations/{id}/messages?guest_id=<uuid>
 ```
 
-Response:
 ```json
+// Response
 {
   "messages": [
     {
@@ -174,10 +230,87 @@ Response:
 }
 ```
 
+Returns `403 ACCESS_DENIED` if `guest_id` does not match the conversation owner.
+
+---
+
+### DELETE /conversations/{conversation_id}
+
+```
+DELETE /conversations/{id}?guest_id=<uuid>
+```
+
+Returns `{ "status": "deleted" }` on success. Returns `403` if ownership check fails.
+
+---
+
+### POST /feedback
+
+```json
+// Request
+{
+  "conversationId": "uuid",
+  "feedback": "string",
+  "guestId": "uuid"   // optional
+}
+```
+
+Exports the full conversation as Markdown + images to `storage/feedback/`.
+
+---
+
 ### GET /health
+
 ```json
 { "ok": true }
 ```
+
+---
+
+### GET /config
+
+Returns current runtime configuration. Intended for frontend capability discovery — single source of truth for model name, RAG limits, and feature flags.
+
+```json
+{
+  "model": "gpt-4o-mini",
+  "rag": {
+    "top_k": 10,
+    "max_history_messages": 8,
+    "summary_threshold": 6
+  },
+  "features": {
+    "vision_enabled": true,
+    "feedback_enabled": true
+  }
+}
+```
+
+All values reflect active env-var overrides (see `.env`).
+
+## Error Format
+
+All error responses use a consistent envelope:
+
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable description",
+    "details": [ ... ]   // present on VALIDATION_ERROR only
+  }
+}
+```
+
+| HTTP Status | Code | Trigger |
+|-------------|------|---------|
+| 422 | `VALIDATION_ERROR` | Invalid request payload (Pydantic) |
+| 403 | `ACCESS_DENIED` | Guest-ID ownership mismatch |
+| 404 | `NOT_FOUND` | Resource not found |
+| 500 | `INTERNAL_ERROR` | Unhandled exception — no internal details leaked |
+| Other 4xx | `HTTP_ERROR` | All other HTTP exceptions |
+
+---
 
 ## Smoke Test
 
@@ -228,6 +361,32 @@ SUMMARY_THRESHOLD=4  # Summary alle 4 Messages statt 6
 ```bash
 MAX_CONTEXT_CHARS=12000  # Mehr Zeichen für Kontext
 ```
+
+## Database Initialization
+
+Schema setup runs automatically on every server start — no manual migration steps required.
+
+```python
+init_db()        # Creates tables and indexes if they don't exist
+run_migrations() # Applies schema changes to existing databases (idempotent)
+```
+
+Both operations are safe to run repeatedly. A fresh database and an already-migrated database both reach the same final state.
+
+---
+
+## CORS
+
+The following origins are allowed by default:
+
+| Origin | Purpose |
+|--------|---------|
+| `http://localhost:4321` | Astro dev server |
+| `https://lebensessenz.de` | Production frontend |
+
+To allow additional origins, add them to `origins` in `app/main.py`.
+
+---
 
 ## Projekt-Struktur
 
