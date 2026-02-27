@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-02-21T19:12:56.496685",
+  "timestamp": "2026-02-27T14:43:00.259021",
   "summary": {
-    "passed": 4,
-    "failed": 4,
+    "passed": 5,
+    "failed": 3,
     "total": 8
   },
   "results": [
@@ -21,12 +21,12 @@
     },
     {
       "id": "nonexistent_topic",
-      "status": "FAILED",
-      "reason": "Check details below"
+      "status": "PASSED"
     },
     {
       "id": "diversification_test",
-      "status": "PASSED"
+      "status": "FAILED",
+      "reason": "Check details below"
     },
     {
       "id": "partial_question_edge_case",
@@ -39,8 +39,7 @@
     },
     {
       "id": "specific_food_fish_rice",
-      "status": "FAILED",
-      "reason": "Check details below"
+      "status": "PASSED"
     }
   ]
 }
