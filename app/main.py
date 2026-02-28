@@ -17,6 +17,7 @@ from app.database import (
 )
 from app.migrations import run_migrations
 from app.auth import router as auth_router
+from app.entitlements import router as entitlements_router
 from app.clients import MODEL, TOP_K, LAST_N, SUMMARY_THRESHOLD
 from app.chat_service import handle_chat
 from app.image_handler import save_image, ImageValidationError
@@ -48,6 +49,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(entitlements_router)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):

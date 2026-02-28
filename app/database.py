@@ -63,6 +63,20 @@ def init_db():
         )
     """)
 
+    # Entitlements table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS entitlements (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            product TEXT NOT NULL,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(user_id, product),
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -335,3 +349,63 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
         )
         row = cursor.fetchone()
         return dict(row) if row else None
+
+
+# ---------------------------------------------------------------------------
+# Entitlements
+# ---------------------------------------------------------------------------
+
+def _now_iso() -> str:
+    return datetime.utcnow().isoformat()
+
+
+def grant_entitlement(user_id: str, product: str, status: str = "active") -> str:
+    """
+    Grant or update an entitlement for a user.
+    If the (user_id, product) pair exists, update status + updated_at.
+    Otherwise insert a new entitlement row.
+    Returns the entitlement id.
+    """
+    now = _now_iso()
+    with get_db() as conn:
+        cursor = conn.execute(
+            "SELECT id FROM entitlements WHERE user_id = ? AND product = ?",
+            (user_id, product),
+        )
+        row = cursor.fetchone()
+        if row:
+            entitlement_id = row["id"]
+            conn.execute(
+                """
+                UPDATE entitlements
+                SET status = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (status, now, entitlement_id),
+            )
+            return entitlement_id
+        else:
+            entitlement_id = str(uuid.uuid4())
+            conn.execute(
+                """
+                INSERT INTO entitlements (id, user_id, product, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (entitlement_id, user_id, product, status, now, now),
+            )
+            return entitlement_id
+
+
+def get_entitlements_for_user(user_id: str) -> List[Dict[str, Any]]:
+    """Return all entitlements for a given user."""
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            SELECT id, user_id, product, status, created_at, updated_at
+            FROM entitlements
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        )
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
