@@ -1,4 +1,5 @@
 import sqlite3
+import uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
@@ -50,6 +51,16 @@ def init_db():
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_conversations_guest_id
         ON conversations(guest_id, updated_at DESC)
+    """)
+
+    # Users table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
     """)
 
     conn.commit()
@@ -290,3 +301,37 @@ def delete_conversation(conversation_id: str):
         conn.execute("""
             DELETE FROM conversations WHERE id = ?
         """, (conversation_id,))
+
+
+def create_user(email: str, password_hash: str) -> str:
+    user_id = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+    with get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO users (id, email, password_hash, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, email, password_hash, now),
+        )
+    return user_id
+
+
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    with get_db() as conn:
+        cursor = conn.execute(
+            "SELECT id, email, password_hash, created_at FROM users WHERE email = ?",
+            (email,),
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
+    with get_db() as conn:
+        cursor = conn.execute(
+            "SELECT id, email, password_hash, created_at FROM users WHERE id = ?",
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
