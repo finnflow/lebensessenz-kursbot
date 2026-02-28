@@ -656,6 +656,27 @@ User-Text → _extract_foods_from_question()
 - `scripts/import_*.py` Skripte ohne Dokumentation über ihren aktuellen Zweck
 - `app/main.py` 859 Zeilen — weiteres Splitting möglich (aktuell: Models + Handler + Routes in einer Datei)
 
+## Dependency-Pinning (kritisch)
+
+`requirements.txt` enthält zwei harte Upper-Bound-Pins:
+
+| Package | Pin | Grund |
+|---------|-----|-------|
+| `numpy<2` | chromadb 0.4.18 nutzt `np.float_`, in NumPy 2.0 entfernt |
+| `httpx<0.28` | openai 1.3.0 nutzt `proxies`-Kwarg, in httpx 0.28 entfernt |
+
+**Fresh Install ab Clean Clone:**
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt   # Pins greifen automatisch
+python scripts/ingest.py          # ChromaDB neu befüllen
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+**ChromaDB-Schema-Warnung:** `storage/chroma` muss mit chromadb 0.4.18 erstellt worden sein.
+Falls die DB von einer neueren ChromaDB-Version stammt → `sqlite3.OperationalError: no such column` / `_decode_seq_id` TypeError.
+Fix: `rm -rf storage/chroma && python scripts/ingest.py`
+
 ---
 
 # 10. Empfehlungen für ChatGPT-Zusammenarbeit
