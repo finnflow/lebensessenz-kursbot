@@ -13,6 +13,7 @@ httpx<0.28    # openai 1.3.0 uses httpx proxies kwarg removed in 0.28
 
 # Testing (optional)
 requests==2.31.0
+pytest
 
 # Auth
 python-jose[cryptography]
