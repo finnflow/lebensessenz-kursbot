@@ -63,6 +63,17 @@ def run_migrations():
                 ADD COLUMN image_path TEXT
             """)
 
+        # Re-read columns after potential changes
+        cursor.execute("PRAGMA table_info(messages)")
+        message_columns = [row[1] for row in cursor.fetchall()]
+
+        if 'intent' not in message_columns:
+            print("  ✓ Adding intent column to messages table...")
+            cursor.execute("""
+                ALTER TABLE messages
+                ADD COLUMN intent TEXT
+            """)
+
         print("✅ Migrations completed successfully!")
 
 if __name__ == "__main__":

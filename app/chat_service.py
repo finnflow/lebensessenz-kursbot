@@ -71,6 +71,33 @@ from app.prompt_builder import (
 )
 
 
+# ── UI intent normalizer ──────────────────────────────────────────────
+
+_UI_INTENT_MAP = {
+    "lernen": "learn",
+    "essen":  "eat",
+    "planen": "plan",
+}
+_VALID_INTENTS = {"learn", "eat", "need", "plan"}
+
+
+def normalize_ui_intent(raw: Optional[str]) -> Optional[str]:
+    """Normalize a raw UI intent hint to a canonical id or None.
+
+    Canonical ids: learn | eat | need | plan
+    """
+    if raw is None:
+        return None
+    s = raw.strip().lower()
+    if s in _UI_INTENT_MAP:
+        return _UI_INTENT_MAP[s]
+    if "was brauche" in s or "bedarf" in s:
+        return "need"
+    if s in _VALID_INTENTS:
+        return s
+    return None
+
+
 # ── Summary helpers ───────────────────────────────────────────────────
 
 def generate_summary(old_summary: Optional[str], new_messages: List[Dict[str, Any]]) -> str:
@@ -134,6 +161,7 @@ def _setup_conversation(
     user_message: str,
     guest_id: Optional[str],
     image_path: Optional[str],
+    ui_intent: Optional[str] = None,
 ) -> Tuple[str, bool, Dict[str, Any]]:
     """Create/validate conversation, save user message, generate title."""
     if not conversation_id:
@@ -153,7 +181,7 @@ def _setup_conversation(
         from app.database import update_conversation_guest_id
         update_conversation_guest_id(conversation_id, guest_id)
 
-    create_message(conversation_id, "user", user_message, image_path=image_path)
+    create_message(conversation_id, "user", user_message, image_path=image_path, intent=ui_intent)
 
     if is_new:
         title = generate_title_from_message(user_message, max_words=10)
@@ -318,6 +346,7 @@ def _generate_and_save(
     llm_input: str,
     mode: "ChatMode" = None,
     recipe_results: Optional[List[Dict]] = None,
+    ui_intent: Optional[str] = None,
 ) -> str:
     """
     Call LLM and save the response.
@@ -328,7 +357,7 @@ def _generate_and_save(
     if mode and recipe_results:
         if mode == ChatMode.RECIPE_REQUEST and recipe_results[0].get('score', 0.0) >= 7.0:
             assistant_message = format_recipe_directly(recipe_results[0])
-            create_message(conversation_id, "assistant", assistant_message)
+            create_message(conversation_id, "assistant", assistant_message, intent=ui_intent)
             print(f"[PIPELINE] High-score recipe (≥7.0) → direct output bypass")
             return assistant_message
 
@@ -341,7 +370,7 @@ def _generate_and_save(
         temperature=0.0,
     )
     assistant_message = response.choices[0].message.content.strip()
-    create_message(conversation_id, "assistant", assistant_message)
+    create_message(conversation_id, "assistant", assistant_message, intent=ui_intent)
     return assistant_message
 
 
@@ -368,6 +397,7 @@ def _prepare_sources(metas: List[Dict], dists: List[float]) -> List[Dict]:
 def _handle_temporal_separation(
     normalized_message: str,
     conversation_id: str,
+    ui_intent: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Return a response dict if 'X 30 min vor Y' pattern is detected, else None.
@@ -397,7 +427,7 @@ def _handle_temporal_separation(
     else:
         text += "💡 Achte auf die richtigen Wartezeiten, dann ist die Trennung optimal!"
 
-    create_message(conversation_id, "assistant", text)
+    create_message(conversation_id, "assistant", text, intent=ui_intent)
     return {"answer": text, "conversationId": conversation_id}
 
 
@@ -439,6 +469,7 @@ def _handle_recipe_from_ingredients_mode(
     is_new: bool,
     conv_data: Dict[str, Any],
     image_path: Optional[str],
+    ui_intent: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Handle RECIPE_FROM_INGREDIENTS mode.
@@ -455,6 +486,7 @@ def _handle_recipe_from_ingredients_mode(
         return _handle_recipe_request(
             conversation_id, normalized_message, recent, vision_data,
             ChatMode.RECIPE_REQUEST, modifiers, is_new, conv_data, image_path,
+            ui_intent=ui_intent,
         )
 
     _GENERIC = {"obst", "gemüse", "lebensmittel", "essen", "zutaten", "früchte", "beeren"}
@@ -463,6 +495,7 @@ def _handle_recipe_from_ingredients_mode(
         return _handle_food_analysis(
             conversation_id, normalized_message, recent, vision_data,
             ChatMode.FOOD_ANALYSIS, modifiers, is_new, conv_data, image_path,
+            ui_intent=ui_intent,
         )
 
     print(f"[PIPELINE] RECIPE_FROM_INGREDIENTS | ingredients={available_ingredients[:5]}")
@@ -485,6 +518,7 @@ def _handle_food_analysis(
     is_new: bool,
     conv_data: Dict[str, Any],
     image_path: Optional[str],
+    ui_intent: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Steps 3e + 4: context-reference resolution, Trennkost engine, then finalize.
@@ -508,6 +542,7 @@ def _handle_food_analysis(
         is_new, conv_data, image_path,
         trennkost_results=trennkost_results,
         analysis_query=analysis_query,
+        ui_intent=ui_intent,
     )
 
 
@@ -521,6 +556,7 @@ def _handle_recipe_request(
     is_new: bool,
     conv_data: Dict[str, Any],
     image_path: Optional[str],
+    ui_intent: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Step 5: recipe search, then finalize."""
     recipe_results: List[Dict] = []
@@ -546,6 +582,7 @@ def _handle_recipe_request(
         conversation_id, normalized_message, vision_data, mode, modifiers,
         is_new, conv_data, image_path,
         recipe_results=recipe_results,
+        ui_intent=ui_intent,
     )
 
 
@@ -559,11 +596,13 @@ def _handle_knowledge_mode(
     is_new: bool,
     conv_data: Dict[str, Any],
     image_path: Optional[str],
+    ui_intent: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Pure RAG path for KNOWLEDGE mode (and any unrecognized mode)."""
     return _finalize_response(
         conversation_id, normalized_message, vision_data, mode, modifiers,
         is_new, conv_data, image_path,
+        ui_intent=ui_intent,
     )
 
 
@@ -579,6 +618,7 @@ def _finalize_response(
     trennkost_results: Optional[List[TrennkostResult]] = None,
     recipe_results: Optional[List[Dict]] = None,
     analysis_query: Optional[str] = None,
+    ui_intent: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Steps 6–11 — shared by all mode handlers:
@@ -624,7 +664,7 @@ def _finalize_response(
     # 7. Fallback check
     best_dist = min(dists) if dists else 999.0
     if _check_fallback(trennkost_results, mode, best_dist, is_partial, course_context):
-        create_message(conversation_id, "assistant", FALLBACK_SENTENCE)
+        create_message(conversation_id, "assistant", FALLBACK_SENTENCE, intent=ui_intent)
         conv_data_updated = get_conversation(conversation_id)
         if should_update_summary(conversation_id, conv_data_updated):
             update_conversation_summary(conversation_id, conv_data_updated)
@@ -642,7 +682,7 @@ def _finalize_response(
     )
 
     # 9. Generate + save
-    assistant_message = _generate_and_save(conversation_id, llm_input, mode, recipe_results)
+    assistant_message = _generate_and_save(conversation_id, llm_input, mode, recipe_results, ui_intent)
 
     # 10. Update summary
     conv_data_updated = get_conversation(conversation_id)
@@ -679,8 +719,9 @@ def handle_chat(
     All handlers converge in _finalize_response() (steps 6–11).
     """
     # ── 1. Setup ──────────────────────────────────────────────────────
+    ui_intent = normalize_ui_intent(intent)
     conversation_id, is_new, conv_data = _setup_conversation(
-        conversation_id, user_message, guest_id, image_path
+        conversation_id, user_message, guest_id, image_path, ui_intent=ui_intent
     )
     recent = get_last_n_messages(conversation_id, 4)
 
@@ -710,7 +751,7 @@ def handle_chat(
     modifiers.vision_failed = vision_data.get("vision_failed", False)
 
     # ── 3b. Temporal separation shortcut ─────────────────────────────
-    early = _handle_temporal_separation(normalized_message, conversation_id)
+    early = _handle_temporal_separation(normalized_message, conversation_id, ui_intent)
     if early:
         return early
 
@@ -721,9 +762,9 @@ def handle_chat(
     # ── 4. Dispatch ───────────────────────────────────────────────────
     ctx = (conversation_id, normalized_message, recent, vision_data, mode, modifiers, is_new, conv_data, image_path)
     if mode == ChatMode.RECIPE_FROM_INGREDIENTS:
-        return _handle_recipe_from_ingredients_mode(*ctx)
+        return _handle_recipe_from_ingredients_mode(*ctx, ui_intent=ui_intent)
     if mode in (ChatMode.FOOD_ANALYSIS, ChatMode.MENU_ANALYSIS, ChatMode.MENU_FOLLOWUP):
-        return _handle_food_analysis(*ctx)
+        return _handle_food_analysis(*ctx, ui_intent=ui_intent)
     if mode == ChatMode.RECIPE_REQUEST:
-        return _handle_recipe_request(*ctx)
-    return _handle_knowledge_mode(*ctx)
+        return _handle_recipe_request(*ctx, ui_intent=ui_intent)
+    return _handle_knowledge_mode(*ctx, ui_intent=ui_intent)

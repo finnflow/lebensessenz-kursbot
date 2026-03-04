@@ -236,7 +236,11 @@ Browser/Mobile
   - `GET /health` — Response: `{"ok": true}`
   - `GET /` — SPA
 - `userId` und `courseId` in `ChatRequest` reserviert (noch nicht an `handle_chat()` weitergegeben)
-- `intent` in `ChatRequest` (optional, `str | None`): optionaler Routing-Hint, wird an `handle_chat()` weitergegeben (aktuell kein Verhaltensunterschied — vorbereitet für Intent-Override-Logik)
+- `intent` in `ChatRequest` (optional, `str | None`): **UI-Hint-Intent** — wird in `normalize_ui_intent()` normalisiert und als `ui_intent` in `chat_service.py` weiterverwendet
+  - Normalisierung: trim + lowercase, DE→EN-Map (`lernen→learn`, `essen→eat`, `planen→plan`), Substring-Checks (`"was brauche"/"bedarf"→need`)
+  - Whitelist: nur `learn | eat | need | plan` akzeptiert, sonst `None`
+  - Gespeichert in `messages.intent` (nullable TEXT) für **beide** Rollen: user-Nachricht + zugehörige Assistent-Antwort
+  - Kein Einfluss auf Trennkost-Logik oder Modus-Erkennung (reiner UI-Hint für Analytics/UX)
 - Guest-ID-System: Conversations gehören einem Browser (localStorage UUID)
 - SQLite über `app/database.py`: `conversations` (inkl. `guest_id`, `title`) + `messages` (inkl. `image_path`) + rolling summary
 - `init_db()` + `run_migrations()` im `@app.on_event("startup")`-Hook (idempotent, kein DB-Seiteneffekt beim Import)
