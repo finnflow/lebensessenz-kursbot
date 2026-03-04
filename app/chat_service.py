@@ -100,6 +100,13 @@ def normalize_ui_intent(raw: Optional[str]) -> Optional[str]:
     return None
 
 
+_INTENT_TITLES: Dict[str, str] = {
+    "eat":   "Essen",
+    "learn": "Lernen",
+    "need":  "Bedürfnis",
+    "plan":  "Planung",
+}
+
 _FIRST_QUESTIONS: Dict[str, str] = {
     "eat":   "Bist du im Restaurant oder zu Hause?",
     "need":  "Spürst du den Hunger eher im Bauch oder eher im Kopf?",
@@ -754,6 +761,7 @@ def handle_chat(
         if guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
             raise ValueError(f"Access denied to conversation {conversation_id}")
         set_conversation_start_intent(conversation_id, ui_intent)
+        update_conversation_title(conversation_id, _INTENT_TITLES.get(ui_intent, ui_intent))
         question = first_question_for_intent(ui_intent)
         create_message(conversation_id, "assistant", question, intent=ui_intent)
         return {"conversationId": conversation_id, "answer": question, "sources": []}
