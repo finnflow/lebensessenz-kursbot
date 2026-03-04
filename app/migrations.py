@@ -74,6 +74,17 @@ def run_migrations():
                 ADD COLUMN intent TEXT
             """)
 
+        # Re-read conversations columns after potential changes
+        cursor.execute("PRAGMA table_info(conversations)")
+        columns = [row[1] for row in cursor.fetchall()]
+
+        if 'start_intent' not in columns:
+            print("  ✓ Adding start_intent column to conversations table...")
+            cursor.execute("""
+                ALTER TABLE conversations
+                ADD COLUMN start_intent TEXT
+            """)
+
         print("✅ Migrations completed successfully!")
 
 if __name__ == "__main__":

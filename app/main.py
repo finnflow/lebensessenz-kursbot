@@ -121,6 +121,7 @@ class ConversationItem(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     guest_id: Optional[str] = None
+    start_intent: Optional[str] = None
 
 class ConversationsResponse(BaseModel):
     conversations: List[ConversationItem]
@@ -174,7 +175,7 @@ def chat(request: ChatRequest):
     - Updates rolling summary if threshold reached
     """
     message = request.message.strip()
-    if not message:
+    if not message and not request.intent:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     try:

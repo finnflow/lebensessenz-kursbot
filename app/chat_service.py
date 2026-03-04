@@ -31,6 +31,7 @@ from app.database import (
     update_conversation_title,
     generate_title_from_message,
     conversation_belongs_to_guest,
+    set_conversation_start_intent,
 )
 from app.vision_service import (
     analyze_meal_image,
@@ -97,6 +98,19 @@ def normalize_ui_intent(raw: Optional[str]) -> Optional[str]:
     if s in _VALID_INTENTS:
         return s
     return None
+
+
+_FIRST_QUESTIONS: Dict[str, str] = {
+    "eat":   "Bist du im Restaurant oder zu Hause?",
+    "need":  "Spürst du den Hunger eher im Bauch oder eher im Kopf?",
+    "plan":  "Planst du für heute oder für mehrere Tage?",
+    "learn": "Worüber möchtest du mehr verstehen?",
+}
+
+
+def first_question_for_intent(intent: str) -> str:
+    """Return the fixed opening question for a given start intent."""
+    return _FIRST_QUESTIONS[intent]
 
 
 # ── Summary helpers ───────────────────────────────────────────────────
@@ -731,6 +745,19 @@ def handle_chat(
     """
     # ── 1. Setup ──────────────────────────────────────────────────────
     ui_intent = normalize_ui_intent(intent)
+
+    # ── Intent shortcut: empty message + valid intent → first question ──
+    # Returns a fixed opening question without any LLM call or user message row.
+    if user_message.strip() == "" and ui_intent in _VALID_INTENTS:
+        if not conversation_id:
+            conversation_id = create_conversation(guest_id=guest_id)
+        if guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
+            raise ValueError(f"Access denied to conversation {conversation_id}")
+        set_conversation_start_intent(conversation_id, ui_intent)
+        question = first_question_for_intent(ui_intent)
+        create_message(conversation_id, "assistant", question, intent=ui_intent)
+        return {"conversationId": conversation_id, "answer": question, "sources": []}
+
     conversation_id, is_new, conv_data = _setup_conversation(
         conversation_id, user_message, guest_id, image_path, ui_intent=ui_intent
     )

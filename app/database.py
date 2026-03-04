@@ -25,7 +25,8 @@ def init_db():
             title TEXT,
             summary_text TEXT,
             summary_updated_at TEXT,
-            summary_message_cursor INTEGER DEFAULT 0
+            summary_message_cursor INTEGER DEFAULT 0,
+            start_intent TEXT
         )
     """)
 
@@ -223,7 +224,7 @@ def get_conversations_by_guest(guest_id: str, limit: int = 50) -> List[Dict[str,
     """Get all conversations for a guest, sorted by updated_at desc."""
     with get_db() as conn:
         cursor = conn.execute("""
-            SELECT id, title, created_at, updated_at, guest_id
+            SELECT id, title, created_at, updated_at, guest_id, start_intent
             FROM conversations
             WHERE guest_id = ?
             ORDER BY updated_at DESC
@@ -400,6 +401,24 @@ def grant_entitlement(user_id: str, product: str, status: str = "active") -> str
                 (entitlement_id, user_id, product, status, now, now),
             )
             return entitlement_id
+
+
+def set_conversation_start_intent(conversation_id: str, start_intent: Optional[str]) -> None:
+    """Set start_intent on a conversation — immutable, only written once.
+
+    No-op if start_intent is None or if the column already has a non-empty value.
+    """
+    if not start_intent:
+        return
+    with get_db() as conn:
+        conn.execute(
+            """
+            UPDATE conversations
+            SET start_intent = ?
+            WHERE id = ? AND (start_intent IS NULL OR start_intent = '')
+            """,
+            (start_intent, conversation_id),
+        )
 
 
 def get_entitlements_for_user(user_id: str) -> List[Dict[str, Any]]:

@@ -60,6 +60,8 @@ lebensessenz-kursbot/
 │   ├── vision_service.py         (367 Z)  # GPT-4o Mahlzeit-/Speisekarten-Analyse
 │   ├── feedback_service.py        (95 Z)  # Export: chat.md + feedback.md + metadata.json + images/
 │   ├── database.py               (292 Z)  # SQLite: Conversations, Messages, Summary, Title
+│   │                                      #   conversations.start_intent (TEXT, nullable, immutable —
+│   │                                      #     set once via set_conversation_start_intent(), never overwritten)
 │   │                                      #   conversation_belongs_to_guest(allow_legacy_open=True)
 │   ├── image_handler.py          (175 Z)  # Upload-Validierung, Base64-Encoding, Cleanup-Job
 │   ├── migrations.py              (69 Z)  # DB-Schema-Migrationen
@@ -139,6 +141,13 @@ Browser/Mobile
 │  app/chat_service.py  handle_chat()  (~70 Zeilen)       │
 │                                                         │
 │  1. Setup: _setup_conversation() → SQLite               │
+│                                                         │
+│  1b. Intent shortcut (before _setup_conversation):      │
+│      if message=="" and intent in {learn,eat,need,plan} │
+│      → create/validate conversation                     │
+│      → set conversations.start_intent (immutable)       │
+│      → persist assistant message with intent            │
+│      → return fixed first question (no LLM call)        │
 │                                                         │
 │  2. Parallel (ThreadPoolExecutor):                      │
 │  ├── normalize_input()      [input_service.py]          │
