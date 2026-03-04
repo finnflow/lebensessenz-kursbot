@@ -105,6 +105,7 @@ class ChatRequest(BaseModel):
     guestId: Optional[str] = None
     userId: Optional[str] = None    # reserved for future auth; not passed to handle_chat
     courseId: Optional[str] = None  # reserved for future multi-course support
+    intent: Optional[str] = None    # optional hint for chat mode routing
 
 class ChatResponse(BaseModel):
     conversationId: str
@@ -177,7 +178,7 @@ def chat(request: ChatRequest):
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     try:
-        result = handle_chat(request.conversationId, message, request.guestId)
+        result = handle_chat(request.conversationId, message, request.guestId, intent=request.intent)
         return ChatResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -188,6 +189,7 @@ async def chat_with_image(
     message: str = Form(...),
     conversationId: Optional[str] = Form(None),
     guestId: Optional[str] = Form(None),
+    intent: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None)
 ):
     """
@@ -218,7 +220,7 @@ async def chat_with_image(
             raise HTTPException(status_code=400, detail=str(e))
 
     try:
-        result = handle_chat(conversationId, message, guestId, image_path)
+        result = handle_chat(conversationId, message, guestId, image_path, intent=intent)
         return ChatResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

@@ -663,6 +663,7 @@ def handle_chat(
     user_message: str,
     guest_id: Optional[str] = None,
     image_path: Optional[str] = None,
+    intent: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Chat request dispatcher.
