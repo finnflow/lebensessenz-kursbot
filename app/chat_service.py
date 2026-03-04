@@ -68,6 +68,7 @@ from app.prompt_builder import (
     build_prompt_knowledge,
     build_prompt_recipe_request,
     assemble_prompt,
+    build_ui_intent_block,
 )
 
 
@@ -272,17 +273,20 @@ def _check_fallback(
     best_dist: float,
     is_partial: bool,
     course_context: str,
-) -> bool:
-    """Check if we should return fallback (no relevant content found)."""
+) -> Tuple[bool, str]:
+    """Check if we should return fallback (no relevant content found).
+
+    Returns (should_fallback, reason) where reason is 'no_snippets' or 'other'.
+    """
     if trennkost_results:
-        return False
+        return False, ""
     if mode == ChatMode.RECIPE_REQUEST:
-        return False
+        return False, ""
     if best_dist > DISTANCE_THRESHOLD and not is_partial:
-        return True
+        return True, "no_snippets"
     if not course_context.strip():
-        return True
-    return False
+        return True, "no_snippets"
+    return False, ""
 
 
 def _build_prompt_parts(
@@ -294,9 +298,11 @@ def _build_prompt_parts(
     last_messages: List[Dict[str, Any]],
     user_message: str,
     recipe_results: Optional[List[Dict]] = None,
+    ui_intent: Optional[str] = None,
 ) -> Tuple[List[str], str]:
     """Build all prompt parts and answer instructions based on mode."""
-    parts = build_base_context(summary, last_messages)
+    parts = build_ui_intent_block(ui_intent)  # prepend intent hint (empty list if no intent)
+    parts += build_base_context(summary, last_messages)
 
     if trennkost_results:
         parts.extend(build_engine_block(trennkost_results, modifiers.is_breakfast))
@@ -663,7 +669,11 @@ def _finalize_response(
 
     # 7. Fallback check
     best_dist = min(dists) if dists else 999.0
-    if _check_fallback(trennkost_results, mode, best_dist, is_partial, course_context):
+    should_fb, fb_reason = _check_fallback(trennkost_results, mode, best_dist, is_partial, course_context)
+    # need/plan allow general process help even without snippets
+    if should_fb and fb_reason == "no_snippets" and ui_intent in {"need", "plan"}:
+        should_fb = False
+    if should_fb:
         create_message(conversation_id, "assistant", FALLBACK_SENTENCE, intent=ui_intent)
         conv_data_updated = get_conversation(conversation_id)
         if should_update_summary(conversation_id, conv_data_updated):
@@ -674,6 +684,7 @@ def _finalize_response(
     prompt_parts, answer_instructions = _build_prompt_parts(
         mode, modifiers, trennkost_results, vision_data,
         summary, last_messages, analysis_query, recipe_results,
+        ui_intent=ui_intent,
     )
     modifiers.needs_clarification = needs_clarification
     llm_input = assemble_prompt(

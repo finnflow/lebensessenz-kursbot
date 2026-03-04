@@ -39,6 +39,37 @@ Du darfst auf frühere Nachrichten referenzieren, aber neue Fakten müssen aus d
 """
 
 
+# ── UI intent hint block ──────────────────────────────────────────────
+
+_INTENT_LINES = {
+    "learn": [
+        "Erkläre strukturiert (3–6 kurze Punkte).",
+        "Wenn nötig: 1 Rückfrage.",
+    ],
+    "eat": [
+        "Fokus: trennkost-konform, klare Empfehlung.",
+        "Max 1 Rückfrage.",
+    ],
+    "need": [
+        "Sanfte Klärung: max 1–2 Fragen.",
+        "Biete 1 mini-nächsten Schritt (nicht-medizinisch) an (z.B. Wasser / 3 Atemzüge / kurzer Körper-Check-in).",
+    ],
+    "plan": [
+        "2–3 konkrete nächste Schritte + 1 Frage zur Eingrenzung.",
+    ],
+}
+_INTENT_SAFETY = "Keine Diagnose/Therapie/medizinische Behandlung. Keine medizinischen Claims."
+
+
+def build_ui_intent_block(ui_intent: Optional[str]) -> List[str]:
+    """Return a short intent-hint block prepended to the prompt parts, or [] if no intent."""
+    lines = _INTENT_LINES.get(ui_intent or "")
+    if not lines:
+        return []
+    block = ["INTENT-HINWEIS (%s):" % ui_intent] + lines + [_INTENT_SAFETY, ""]
+    return block
+
+
 # ── Context blocks ────────────────────────────────────────────────────
 
 def build_base_context(

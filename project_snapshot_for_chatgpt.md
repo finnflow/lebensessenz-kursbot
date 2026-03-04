@@ -240,7 +240,9 @@ Browser/Mobile
   - Normalisierung: trim + lowercase, DE→EN-Map (`lernen→learn`, `essen→eat`, `planen→plan`), Substring-Checks (`"was brauche"/"bedarf"→need`)
   - Whitelist: nur `learn | eat | need | plan` akzeptiert, sonst `None`
   - Gespeichert in `messages.intent` (nullable TEXT) für **beide** Rollen: user-Nachricht + zugehörige Assistent-Antwort
-  - Kein Einfluss auf Trennkost-Logik oder Modus-Erkennung (reiner UI-Hint für Analytics/UX)
+  - `build_ui_intent_block(ui_intent)` in `prompt_builder.py` erzeugt einen kurzen Ton/Struktur-Block (max ~4 Zeilen), der dem Prompt vorangestellt wird (learn=strukturiert, eat=Empfehlung, need=sanfte Klärung, plan=Schritte)
+  - Fallback-Bypass: `need` und `plan` umgehen den "keine Kurs-Snippets"-Fallback (`reason=="no_snippets"`) und lassen die LLM-Generierung trotzdem laufen — alle anderen Fallback-Gründe bleiben unverändert
+  - Sicherheitszeile für alle Intents: "Keine Diagnose/Therapie/medizinische Behandlung."
 - Guest-ID-System: Conversations gehören einem Browser (localStorage UUID)
 - SQLite über `app/database.py`: `conversations` (inkl. `guest_id`, `title`) + `messages` (inkl. `image_path`) + rolling summary
 - `init_db()` + `run_migrations()` im `@app.on_event("startup")`-Hook (idempotent, kein DB-Seiteneffekt beim Import)
