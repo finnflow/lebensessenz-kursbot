@@ -213,6 +213,8 @@ Browser/Mobile
                        │
                        ▼
          JSON Response: {answer, conversationId, sources}
+         Note: sources are only returned for conversations with start_intent=learn;
+               all other start intents (eat, need, plan) always return sources: [].
 ```
 
 ## Schicht-Beschreibung

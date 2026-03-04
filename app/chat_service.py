@@ -203,6 +203,10 @@ def _setup_conversation(
         from app.database import update_conversation_guest_id
         update_conversation_guest_id(conversation_id, guest_id)
 
+    if is_new and ui_intent is not None:
+        set_conversation_start_intent(conversation_id, ui_intent)
+        conv_data["start_intent"] = ui_intent  # keep in-memory copy consistent
+
     create_message(conversation_id, "user", user_message, image_path=image_path, intent=ui_intent)
 
     if is_new:
@@ -721,10 +725,13 @@ def _finalize_response(
     if should_update_summary(conversation_id, conv_data_updated):
         update_conversation_summary(conversation_id, conv_data_updated)
 
+    start_intent = (conv_data or {}).get("start_intent")
+    sources_out = _prepare_sources(metas, dists) if start_intent == "learn" else []
+
     return {
         "conversationId": conversation_id,
         "answer": assistant_message,
-        "sources": _prepare_sources(metas, dists),
+        "sources": sources_out,
     }
 
 
