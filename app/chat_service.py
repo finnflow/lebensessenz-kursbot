@@ -1,5 +1,6 @@
+import json
 import re
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Generator, Optional, List, Dict, Any, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
 from app.clients import client, MODEL, LAST_N, SUMMARY_THRESHOLD, DISTANCE_THRESHOLD, DEBUG_RAG
@@ -821,3 +822,244 @@ def handle_chat(
     if mode == ChatMode.RECIPE_REQUEST:
         return _handle_recipe_request(*ctx, ui_intent=ui_intent)
     return _handle_knowledge_mode(*ctx, ui_intent=ui_intent)
+
+
+# ── SSE streaming ─────────────────────────────────────────────────────
+
+def _sse(event: str, data: Dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def _prepare_stream(
+    conversation_id: Optional[str],
+    user_message: str,
+    guest_id: Optional[str],
+    ui_intent: Optional[str],
+) -> Dict[str, Any]:
+    """
+    Run the full pipeline up to (but not including) the LLM call.
+
+    Returns either:
+      {"conversation_id": ..., "early_answer": ..., "sources": [...], "ui_intent": ...}
+      {"conversation_id": ..., "llm_input": ..., "ui_intent": ..., "mode": ...,
+       "recipe_results": ..., "sources": [...]}
+    """
+    conversation_id, is_new, conv_data = _setup_conversation(
+        conversation_id, user_message, guest_id, image_path=None, ui_intent=ui_intent
+    )
+    recent = get_last_n_messages(conversation_id, 4)
+
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        nf = ex.submit(normalize_input, user_message, recent, is_new)
+        inf = ex.submit(classify_intent, user_message, recent)
+        normalized_message = nf.result()
+        intent_result = inf.result()
+
+    vision_data: Dict[str, Any] = {
+        "vision_analysis": None, "food_groups": None,
+        "vision_extraction": None, "vision_is_menu": False, "vision_failed": False,
+    }
+
+    mode, modifiers = detect_chat_mode(
+        normalized_message, image_path=None, vision_type=None,
+        is_new_conversation=is_new, recent_message_count=len(recent),
+        last_messages=recent,
+    )
+
+    early = _handle_temporal_separation(normalized_message, conversation_id, ui_intent)
+    if early:
+        return {"conversation_id": conversation_id, "early_answer": early["answer"],
+                "sources": [], "ui_intent": ui_intent}
+
+    mode = _apply_intent_override(mode, modifiers, intent_result, image_path=None)
+
+    # RECIPE_FROM_INGREDIENTS: run synchronously (no streaming path for this mode)
+    if mode == ChatMode.RECIPE_FROM_INGREDIENTS:
+        result = _handle_recipe_from_ingredients_mode(
+            conversation_id, normalized_message, recent, vision_data,
+            mode, modifiers, is_new, conv_data, image_path=None, ui_intent=ui_intent,
+        )
+        return {"conversation_id": conversation_id, "early_answer": result["answer"],
+                "sources": result.get("sources", []), "ui_intent": ui_intent}
+
+    # Food analysis: run engine if applicable
+    analysis_query = normalized_message
+    trennkost_results = None
+    if mode in (ChatMode.FOOD_ANALYSIS, ChatMode.MENU_ANALYSIS, ChatMode.MENU_FOLLOWUP):
+        if mode == ChatMode.FOOD_ANALYSIS:
+            resolved = resolve_context_references(normalized_message, recent)
+            if resolved:
+                analysis_query = resolved
+        trennkost_results = _run_engine(analysis_query, None, mode)
+
+    # Recipe search
+    recipe_results: Optional[List[Dict]] = None
+    if mode == ChatMode.RECIPE_REQUEST:
+        try:
+            from app.recipe_service import search_recipes
+            search_query = normalized_message
+            if modifiers.is_followup and len(normalized_message.strip()) <= 20:
+                for msg in reversed(recent):
+                    if msg.get("role") == "user":
+                        content = msg.get("content", "").strip()
+                        if len(content) > 20 and content != normalized_message:
+                            search_query = content
+                            break
+            recipe_results = search_recipes(search_query, limit=5)
+        except Exception:
+            recipe_results = []
+        # High-score recipe bypass: format directly, persist, return as early_answer
+        if recipe_results and recipe_results[0].get("score", 0.0) >= 7.0:
+            assistant_message = format_recipe_directly(recipe_results[0])
+            create_message(conversation_id, "assistant", assistant_message, intent=ui_intent)
+            return {"conversation_id": conversation_id, "early_answer": assistant_message,
+                    "sources": [], "ui_intent": ui_intent}
+
+    # RAG
+    summary = conv_data.get("summary_text")
+    last_messages = get_last_n_messages(conversation_id, LAST_N)
+    standalone_query = _build_rag_query(
+        trennkost_results, None, None, summary, last_messages, normalized_message,
+        modifiers.is_breakfast,
+    )
+
+    needs_clarification = None
+    is_followup = not is_new and len(last_messages) >= 2
+    if not trennkost_results:
+        food_cls = classify_food_items(normalized_message, standalone_query)
+        if food_cls:
+            classification = food_cls.get("classification", "")
+            if not is_followup or len(normalized_message) > 80:
+                needs_clarification = food_cls.get("needs_clarification")
+            if classification:
+                standalone_query += f"\n{classification}"
+
+    docs, metas, dists, is_partial = retrieve_with_fallback(standalone_query, normalized_message)
+    course_context = build_context(docs, metas)
+
+    best_dist = min(dists) if dists else 999.0
+    should_fb, fb_reason = _check_fallback(trennkost_results, mode, best_dist, is_partial, course_context)
+    if should_fb and fb_reason == "no_snippets" and ui_intent in {"need", "plan"}:
+        should_fb = False
+    if should_fb:
+        create_message(conversation_id, "assistant", FALLBACK_SENTENCE, intent=ui_intent)
+        conv_data_updated = get_conversation(conversation_id)
+        if should_update_summary(conversation_id, conv_data_updated):
+            update_conversation_summary(conversation_id, conv_data_updated)
+        return {"conversation_id": conversation_id, "early_answer": FALLBACK_SENTENCE,
+                "sources": [], "ui_intent": ui_intent}
+
+    prompt_parts, answer_instructions = _build_prompt_parts(
+        mode, modifiers, trennkost_results, vision_data,
+        summary, last_messages, analysis_query, recipe_results,
+        ui_intent=ui_intent,
+    )
+    modifiers.needs_clarification = needs_clarification
+    llm_input = assemble_prompt(
+        prompt_parts, course_context, normalized_message,
+        answer_instructions, needs_clarification,
+    )
+
+    start_intent = (conv_data or {}).get("start_intent")
+    sources = _prepare_sources(metas, dists) if start_intent == "learn" else []
+
+    return {
+        "conversation_id": conversation_id,
+        "llm_input": llm_input,
+        "ui_intent": ui_intent,
+        "mode": mode,
+        "recipe_results": recipe_results,
+        "sources": sources,
+    }
+
+
+def handle_chat_stream(
+    conversation_id: Optional[str],
+    user_message: str,
+    guest_id: Optional[str] = None,
+    intent: Optional[str] = None,
+) -> Generator[str, None, None]:
+    """
+    Sync generator yielding SSE-formatted strings.
+
+    Event sequence:
+      meta → delta* → final     (normal LLM path)
+      meta → final              (shortcut / early return)
+      error                     (on failure before conv_id known)
+      meta → error              (on failure after conv_id known)
+    """
+    ui_intent = normalize_ui_intent(intent)
+
+    # ── Intent shortcut: empty message + valid intent ──────────────────
+    if user_message.strip() == "" and ui_intent in _VALID_INTENTS:
+        try:
+            if not conversation_id:
+                conversation_id = create_conversation(guest_id=guest_id)
+            if guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
+                yield _sse("error", {"message": "Zugriff verweigert."})
+                return
+            set_conversation_start_intent(conversation_id, ui_intent)
+            update_conversation_title(conversation_id, _INTENT_TITLES.get(ui_intent, ui_intent))
+            question = first_question_for_intent(ui_intent)
+            create_message(conversation_id, "assistant", question, intent=ui_intent)
+            yield _sse("meta", {"conversationId": conversation_id})
+            yield _sse("final", {"conversationId": conversation_id,
+                                  "answer": question, "sources": []})
+        except Exception as exc:
+            print(f"[STREAM] Shortcut error: {exc}")
+            yield _sse("error", {"message": "Etwas ist schiefgelaufen."})
+        return
+
+    # ── Normal path: prepare pipeline ─────────────────────────────────
+    try:
+        prep = _prepare_stream(conversation_id, user_message, guest_id, ui_intent)
+    except Exception as exc:
+        print(f"[STREAM] Prepare failed: {exc}")
+        yield _sse("error", {"message": "Etwas ist schiefgelaufen."})
+        return
+
+    conv_id = prep["conversation_id"]
+    yield _sse("meta", {"conversationId": conv_id})
+
+    # Early return (temporal, recipe bypass, fallback, recipe-from-ingredients)
+    if "early_answer" in prep:
+        yield _sse("final", {"conversationId": conv_id,
+                              "answer": prep["early_answer"],
+                              "sources": prep.get("sources", [])})
+        return
+
+    # ── LLM streaming ────────────────────────────────────────────────
+    sources = prep.get("sources", [])
+    full_text = ""
+    try:
+        stream = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": SYSTEM_INSTRUCTIONS},
+                {"role": "user", "content": prep["llm_input"]},
+            ],
+            temperature=0.0,
+            stream=True,
+        )
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            token = chunk.choices[0].delta.content
+            if token:
+                full_text += token
+                yield _sse("delta", {"text": token})
+    except Exception as exc:
+        print(f"[STREAM] LLM error: {exc}")
+        yield _sse("error", {"message": "Antwort konnte nicht generiert werden."})
+        return
+
+    # ── Persist exactly once ──────────────────────────────────────────
+    assistant_message = full_text.strip()
+    create_message(conv_id, "assistant", assistant_message, intent=prep.get("ui_intent"))
+    conv_data_updated = get_conversation(conv_id)
+    if conv_data_updated and should_update_summary(conv_id, conv_data_updated):
+        update_conversation_summary(conv_id, conv_data_updated)
+
+    yield _sse("final", {"conversationId": conv_id,
+                          "answer": assistant_message,
+                          "sources": sources})

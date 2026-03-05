@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 from pydantic import BaseModel
@@ -19,7 +19,7 @@ from app.migrations import run_migrations
 from app.auth import router as auth_router
 from app.entitlements import router as entitlements_router
 from app.clients import MODEL, TOP_K, LAST_N, SUMMARY_THRESHOLD
-from app.chat_service import handle_chat
+from app.chat_service import handle_chat, handle_chat_stream
 from app.image_handler import save_image, ImageValidationError
 from app.feedback_service import export_feedback
 from trennkost.analyzer import analyze_text as trennkost_analyze_text, format_results_for_llm
@@ -183,6 +183,33 @@ def chat(request: ChatRequest):
         return ChatResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+@app.post("/api/v1/chat/stream")
+def chat_stream(request: ChatRequest):
+    """
+    SSE streaming variant of POST /api/v1/chat.
+
+    Yields Server-Sent Events:
+      event: meta   data: {"conversationId":"..."}
+      event: delta  data: {"text":"..."}         (one per token)
+      event: final  data: {"conversationId":"...","answer":"...","sources":[...]}
+      event: error  data: {"message":"..."}      (on failure)
+
+    For the intent-start shortcut (message=="" + valid intent):
+    emits meta + final only (no deltas).
+    """
+    message = request.message.strip()
+    if not message and not request.intent:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    gen = handle_chat_stream(
+        request.conversationId,
+        message,
+        request.guestId,
+        intent=request.intent,
+    )
+    return StreamingResponse(gen, media_type="text/event-stream")
+
 
 @app.post("/chat/image", response_model=ChatResponse)
 @app.post("/api/v1/chat/image", response_model=ChatResponse)
