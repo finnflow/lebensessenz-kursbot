@@ -1,7 +1,9 @@
+import asyncio
 import json
+import os
 import re
 import time
-from typing import Generator, Optional, List, Dict, Any, Tuple
+from typing import AsyncGenerator, Generator, Optional, List, Dict, Any, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
 from app.clients import client, MODEL, LAST_N, SUMMARY_THRESHOLD, DISTANCE_THRESHOLD, DEBUG_RAG
@@ -1094,3 +1096,227 @@ def handle_chat_stream(
     yield _sse("final", {"conversationId": conv_id,
                           "answer": assistant_message,
                           "sources": sources})
+
+
+# ---------------------------------------------------------------------------
+# Dev-only knob: STREAM_TEST_DELAY_BEFORE_FIRST_TOKEN=<seconds>
+# Inserts an artificial sleep AFTER the pipeline but BEFORE the LLM stream so
+# the status-event ticker fires during tests even when retrieval is fast.
+# ---------------------------------------------------------------------------
+
+_STREAM_TEST_DELAY = float(os.getenv("STREAM_TEST_DELAY_BEFORE_FIRST_TOKEN", "0"))
+
+
+async def handle_chat_stream_async(
+    conversation_id: Optional[str],
+    user_message: str,
+    guest_id: Optional[str] = None,
+    intent: Optional[str] = None,
+) -> AsyncGenerator[str, None]:
+    """
+    Async SSE generator.  Status events are emitted by a time-based asyncio
+    ticker that is fully independent of OpenAI token chunk arrival.
+
+    Event sequence (same contract as the sync version):
+      meta → status* → delta* → final   (normal LLM path)
+      meta → final                       (shortcut / early return)
+      error                              (failure before conv_id known)
+      meta → error                       (failure after conv_id known)
+    """
+    ui_intent = normalize_ui_intent(intent)
+    loop = asyncio.get_running_loop()
+
+    # ── Intent shortcut: empty message + valid intent ──────────────────────
+    if user_message.strip() == "" and ui_intent in _VALID_INTENTS:
+        try:
+            if not conversation_id:
+                conversation_id = await loop.run_in_executor(
+                    None, create_conversation, guest_id
+                )
+            if guest_id:
+                belongs = await loop.run_in_executor(
+                    None, conversation_belongs_to_guest, conversation_id, guest_id
+                )
+                if not belongs:
+                    yield _sse("error", {"message": "Zugriff verweigert."})
+                    return
+            await loop.run_in_executor(
+                None, set_conversation_start_intent, conversation_id, ui_intent
+            )
+            await loop.run_in_executor(
+                None,
+                update_conversation_title,
+                conversation_id,
+                _INTENT_TITLES.get(ui_intent, ui_intent),
+            )
+            question = first_question_for_intent(ui_intent)
+            _cid = conversation_id
+            _q = question
+            _ui = ui_intent
+            await loop.run_in_executor(
+                None,
+                lambda: create_message(_cid, "assistant", _q, intent=_ui),
+            )
+            yield _sse("meta", {"conversationId": conversation_id})
+            yield _sse("final", {
+                "conversationId": conversation_id,
+                "answer": question,
+                "sources": [],
+            })
+        except Exception as exc:
+            print(f"[STREAM] Shortcut error: {exc}")
+            yield _sse("error", {"message": "Etwas ist schiefgelaufen."})
+        return
+
+    # ── Normal path: ensure conversation ID, yield meta immediately ────────
+    try:
+        if not conversation_id:
+            conversation_id = await loop.run_in_executor(
+                None, create_conversation, guest_id
+            )
+            if ui_intent is not None:
+                await loop.run_in_executor(
+                    None, set_conversation_start_intent, conversation_id, ui_intent
+                )
+        elif guest_id:
+            belongs = await loop.run_in_executor(
+                None, conversation_belongs_to_guest, conversation_id, guest_id
+            )
+            if not belongs:
+                yield _sse("error", {"message": "Zugriff verweigert."})
+                return
+    except Exception as exc:
+        print(f"[STREAM] Conversation setup failed: {exc}")
+        yield _sse("error", {"message": "Etwas ist schiefgelaufen."})
+        return
+
+    meta_payload: Dict[str, Any] = {"conversationId": conversation_id}
+    if ui_intent is not None:
+        meta_payload["start_intent"] = ui_intent
+    yield _sse("meta", meta_payload)
+
+    # ── Concurrent pipeline + time-based status ticker ─────────────────────
+    out_q: asyncio.Queue = asyncio.Queue()
+    stop_event = asyncio.Event()
+
+    async def _ticker() -> None:
+        await asyncio.sleep(2.5)
+        if not stop_event.is_set():
+            await out_q.put(_sse("status", {"message": "Suche passende Kursstellen \u2026"}))
+        await asyncio.sleep(3.5)  # 6.0 s total from meta
+        if not stop_event.is_set():
+            await out_q.put(_sse("status", {"message": "Formuliere Antwort \u2026"}))
+
+    async def _pipeline() -> None:
+        try:
+            prep = await loop.run_in_executor(
+                None, _prepare_stream, conversation_id, user_message, guest_id, ui_intent
+            )
+        except Exception as exc:
+            print(f"[STREAM] Prepare failed: {exc}")
+            stop_event.set()
+            await out_q.put(_sse("error", {"message": "Etwas ist schiefgelaufen."}))
+            await out_q.put(None)
+            return
+
+        conv_id = prep["conversation_id"]
+
+        if "early_answer" in prep:
+            stop_event.set()
+            await out_q.put(_sse("final", {
+                "conversationId": conv_id,
+                "answer": prep["early_answer"],
+                "sources": prep.get("sources", []),
+            }))
+            await out_q.put(None)
+            return
+
+        sources = prep.get("sources", [])
+
+        # Dev-only: artificial delay before LLM stream for status-event testing
+        if _STREAM_TEST_DELAY > 0:
+            await asyncio.sleep(_STREAM_TEST_DELAY)
+
+        # Run sync OpenAI stream in a thread; push chunks via thread-safe calls
+        chunk_q: asyncio.Queue = asyncio.Queue()
+        _prep = prep
+
+        def _stream_worker() -> None:
+            try:
+                stream = client.chat.completions.create(
+                    model=MODEL,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_INSTRUCTIONS},
+                        {"role": "user", "content": _prep["llm_input"]},
+                    ],
+                    temperature=0.0,
+                    stream=True,
+                )
+                for chunk in stream:
+                    loop.call_soon_threadsafe(chunk_q.put_nowait, chunk)
+                loop.call_soon_threadsafe(chunk_q.put_nowait, None)
+            except Exception as exc:
+                loop.call_soon_threadsafe(chunk_q.put_nowait, exc)
+
+        loop.run_in_executor(None, _stream_worker)
+
+        full_text = ""
+        first_token_seen = False
+        while True:
+            chunk = await chunk_q.get()
+            if chunk is None:
+                break
+            if isinstance(chunk, Exception):
+                print(f"[STREAM] LLM error: {chunk}")
+                stop_event.set()
+                await out_q.put(_sse("error", {"message": "Antwort konnte nicht generiert werden."}))
+                await out_q.put(None)
+                return
+            if not chunk.choices:
+                continue
+            token = chunk.choices[0].delta.content
+            if token:
+                if not first_token_seen:
+                    first_token_seen = True
+                    stop_event.set()
+                full_text += token
+                await out_q.put(_sse("delta", {"text": token}))
+
+        # Persist exactly once
+        assistant_message = full_text.strip()
+        _cid2 = conv_id
+        _am = assistant_message
+        _ui2 = prep.get("ui_intent")
+        await loop.run_in_executor(
+            None,
+            lambda: create_message(_cid2, "assistant", _am, intent=_ui2),
+        )
+        conv_data_updated = await loop.run_in_executor(None, get_conversation, conv_id)
+        if conv_data_updated:
+            should_upd = await loop.run_in_executor(
+                None, should_update_summary, conv_id, conv_data_updated
+            )
+            if should_upd:
+                await loop.run_in_executor(
+                    None, update_conversation_summary, conv_id, conv_data_updated
+                )
+
+        await out_q.put(_sse("final", {
+            "conversationId": conv_id,
+            "answer": assistant_message,
+            "sources": sources,
+        }))
+        await out_q.put(None)  # sentinel
+
+    ticker_task = asyncio.create_task(_ticker())
+    pipeline_task = asyncio.create_task(_pipeline())
+    try:
+        while True:
+            item = await out_q.get()
+            if item is None:
+                break
+            yield item
+    finally:
+        stop_event.set()
+        ticker_task.cancel()
+        pipeline_task.cancel()
