@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from typing import Generator, Optional, List, Dict, Any, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
@@ -1010,6 +1011,27 @@ def handle_chat_stream(
             yield _sse("error", {"message": "Etwas ist schiefgelaufen."})
         return
 
+    # ── Normal path: ensure conversation ID, yield meta immediately ───
+    try:
+        if not conversation_id:
+            conversation_id = create_conversation(guest_id=guest_id)
+            if ui_intent is not None:
+                set_conversation_start_intent(conversation_id, ui_intent)
+        elif guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
+            yield _sse("error", {"message": "Zugriff verweigert."})
+            return
+    except Exception as exc:
+        print(f"[STREAM] Conversation setup failed: {exc}")
+        yield _sse("error", {"message": "Etwas ist schiefgelaufen."})
+        return
+
+    meta_payload: Dict[str, Any] = {"conversationId": conversation_id}
+    if ui_intent is not None:
+        meta_payload["start_intent"] = ui_intent
+    yield _sse("meta", meta_payload)
+    meta_sent_at = time.monotonic()
+    status_sent = 0
+
     # ── Normal path: prepare pipeline ─────────────────────────────────
     try:
         prep = _prepare_stream(conversation_id, user_message, guest_id, ui_intent)
@@ -1019,7 +1041,6 @@ def handle_chat_stream(
         return
 
     conv_id = prep["conversation_id"]
-    yield _sse("meta", {"conversationId": conv_id})
 
     # Early return (temporal, recipe bypass, fallback, recipe-from-ingredients)
     if "early_answer" in prep:
@@ -1031,6 +1052,7 @@ def handle_chat_stream(
     # ── LLM streaming ────────────────────────────────────────────────
     sources = prep.get("sources", [])
     full_text = ""
+    first_token_seen = False
     try:
         stream = client.chat.completions.create(
             model=MODEL,
@@ -1042,10 +1064,19 @@ def handle_chat_stream(
             stream=True,
         )
         for chunk in stream:
+            if not first_token_seen and status_sent < 2:
+                elapsed = time.monotonic() - meta_sent_at
+                if elapsed >= 6.0:
+                    yield _sse("status", {"message": "Formuliere Antwort \u2026"})
+                    status_sent = 2
+                elif elapsed >= 2.5 and status_sent < 1:
+                    yield _sse("status", {"message": "Suche passende Kursstellen \u2026"})
+                    status_sent = 1
             if not chunk.choices:
                 continue
             token = chunk.choices[0].delta.content
             if token:
+                first_token_seen = True
                 full_text += token
                 yield _sse("delta", {"text": token})
     except Exception as exc:
