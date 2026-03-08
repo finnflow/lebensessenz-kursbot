@@ -7,11 +7,12 @@ NO LLM calls. Pure logic.
 import json
 import logging
 from pathlib import Path
-from typing import List, Dict, Set, Optional, Tuple
+from typing import List, Dict, Set, Optional, Tuple, Union
 from collections import defaultdict
 
 from trennkost.models import (
     CombinationGroup,
+    EvaluationMode,
     FoodGroup,
     FoodSubgroup,
     RiskSeverity,
@@ -30,9 +31,9 @@ from trennkost.models import (
 )
 from trennkost.ontology import (
     STRICT_FRUIT_GROUPS,
+    combination_group_to_display_group,
     get_ontology,
-    resolve_strict_combination_group,
-    strict_combination_group_to_display_group,
+    resolve_combination_group,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,8 @@ SUMMARY_GROUP_LABELS = {
     CombinationGroup.FETT.value: "Fette",
 }
 
+MODE_RELAXATION_CODE = "LIGHT_MODE_RELAXED"
+
 
 class TrennkostEngine:
     """Deterministic rule engine for food combination checking."""
@@ -108,29 +111,96 @@ class TrennkostEngine:
         self.rule_priority = data.get("rule_priority", [r.rule_id for r in self.rules])
         logger.info(f"Loaded {len(self.rules)} rules")
 
-    def evaluate(self, analysis: DishAnalysis) -> TrennkostResult:
+    def evaluate(
+        self,
+        analysis: DishAnalysis,
+        mode: Union[str, EvaluationMode] = EvaluationMode.STRICT,
+    ) -> TrennkostResult:
         """
         Evaluate a DishAnalysis against all rules.
 
         Returns TrennkostResult with verdict, problems, and required questions.
         """
+        active_mode = mode if isinstance(mode, EvaluationMode) else EvaluationMode(mode)
+        all_items = analysis.items + analysis.assumed_items
+
+        strict_result = self._evaluate_mode(analysis, mode=EvaluationMode.STRICT)
+        active_result = (
+            strict_result
+            if active_mode == EvaluationMode.STRICT
+            else self._evaluate_mode(analysis, mode=active_mode)
+        )
+
+        # ── Build structured risk / ampel ───────────────────────────
+        risk_facts = self._build_risk_facts(all_items)
+        risk_codes = list(dict.fromkeys(fact.risk_code for fact in risk_facts))
+        traffic_light = self._aggregate_traffic_light(risk_facts)
+
+        mode_relaxation_applied = (
+            active_mode == EvaluationMode.LIGHT
+            and active_result["verdict"] != strict_result["verdict"]
+        )
+        mode_delta_codes = [MODE_RELAXATION_CODE] if mode_relaxation_applied else []
+
+        return TrennkostResult(
+            dish_name=analysis.dish_name,
+            verdict=active_result["verdict"],
+            active_mode=active_mode,
+            strict_verdict=strict_result["verdict"],
+            active_mode_verdict=active_result["verdict"],
+            mode_relaxation_applied=mode_relaxation_applied,
+            mode_delta_codes=mode_delta_codes,
+            traffic_light=traffic_light,
+            summary=active_result["summary"],
+            problems=active_result["problems"],
+            required_questions=active_result["required_questions"],
+            risk_codes=risk_codes,
+            risk_facts=risk_facts,
+            guidance_codes=active_result["guidance_codes"],
+            guidance_facts=active_result["guidance_facts"],
+            ok_combinations=active_result["ok_notes"],
+            groups_found=active_result["display_groups_found"],
+            strict_groups_found=strict_result["combination_groups_found"],
+            debug={
+                "rules_checked": len(self.rules),
+                "rules_triggered": active_result["rules_triggered"],
+                "unknown_items": analysis.unknown_items,
+                "assumed_items": [it.raw_name for it in analysis.assumed_items],
+                "group_set": sorted(active_result["group_set"]),
+                "display_group_set": sorted(active_result["display_groups_found"].keys()),
+                "strict_group_set": sorted(strict_result["group_set"]),
+                "active_mode": active_mode.value,
+                "strict_verdict": strict_result["verdict"].value,
+                "active_mode_verdict": active_result["verdict"].value,
+                "mode_delta_codes": mode_delta_codes,
+                "traffic_light": traffic_light.value,
+                "risk_codes": risk_codes,
+                "guidance_codes": active_result["guidance_codes"],
+            },
+        )
+
+    def _evaluate_mode(
+        self,
+        analysis: DishAnalysis,
+        mode: EvaluationMode,
+    ) -> Dict[str, object]:
         all_items = analysis.items + analysis.assumed_items
 
         # ── Build group sets ────────────────────────────────────────
-        groups_found: Dict[str, List[str]] = defaultdict(list)
-        strict_groups_found: Dict[str, List[str]] = defaultdict(list)
+        display_groups_found: Dict[str, List[str]] = defaultdict(list)
+        combination_groups_found: Dict[str, List[str]] = defaultdict(list)
         subgroups_found: Dict[str, Set[FoodSubgroup]] = defaultdict(set)
 
         for item in all_items:
-            strict_group = resolve_strict_combination_group(item)
-            effective_group = strict_combination_group_to_display_group(strict_group, fallback=item.group)
+            combination_group = resolve_combination_group(item, mode=mode)
+            display_group = combination_group_to_display_group(combination_group, fallback=item.group)
             label = self._format_item_label(item)
-            strict_groups_found[strict_group.value].append(label)
-            groups_found[effective_group.value].append(label)
+            combination_groups_found[combination_group.value].append(label)
+            display_groups_found[display_group.value].append(label)
             if item.subgroup:
-                subgroups_found[strict_group.value].add(item.subgroup)
+                subgroups_found[combination_group.value].add(item.subgroup)
 
-        group_set = set(strict_groups_found.keys())
+        group_set = set(combination_groups_found.keys())
         has_unknown = bool(analysis.unknown_items)
         has_assumed = bool(analysis.assumed_items)
 
@@ -145,8 +215,8 @@ class TrennkostEngine:
                 continue
 
             fired, detail = self._check_rule(
-                rule, group_set, subgroups_found, groups_found,
-                strict_groups_found,
+                rule, group_set, subgroups_found, display_groups_found,
+                combination_groups_found,
                 has_unknown, has_assumed, triggered_pairs
             )
 
@@ -163,14 +233,14 @@ class TrennkostEngine:
                 if detail.get("pair"):
                     for g in detail["pair"]:
                         affected_groups.append(g)
-                        for item_label in strict_groups_found.get(g, []):
+                        for item_label in combination_groups_found.get(g, []):
                             affected_items.append(f"{item_label} ({g})")
                     triggered_pairs.add(tuple(sorted(detail["pair"])))
                 elif detail.get("group"):
                     matched_groups = detail.get("matched_groups") or [detail["group"]]
                     for g in matched_groups:
                         affected_groups.append(g)
-                        for item_label in strict_groups_found.get(g, []):
+                        for item_label in combination_groups_found.get(g, []):
                             affected_items.append(f"{item_label} ({g})")
 
                 problems.append(RuleProblem(
@@ -208,7 +278,7 @@ class TrennkostEngine:
             # Group items by subgroup to show which protein types are mixed
             subgroup_items = defaultdict(list)
             for item in all_items:
-                if resolve_strict_combination_group(item) == CombinationGroup.PROTEIN and item.subgroup:
+                if resolve_combination_group(item, mode=mode) == CombinationGroup.PROTEIN and item.subgroup:
                     label = self._format_item_label(item)
                     subgroup_items[item.subgroup.value].append(label)
 
@@ -230,50 +300,31 @@ class TrennkostEngine:
 
         # ── Build required questions ────────────────────────────────
         required_questions = self._build_questions(
-            analysis, groups_found, has_unknown, has_assumed
+            analysis, display_groups_found, has_unknown, has_assumed
         )
 
         # ── Build structured guidance ───────────────────────────────
-        guidance_facts = self._build_guidance(analysis, strict_groups_found)
+        guidance_facts = self._build_guidance(analysis, combination_groups_found, mode=mode)
         guidance_codes = list(dict.fromkeys(fact.code for fact in guidance_facts))
-
-        # ── Build structured risk / ampel ───────────────────────────
-        risk_facts = self._build_risk_facts(all_items)
-        risk_codes = list(dict.fromkeys(fact.risk_code for fact in risk_facts))
-        traffic_light = self._aggregate_traffic_light(risk_facts)
 
         # ── Determine final verdict ─────────────────────────────────
         verdict = self._determine_verdict(problems, required_questions, has_unknown)
 
         # ── Build summary ───────────────────────────────────────────
         summary = self._build_summary(analysis.dish_name, verdict, problems, required_questions)
-
-        return TrennkostResult(
-            dish_name=analysis.dish_name,
-            verdict=verdict,
-            traffic_light=traffic_light,
-            summary=summary,
-            problems=problems,
-            required_questions=required_questions,
-            risk_codes=risk_codes,
-            risk_facts=risk_facts,
-            guidance_codes=guidance_codes,
-            guidance_facts=guidance_facts,
-            ok_combinations=ok_notes,
-            groups_found=dict(groups_found),
-            strict_groups_found=dict(strict_groups_found),
-            debug={
-                "rules_checked": len(self.rules),
-                "rules_triggered": len(problems) + len(ok_notes),
-                "unknown_items": analysis.unknown_items,
-                "assumed_items": [it.raw_name for it in analysis.assumed_items],
-                "group_set": sorted(group_set),
-                "display_group_set": sorted(groups_found.keys()),
-                "traffic_light": traffic_light.value,
-                "risk_codes": risk_codes,
-                "guidance_codes": guidance_codes,
-            },
-        )
+        return {
+            "verdict": verdict,
+            "summary": summary,
+            "problems": problems,
+            "required_questions": required_questions,
+            "guidance_codes": guidance_codes,
+            "guidance_facts": guidance_facts,
+            "ok_notes": ok_notes,
+            "display_groups_found": dict(display_groups_found),
+            "combination_groups_found": dict(combination_groups_found),
+            "group_set": group_set,
+            "rules_triggered": len(problems) + len(ok_notes),
+        }
 
     def _get_rule(self, rule_id: str) -> Optional[RuleDefinition]:
         for r in self.rules:
@@ -413,10 +464,14 @@ class TrennkostEngine:
         self,
         analysis: DishAnalysis,
         groups_found: Dict[str, List[str]],
+        mode: EvaluationMode = EvaluationMode.STRICT,
     ) -> List[GuidanceFact]:
         """Build structured, verdict-independent guidance facts."""
         all_items = analysis.items + analysis.assumed_items
-        fat_items = [item for item in all_items if resolve_strict_combination_group(item) == CombinationGroup.FETT]
+        fat_items = [
+            item for item in all_items
+            if resolve_combination_group(item, mode=mode) == CombinationGroup.FETT
+        ]
         if not fat_items:
             return []
 
@@ -614,6 +669,9 @@ def get_engine() -> TrennkostEngine:
     return _engine
 
 
-def evaluate_dish(analysis: DishAnalysis) -> TrennkostResult:
+def evaluate_dish(
+    analysis: DishAnalysis,
+    mode: Union[str, EvaluationMode] = EvaluationMode.STRICT,
+) -> TrennkostResult:
     """Convenience: evaluate a DishAnalysis using the singleton engine."""
-    return get_engine().evaluate(analysis)
+    return get_engine().evaluate(analysis, mode=mode)

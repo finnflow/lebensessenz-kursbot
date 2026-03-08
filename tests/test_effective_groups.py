@@ -8,9 +8,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from trennkost.models import CombinationGroup, FoodGroup, Verdict
+from trennkost.models import CombinationGroup, EvaluationMode, FoodGroup, Verdict
 from trennkost.normalizer import normalize_dish
-from trennkost.ontology import Ontology, resolve_effective_group, resolve_strict_combination_group
+from trennkost.ontology import (
+    Ontology,
+    resolve_combination_group,
+    resolve_effective_group,
+    resolve_strict_combination_group,
+)
 from trennkost.engine import TrennkostEngine
 
 
@@ -35,19 +40,26 @@ def test_resolvers_expose_strict_and_display_groups(ontology):
     assert resolve_effective_group(tofu) == FoodGroup.PROTEIN
     assert resolve_effective_group(mayo) == FoodGroup.FETT
 
-    with pytest.raises(NotImplementedError):
-        resolve_strict_combination_group(mayo, mode="light")
+    assert resolve_combination_group(banana, mode=EvaluationMode.LIGHT) == CombinationGroup.KH
+    assert resolve_combination_group(dried, mode=EvaluationMode.LIGHT) == CombinationGroup.KH
+    assert resolve_combination_group(tofu, mode=EvaluationMode.LIGHT) == CombinationGroup.KH
+    assert resolve_combination_group(mayo, mode=EvaluationMode.LIGHT) == CombinationGroup.FETT
+
+    assert resolve_effective_group(banana, mode=EvaluationMode.LIGHT) == FoodGroup.KH
+    assert resolve_effective_group(dried, mode=EvaluationMode.LIGHT) == FoodGroup.KH
+    assert resolve_effective_group(tofu, mode=EvaluationMode.LIGHT) == FoodGroup.KH
+    assert resolve_effective_group(mayo, mode=EvaluationMode.LIGHT) == FoodGroup.FETT
 
 
 def test_engine_uses_strict_group_resolver(monkeypatch):
     analysis = normalize_dish("Test", raw_items=["Kartoffel", "Mayonnaise"])
 
-    def fake_resolver(item, mode="strict"):
-        if item.canonical == "Mayonnaise":
+    def fake_resolver(item, mode=EvaluationMode.STRICT):
+        if item.canonical == "Mayonnaise" and mode == EvaluationMode.STRICT:
             return CombinationGroup.NEUTRAL
         return item.group_strict or CombinationGroup.UNKNOWN
 
-    monkeypatch.setattr("trennkost.engine.resolve_strict_combination_group", fake_resolver)
+    monkeypatch.setattr("trennkost.engine.resolve_combination_group", fake_resolver)
 
     result = TrennkostEngine().evaluate(analysis)
 

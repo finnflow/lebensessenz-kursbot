@@ -256,7 +256,8 @@ async def chat_with_image(
 
 class AnalyzeRequest(BaseModel):
     text: str
-    mode: str = "strict"  # "strict" or "assumption"
+    mode: str = "strict"  # explicit ingredients only ("strict") or include assumed ("assumption")
+    evaluation_mode: str = "strict"  # deterministic evaluation mode: "strict" or "light"
 
 @app.post("/analyze")
 @app.post("/api/v1/analyze")
@@ -271,7 +272,11 @@ def analyze_food(request: AnalyzeRequest):
     if not text:
         raise HTTPException(status_code=400, detail="Text cannot be empty")
 
-    results = trennkost_analyze_text(text, mode=request.mode)
+    results = trennkost_analyze_text(
+        text,
+        mode=request.mode,
+        evaluation_mode=request.evaluation_mode,
+    )
     return {
         "results": [
             {

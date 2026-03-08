@@ -89,6 +89,11 @@ class TrafficLight(str, Enum):
     RED = "RED"
 
 
+class EvaluationMode(str, Enum):
+    STRICT = "strict"
+    LIGHT = "light"
+
+
 # ── Verdict & Severity ─────────────────────────────────────────────────
 
 class Verdict(str, Enum):
@@ -182,7 +187,12 @@ class ItemRiskFact(BaseModel):
 class TrennkostResult(BaseModel):
     """Final output of the rule engine."""
     dish_name: str
-    verdict: Verdict
+    verdict: Verdict                                        # Active-mode verdict for compatibility
+    active_mode: EvaluationMode = EvaluationMode.STRICT
+    strict_verdict: Verdict
+    active_mode_verdict: Verdict
+    mode_relaxation_applied: bool = False
+    mode_delta_codes: List[str] = Field(default_factory=list)
     traffic_light: TrafficLight = TrafficLight.GREEN
     summary: str                                            # One-line human summary
     problems: List[RuleProblem] = Field(default_factory=list)

@@ -9,10 +9,11 @@ import json
 import logging
 from pathlib import Path
 import re
-from typing import Dict, List, Optional, Tuple, Type, TypeVar
+from typing import Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from trennkost.models import (
     CombinationGroup,
+    EvaluationMode,
     FoodGroup,
     FoodSubgroup,
     FoodItem,
@@ -64,7 +65,7 @@ STRICT_FRUIT_GROUPS = {
     CombinationGroup.DRIED_FRUIT,
 }
 
-STRICT_COMBINATION_TO_LEGACY_GROUP: Dict[CombinationGroup, FoodGroup] = {
+COMBINATION_TO_DISPLAY_GROUP: Dict[CombinationGroup, FoodGroup] = {
     CombinationGroup.FRUIT_WATERY: FoodGroup.OBST,
     CombinationGroup.FRUIT_DENSE: FoodGroup.OBST,
     CombinationGroup.DRIED_FRUIT: FoodGroup.TROCKENOBST,
@@ -78,35 +79,64 @@ STRICT_COMBINATION_TO_LEGACY_GROUP: Dict[CombinationGroup, FoodGroup] = {
 }
 
 
-def resolve_strict_combination_group(item: FoodItem, mode: str = "strict") -> CombinationGroup:
+def _normalize_evaluation_mode(mode: Union[str, EvaluationMode]) -> EvaluationMode:
+    try:
+        return mode if isinstance(mode, EvaluationMode) else EvaluationMode(mode)
+    except ValueError as exc:
+        raise NotImplementedError(f"Evaluation group mode '{mode}' is not supported") from exc
+
+
+def resolve_combination_group(
+    item: FoodItem,
+    mode: Union[str, EvaluationMode] = EvaluationMode.STRICT,
+) -> CombinationGroup:
     """
-    Central resolver for the strict combination group used in deterministic evaluation.
+    Central resolver for mode-aware combination groups used in deterministic evaluation.
     """
-    if mode != "strict":
-        raise NotImplementedError(f"Evaluation group mode '{mode}' is not activated yet")
+    evaluation_mode = _normalize_evaluation_mode(mode)
 
     if item.group == FoodGroup.UNKNOWN:
         return CombinationGroup.UNKNOWN
 
-    return item.group_strict or STRICT_GROUP_DEFAULTS.get(item.group, CombinationGroup.UNKNOWN)
+    if evaluation_mode == EvaluationMode.STRICT:
+        return item.group_strict or STRICT_GROUP_DEFAULTS.get(item.group, CombinationGroup.UNKNOWN)
+
+    return item.group_light or LIGHT_GROUP_DEFAULTS.get(item.group, CombinationGroup.UNKNOWN)
+
+
+def resolve_strict_combination_group(
+    item: FoodItem,
+    mode: Union[str, EvaluationMode] = EvaluationMode.STRICT,
+) -> CombinationGroup:
+    """
+    Backwards-compatible wrapper for the evaluation-group resolver.
+    """
+    return resolve_combination_group(item, mode=mode)
+
+
+def combination_group_to_display_group(
+    group: CombinationGroup,
+    fallback: FoodGroup = FoodGroup.UNKNOWN,
+) -> FoodGroup:
+    return COMBINATION_TO_DISPLAY_GROUP.get(group, fallback)
 
 
 def strict_combination_group_to_display_group(
     strict_group: CombinationGroup,
     fallback: FoodGroup = FoodGroup.UNKNOWN,
 ) -> FoodGroup:
-    return STRICT_COMBINATION_TO_LEGACY_GROUP.get(strict_group, fallback)
+    return combination_group_to_display_group(strict_group, fallback)
 
 
-def resolve_effective_group(item: FoodItem, mode: str = "strict") -> FoodGroup:
+def resolve_effective_group(
+    item: FoodItem,
+    mode: Union[str, EvaluationMode] = EvaluationMode.STRICT,
+) -> FoodGroup:
     """
-    Central resolver for the user-facing display group of strict evaluation.
-
-    Strict mode is the only supported mode for now. It projects the strict
-    combination-group model back into the closest legacy display category.
+    Central resolver for the user-facing display group of the active evaluation mode.
     """
-    strict_group = resolve_strict_combination_group(item, mode=mode)
-    return strict_combination_group_to_display_group(strict_group, fallback=item.group)
+    combination_group = resolve_combination_group(item, mode=mode)
+    return combination_group_to_display_group(combination_group, fallback=item.group)
 
 
 class Ontology:
