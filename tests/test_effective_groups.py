@@ -8,9 +8,9 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from trennkost.models import FoodGroup, Verdict
+from trennkost.models import CombinationGroup, FoodGroup, Verdict
 from trennkost.normalizer import normalize_dish
-from trennkost.ontology import Ontology, resolve_effective_group
+from trennkost.ontology import Ontology, resolve_effective_group, resolve_strict_combination_group
 from trennkost.engine import TrennkostEngine
 
 
@@ -19,35 +19,42 @@ def ontology():
     return Ontology()
 
 
-def test_resolve_effective_group_is_strict_only_and_stable(ontology):
+def test_resolvers_expose_strict_and_display_groups(ontology):
     banana = ontology.lookup_to_food_item("Banane")
     dried = ontology.lookup_to_food_item("Datteln")
     tofu = ontology.lookup_to_food_item("Tofu")
     mayo = ontology.lookup_to_food_item("Mayonnaise")
 
+    assert resolve_strict_combination_group(banana) == CombinationGroup.FRUIT_DENSE
+    assert resolve_strict_combination_group(dried) == CombinationGroup.DRIED_FRUIT
+    assert resolve_strict_combination_group(tofu) == CombinationGroup.PROTEIN
+    assert resolve_strict_combination_group(mayo) == CombinationGroup.FETT
+
     assert resolve_effective_group(banana) == FoodGroup.OBST
     assert resolve_effective_group(dried) == FoodGroup.TROCKENOBST
-    assert resolve_effective_group(tofu) == FoodGroup.HUELSENFRUECHTE
+    assert resolve_effective_group(tofu) == FoodGroup.PROTEIN
     assert resolve_effective_group(mayo) == FoodGroup.FETT
 
     with pytest.raises(NotImplementedError):
-        resolve_effective_group(mayo, mode="light")
+        resolve_strict_combination_group(mayo, mode="light")
 
 
-def test_engine_uses_effective_group_resolver(monkeypatch):
+def test_engine_uses_strict_group_resolver(monkeypatch):
     analysis = normalize_dish("Test", raw_items=["Kartoffel", "Mayonnaise"])
 
     def fake_resolver(item, mode="strict"):
         if item.canonical == "Mayonnaise":
-            return FoodGroup.NEUTRAL
-        return item.group
+            return CombinationGroup.NEUTRAL
+        return item.group_strict or CombinationGroup.UNKNOWN
 
-    monkeypatch.setattr("trennkost.engine.resolve_effective_group", fake_resolver)
+    monkeypatch.setattr("trennkost.engine.resolve_strict_combination_group", fake_resolver)
 
     result = TrennkostEngine().evaluate(analysis)
 
     assert "NEUTRAL" in result.groups_found
     assert "FETT" not in result.groups_found
+    assert "NEUTRAL" in result.strict_groups_found
+    assert "FETT" not in result.strict_groups_found
 
 
 def test_mayonnaise_now_uses_target_group_in_strict_evaluation():
@@ -57,4 +64,5 @@ def test_mayonnaise_now_uses_target_group_in_strict_evaluation():
     assert result.verdict == Verdict.OK
     assert "FETT" in result.groups_found
     assert "NEUTRAL" not in result.groups_found
+    assert "FETT" in result.strict_groups_found
     assert result.guidance_codes == ["FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT"]

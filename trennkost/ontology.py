@@ -58,6 +58,12 @@ LIGHT_GROUP_DEFAULTS: Dict[FoodGroup, CombinationGroup] = {
     FoodGroup.UNKNOWN: CombinationGroup.UNKNOWN,
 }
 
+STRICT_FRUIT_GROUPS = {
+    CombinationGroup.FRUIT_WATERY,
+    CombinationGroup.FRUIT_DENSE,
+    CombinationGroup.DRIED_FRUIT,
+}
+
 STRICT_COMBINATION_TO_LEGACY_GROUP: Dict[CombinationGroup, FoodGroup] = {
     CombinationGroup.FRUIT_WATERY: FoodGroup.OBST,
     CombinationGroup.FRUIT_DENSE: FoodGroup.OBST,
@@ -71,33 +77,36 @@ STRICT_COMBINATION_TO_LEGACY_GROUP: Dict[CombinationGroup, FoodGroup] = {
     CombinationGroup.UNKNOWN: FoodGroup.UNKNOWN,
 }
 
-# Explicit stability seam: these items already carry future-facing target mappings,
-# but deterministic evaluation must stay legacy-compatible until follow-up PRs land.
-STRICT_EVALUATION_LEGACY_OVERRIDES: Dict[str, FoodGroup] = {
-    "tofu": FoodGroup.HUELSENFRUECHTE,
-    "tempeh": FoodGroup.HUELSENFRUECHTE,
-}
 
-
-def resolve_effective_group(item: FoodItem, mode: str = "strict") -> FoodGroup:
+def resolve_strict_combination_group(item: FoodItem, mode: str = "strict") -> CombinationGroup:
     """
-    Central resolver for the group used in deterministic evaluation.
-
-    Strict mode is the only supported mode for now. It uses strict ontology groups
-    where that is behaviorally safe, while preserving explicit legacy overrides for
-    known split items until later PRs intentionally change verdict behavior.
+    Central resolver for the strict combination group used in deterministic evaluation.
     """
     if mode != "strict":
         raise NotImplementedError(f"Evaluation group mode '{mode}' is not activated yet")
 
     if item.group == FoodGroup.UNKNOWN:
-        return FoodGroup.UNKNOWN
+        return CombinationGroup.UNKNOWN
 
-    if item.item_id and item.item_id in STRICT_EVALUATION_LEGACY_OVERRIDES:
-        return STRICT_EVALUATION_LEGACY_OVERRIDES[item.item_id]
+    return item.group_strict or STRICT_GROUP_DEFAULTS.get(item.group, CombinationGroup.UNKNOWN)
 
-    strict_group = item.group_strict or STRICT_GROUP_DEFAULTS.get(item.group, CombinationGroup.UNKNOWN)
-    return STRICT_COMBINATION_TO_LEGACY_GROUP.get(strict_group, item.group)
+
+def strict_combination_group_to_display_group(
+    strict_group: CombinationGroup,
+    fallback: FoodGroup = FoodGroup.UNKNOWN,
+) -> FoodGroup:
+    return STRICT_COMBINATION_TO_LEGACY_GROUP.get(strict_group, fallback)
+
+
+def resolve_effective_group(item: FoodItem, mode: str = "strict") -> FoodGroup:
+    """
+    Central resolver for the user-facing display group of strict evaluation.
+
+    Strict mode is the only supported mode for now. It projects the strict
+    combination-group model back into the closest legacy display category.
+    """
+    strict_group = resolve_strict_combination_group(item, mode=mode)
+    return strict_combination_group_to_display_group(strict_group, fallback=item.group)
 
 
 class Ontology:

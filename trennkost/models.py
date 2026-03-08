@@ -83,6 +83,12 @@ class RiskSeverity(str, Enum):
     RED = "RED"
 
 
+class TrafficLight(str, Enum):
+    GREEN = "GREEN"
+    YELLOW = "YELLOW"
+    RED = "RED"
+
+
 # ── Verdict & Severity ─────────────────────────────────────────────────
 
 class Verdict(str, Enum):
@@ -164,17 +170,30 @@ class GuidanceFact(BaseModel):
     fat_category: Optional[str] = None
 
 
+class ItemRiskFact(BaseModel):
+    """Structured risk metadata emitted alongside the deterministic verdict."""
+    item: str
+    risk_code: str
+    severity: RiskSeverity
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+
 class TrennkostResult(BaseModel):
     """Final output of the rule engine."""
     dish_name: str
     verdict: Verdict
+    traffic_light: TrafficLight = TrafficLight.GREEN
     summary: str                                            # One-line human summary
     problems: List[RuleProblem] = Field(default_factory=list)
     required_questions: List[RequiredQuestion] = Field(default_factory=list)
+    risk_codes: List[str] = Field(default_factory=list)
+    risk_facts: List[ItemRiskFact] = Field(default_factory=list)
     guidance_codes: List[str] = Field(default_factory=list)
     guidance_facts: List[GuidanceFact] = Field(default_factory=list)
     ok_combinations: List[str] = Field(default_factory=list)  # What IS ok in this dish
     groups_found: Dict[str, List[str]] = Field(default_factory=dict)  # group → [items]
+    strict_groups_found: Dict[str, List[str]] = Field(default_factory=dict)  # strict group → [items]
     debug: Optional[Dict[str, Any]] = None
 
 

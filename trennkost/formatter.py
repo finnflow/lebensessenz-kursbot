@@ -16,7 +16,16 @@ _GROUP_DISPLAY = {
     "OBST": "Obst",
     "FETT": "Fette",
     "TROCKENOBST": "Trockenobst",
+    "FRUIT_WATERY": "wasserreiches Obst",
+    "FRUIT_DENSE": "dichtes Obst",
+    "DRIED_FRUIT": "Trockenobst",
 }
+
+
+def _group_items(result: TrennkostResult, group: str) -> List[str]:
+    if result.strict_groups_found and group in result.strict_groups_found:
+        return result.strict_groups_found[group]
+    return result.groups_found.get(group, [])
 
 
 def _generate_fix_directions(result: TrennkostResult) -> List[str]:
@@ -41,15 +50,15 @@ def _generate_fix_directions(result: TrennkostResult) -> List[str]:
 
     directions = []
     for keep_group in sorted(conflicting_groups):
-        keep_items = result.groups_found.get(keep_group, [])
+        keep_items = _group_items(result, keep_group)
         if not keep_items:
             continue
 
         keep_display = _GROUP_DISPLAY.get(keep_group, keep_group)
         clean = lambda items: ", ".join(i.split(" → ")[0] for i in items)
         keep_items_str = clean(keep_items)
-        replace_str = ", ".join(clean(result.groups_found.get(g, [])) for g in sorted(conflicting_groups) if g != keep_group and result.groups_found.get(g))
-        forbidden_displays = [_GROUP_DISPLAY.get(g, g) for g in sorted(conflicting_groups) if g != keep_group]
+        replace_str = ", ".join(clean(_group_items(result, g)) for g in sorted(conflicting_groups) if g != keep_group and _group_items(result, g))
+        forbidden_displays = [_GROUP_DISPLAY.get(g, g) for g in sorted(conflicting_groups) if g != keep_group and _group_items(result, g)]
 
         directions.append(
             f"Behalte {keep_display} ({keep_items_str}) "
@@ -196,6 +205,9 @@ def build_rag_query(results: List[TrennkostResult], breakfast_context: bool = Fa
         "MILCH": "Milchprodukte Käse sauer verstoffwechselt",
         "HUELSENFRUECHTE": "Hülsenfrüchte schwer verdaulich",
         "OBST": "Obst allein nüchterner Magen Verdauung schnell",
+        "FRUIT_WATERY": "wasserreiches Obst 20-30 Minuten nüchterner Magen",
+        "FRUIT_DENSE": "Banane dichtes Obst 45-60 Minuten",
+        "DRIED_FRUIT": "Trockenobst 45-60 Minuten",
         "FETT": "Fette kleine Mengen Öle",
         "NEUTRAL": "stärkearmes Gemüse Salat neutral kombinierbar",
     }

@@ -14,10 +14,13 @@ from trennkost.models import (
     CombinationGroup,
     FoodGroup,
     FoodSubgroup,
+    RiskSeverity,
+    TrafficLight,
     Verdict,
     Severity,
     FoodItem,
     DishAnalysis,
+    ItemRiskFact,
     RuleProblem,
     RequiredQuestion,
     GuidanceFact,
@@ -27,6 +30,7 @@ from trennkost.models import (
 )
 from trennkost.ontology import (
     STRICT_FRUIT_GROUPS,
+    get_ontology,
     resolve_strict_combination_group,
     strict_combination_group_to_display_group,
 )
@@ -233,6 +237,11 @@ class TrennkostEngine:
         guidance_facts = self._build_guidance(analysis, strict_groups_found)
         guidance_codes = list(dict.fromkeys(fact.code for fact in guidance_facts))
 
+        # ── Build structured risk / ampel ───────────────────────────
+        risk_facts = self._build_risk_facts(all_items)
+        risk_codes = list(dict.fromkeys(fact.risk_code for fact in risk_facts))
+        traffic_light = self._aggregate_traffic_light(risk_facts)
+
         # ── Determine final verdict ─────────────────────────────────
         verdict = self._determine_verdict(problems, required_questions, has_unknown)
 
@@ -242,9 +251,12 @@ class TrennkostEngine:
         return TrennkostResult(
             dish_name=analysis.dish_name,
             verdict=verdict,
+            traffic_light=traffic_light,
             summary=summary,
             problems=problems,
             required_questions=required_questions,
+            risk_codes=risk_codes,
+            risk_facts=risk_facts,
             guidance_codes=guidance_codes,
             guidance_facts=guidance_facts,
             ok_combinations=ok_notes,
@@ -257,6 +269,8 @@ class TrennkostEngine:
                 "assumed_items": [it.raw_name for it in analysis.assumed_items],
                 "group_set": sorted(group_set),
                 "display_group_set": sorted(groups_found.keys()),
+                "traffic_light": traffic_light.value,
+                "risk_codes": risk_codes,
                 "guidance_codes": guidance_codes,
             },
         )
@@ -365,6 +379,35 @@ class TrennkostEngine:
             }
 
         return {group for group in group_set if group == rule_token}
+
+    def _build_risk_facts(self, all_items: List[FoodItem]) -> List[ItemRiskFact]:
+        """Build structured item-level risk facts from ontology metadata."""
+        ontology = get_ontology()
+        risk_profiles = ontology.risk_profiles
+        facts: List[ItemRiskFact] = []
+
+        for item in all_items:
+            for risk_code in item.risk_codes:
+                profile = risk_profiles.get(risk_code)
+                if not profile:
+                    logger.warning("Ignoring unknown risk code '%s' on item '%s'", risk_code, item.raw_name)
+                    continue
+                facts.append(ItemRiskFact(
+                    item=self._format_item_label(item),
+                    risk_code=risk_code,
+                    severity=profile.severity,
+                    title=profile.title,
+                    description=profile.description,
+                ))
+
+        return facts
+
+    def _aggregate_traffic_light(self, risk_facts: List[ItemRiskFact]) -> TrafficLight:
+        if any(fact.severity == RiskSeverity.RED for fact in risk_facts):
+            return TrafficLight.RED
+        if any(fact.severity == RiskSeverity.YELLOW for fact in risk_facts):
+            return TrafficLight.YELLOW
+        return TrafficLight.GREEN
 
     def _build_guidance(
         self,
