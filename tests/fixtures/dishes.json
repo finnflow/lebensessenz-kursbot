@@ -64,7 +64,7 @@
       "items": ["Apfel", "Banane", "Erdbeere", "Kiwi"],
       "expected_verdict": "OK",
       "expected_groups": ["OBST"],
-      "note": "Only OBST → OK"
+      "note": "Mixed fruit salad stays OK even though strict fruit subtypes remain distinct in the model."
     },
     {
       "id": "D09",
