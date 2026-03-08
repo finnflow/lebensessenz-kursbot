@@ -1,10 +1,10 @@
-canonical,synonyms,group,subgroup,ambiguity_flag,ambiguity_note,high_fat,notes
+canonical,synonyms,group,subgroup,ambiguity_flag,ambiguity_note,high_fat,notes,item_id,food_family,group_strict,group_light,post_meal_wait_profile,modifier_policy,base_item_id,intrinsic_conflict_code,risk_codes,guidance_codes,forced_components,compound_type,decompose_for_logic
 # ═══════════════════════════════════════════════════════════════════════
 # OBST (Fresh Fruit) — eat alone or with BLATTGRUEN/TROCKENOBST
 # ═══════════════════════════════════════════════════════════════════════
-Apfel,"Äpfel,Apple,Apples",OBST,FRISCH,false,,false,
+Apfel,"Äpfel,Apple,Apples",OBST,FRISCH,false,,false,,apfel,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
 Birne,"Birnen,Pear,Pears",OBST,FRISCH,false,,false,
-Banane,"Bananen,Banana,Bananas",OBST,FRISCH,false,,false,längere Verdauung: 45-60 Min
+Banane,"Bananen,Banana,Bananas",OBST,FRISCH,false,,false,längere Verdauung: 45-60 Min,banane,fruit,FRUIT_DENSE,KH,FRUIT_DENSE_OR_DRIED_45_60,,,,,
 Orange,"Orangen,Apfelsine,Apfelsinen",OBST,FRISCH,false,,false,
 Zitrone,"Zitronen,Limette,Limetten,Lime,Lemon,Lemon wedge",OBST,FRISCH,true,Als ganze Frucht (Dessert/Obst-Mahlzeit) = OBST. Als Würzmittel/Saft in Kochrezepten = NEUTRAL (wie Essig). Kurs-Rezepte Ofenhähnchen + Ofenfisch enthalten Zitrone als PROTEIN-Beilage → im Kochkontext OK.,false,Zubereitungskontext entscheidend: Kochrezept → neutral; Obst-Mahlzeit → OBST
 Grapefruit,Grapefruits,OBST,FRISCH,false,,false,
@@ -26,11 +26,11 @@ Granatapfel,"Granatäpfel,Pomegranate",OBST,FRISCH,false,,false,
 # ═══════════════════════════════════════════════════════════════════════
 # TROCKENOBST — combinable with OBST, longer digestion (45-60 min)
 # ═══════════════════════════════════════════════════════════════════════
-Dattel,"Datteln,Dates,Date",TROCKENOBST,TROCKEN,false,,false,45-60 Min Verdauung
-Feige,"Feigen,getrocknete Feigen,Fig,Dried fig",TROCKENOBST,TROCKEN,false,,false,
-Rosine,"Rosinen,Sultanine,Sultaninen,Raisin,Raisins",TROCKENOBST,TROCKEN,false,,false,
-Aprikose getrocknet,"getrocknete Aprikosen,Trockenaprikosen,Dried apricot",TROCKENOBST,TROCKEN,false,,false,
-Cranberry getrocknet,"getrocknete Cranberries,Dried cranberry,Dried cranberries",TROCKENOBST,TROCKEN,false,,false,
+Dattel,"Datteln,Dates,Date",TROCKENOBST,TROCKEN,false,,false,45-60 Min Verdauung,dattel,fruit,DRIED_FRUIT,KH,FRUIT_DENSE_OR_DRIED_45_60,,,,,
+Feige,"Feigen,getrocknete Feigen,Fig,Dried fig",TROCKENOBST,TROCKEN,false,,false,,feige_getrocknet,fruit,DRIED_FRUIT,KH,FRUIT_DENSE_OR_DRIED_45_60,,,,,
+Rosine,"Rosinen,Sultanine,Sultaninen,Raisin,Raisins",TROCKENOBST,TROCKEN,false,,false,,rosine,fruit,DRIED_FRUIT,KH,FRUIT_DENSE_OR_DRIED_45_60,,,,,
+Aprikose getrocknet,"getrocknete Aprikosen,Trockenaprikosen,Dried apricot",TROCKENOBST,TROCKEN,false,,false,,aprikose_getrocknet,fruit,DRIED_FRUIT,KH,FRUIT_DENSE_OR_DRIED_45_60,,,,,
+Cranberry getrocknet,"getrocknete Cranberries,Dried cranberry,Dried cranberries",TROCKENOBST,TROCKEN,false,,false,,cranberry_getrocknet,fruit,DRIED_FRUIT,KH,FRUIT_DENSE_OR_DRIED_45_60,,,,,
 # ═══════════════════════════════════════════════════════════════════════
 # NEUTRAL — Stärkearmes Gemüse, Salat, Kräuter, Sprossen
 # Kombinierbar mit ALLEM
@@ -111,11 +111,11 @@ Knoblauchpulver,Garlic powder,NEUTRAL,KRAEUTER,false,,false,Gewürz
 Chili,"Chilipulver,Chiliflocken,Cayennepfeffer,Chili flakes,Chili powder",NEUTRAL,KRAEUTER,false,,false,Gewürz
 Senf,"Senfpulver,Dijon-Senf,Mustard",NEUTRAL,KRAEUTER,false,,false,Gewürz
 Essig,"Apfelessig,Balsamico,Weißweinessig,Vinegar,Apple cider vinegar,Balsamic vinegar",NEUTRAL,KRAEUTER,false,,false,Würzmittel
-Zitronensaft,"Zitronen-Saft,Lemon juice,Limettensaft,Lime juice,Zitronenabrieb,Zitronenschale",NEUTRAL,KRAEUTER,false,,false,Als Würzmittel/Zutat in Kochrezepten — wie Essig. Kursrezepte (Ofenhähnchen, Ofenfisch) bestätigen: OK mit PROTEIN
+Zitronensaft,"Zitronen-Saft,Lemon juice,Limettensaft,Lime juice,Zitronenabrieb,Zitronenschale",NEUTRAL,KRAEUTER,false,,false,"Als Würzmittel/Zutat in Kochrezepten — wie Essig. Kursrezepte (Ofenhähnchen, Ofenfisch) bestätigen: OK mit PROTEIN",zitronensaft,condiment,NEUTRAL,NEUTRAL,,CONDIMENT,zitrone,CITRUS_CONTEXTUAL,,
 Sojasauce,"Sojasoße,Tamari,Soy sauce",NEUTRAL,KRAEUTER,false,,false,Würzsauce
 Ketchup,"Tomatenketchup,Tomaten-Ketchup,Ketchup Sauce",NEUTRAL,KRAEUTER,false,,false,Tomatensauce mit Gewürzen - als Würze neutral
 Vanille,"Vanilleextrakt,Vanilleschote,Vanilla",NEUTRAL,KRAEUTER,false,,false,Gewürz
-Mayonnaise,"Mayo,Mayonaise",NEUTRAL,KRAEUTER,false,,true,Würzsauce - kleine Mengen als Würze neutral
+Mayonnaise,"Mayo,Mayonaise",NEUTRAL,KRAEUTER,false,,true,Würzsauce - kleine Mengen als Würze neutral,mayonnaise,condiment,FETT,FETT,,CONDIMENT_ONLY,,,HEAVY_FAT_LOAD,SMALL_AMOUNT_ONLY
 # Getränke & Flüssigkeiten (für Trennkost neutral/irrelevant)
 Wasser,"Mineralwasser,Leitungswasser,stilles Wasser,Water",NEUTRAL,KRAEUTER,false,,false,Getränk - keine Kalorien
 Tee,"Kräutertee,Schwarztee,Grüntee,Tea,Herbal tea,Green tea,Black tea",NEUTRAL,KRAEUTER,false,,false,Getränk - ungesüßt neutral
@@ -142,7 +142,11 @@ Buchweizen,"Buchweizenmehl,Buckwheat",KH,PSEUDOGETREIDE,false,,false,
 Amaranth,,KH,PSEUDOGETREIDE,false,,false,
 Wildreis,Wild rice,KH,PSEUDOGETREIDE,false,,false,
 # Stärkehaltiges Gemüse
-Kartoffel,"Kartoffeln,Pommes,Pommes Frites,Bratkartoffeln,Kartoffelpüree,Kartoffelsalat,Ofenkartoffel,Pellkartoffel,Potato,Potatoes,Fries,French fries,Mashed potato,Baked potato",KH,STAERKEHALTIGES_GEMUESE,false,,false,
+Kartoffel,"Kartoffeln,Kartoffelsalat,Potato,Potatoes",KH,STAERKEHALTIGES_GEMUESE,false,,false,,kartoffel,potato,KH,KH,,,,,,
+Kartoffel gekocht,"gekochte Kartoffeln,gekochte Kartoffel,Pellkartoffel,Pellkartoffeln,Salzkartoffel,Salzkartoffeln,Boiled potato,Boiled potatoes",KH,STAERKEHALTIGES_GEMUESE,false,,false,,kartoffel_gekocht,potato,KH,KH,,,kartoffel,,,
+Bratkartoffeln,"gebratene Kartoffeln,Bratkartoffel,Fried potatoes",KH,STAERKEHALTIGES_GEMUESE,false,,false,,bratkartoffeln,potato,KH,KH,,,kartoffel,,FRIED,
+Pommes,"Pommes Frites,Pommes,Fries,French fries",KH,STAERKEHALTIGES_GEMUESE,false,,false,,pommes,potato,KH,KH,,,kartoffel,,"FRIED,HEAVY_FAT_LOAD",
+Kartoffelpüree,"Kartoffelbrei,Mashed potato,Mashed potatoes",KH,STAERKEHALTIGES_GEMUESE,false,,false,,kartoffelpueree,potato,KH,KH,,,kartoffel,,UNKNOWN_BINDERS,CHECK_BINDERS
 Süßkartoffel,"Süßkartoffeln,Süsskartoffel,Batate,Sweet potato,Sweet potatoes",KH,STAERKEHALTIGES_GEMUESE,false,,false,
 Möhre,"Möhren,Karotte,Karotten,Mohrrübe,Mohrrüben,Carrot,Carrots",KH,STAERKEHALTIGES_GEMUESE,false,,false,
 Kürbis,"Hokkaido,Butternut,Muskatkürbis,Pumpkin,Squash,Butternut squash",KH,STAERKEHALTIGES_GEMUESE,false,,false,
@@ -167,8 +171,9 @@ Kidneybohnen,"Kidney-Bohnen,Kidney beans",HUELSENFRUECHTE,HUELSE,false,,false,
 Schwarze Bohnen,"Black Beans,Black beans",HUELSENFRUECHTE,HUELSE,false,,false,
 Weiße Bohnen,"Cannellini,Navy Beans,White beans",HUELSENFRUECHTE,HUELSE,false,,false,
 Mungobohnen,"Mung Dal,Mung beans",HUELSENFRUECHTE,HUELSE,false,,false,
-Tempeh,,HUELSENFRUECHTE,HUELSE,false,,false,fermentiertes Soja
-Tofu,,HUELSENFRUECHTE,HUELSE,false,,false,aus Soja; Kurs warnt vor Soja generell
+Tempeh,,HUELSENFRUECHTE,HUELSE,false,,false,fermentiertes Soja,tempeh,legume,PROTEIN,KH,PROPER_MEAL_NO_MEAT_3H,,,,SOY,SOY_IN_MODERATION
+Tofu,,HUELSENFRUECHTE,HUELSE,false,,false,aus Soja; Kurs warnt vor Soja generell,tofu,legume,PROTEIN,KH,PROPER_MEAL_NO_MEAT_3H,,,,SOY,SOY_IN_MODERATION
+Seitan,"Weizengluten,Wheat gluten,Gluten meat",PROTEIN,,false,,false,aus Weizengluten,seitan,protein,PROTEIN,KH,PROPER_MEAL_NO_MEAT_3H,,,,GLUTEN_HIGH,GLUTEN_AWARE
 Edamame,,HUELSENFRUECHTE,HUELSE,false,,false,Sojabohne; Kurs warnt vor Soja
 Bohnen,Beans,HUELSENFRUECHTE,HUELSE,true,Können grüne Bohnen (NEUTRAL) oder getrocknete Bohnen (HUELSENFRUECHTE) sein. Grüne Bohnen = NEUTRAL.,false,
 Erbsen,Peas,HUELSENFRUECHTE,HUELSE,true,Können frische grüne Erbsen (NEUTRAL) oder getrocknete Erbsen (HUELSENFRUECHTE) sein.,false,
@@ -194,6 +199,10 @@ Kabeljau,"Dorsch,Cod",PROTEIN,FISCH,false,,false,
 Garnele,"Garnelen,Shrimp,Shrimps,Krabben,Scampi,Prawn,Prawns",PROTEIN,FISCH,false,,false,
 # Eier
 Ei,"Eier,Spiegelei,Rührei,Omelette,pochiertes Ei,gekochtes Ei,Eierspeise,Egg,Eggs,Poached egg,Fried egg,Scrambled egg,Scrambled eggs,Boiled egg,Omelette",PROTEIN,EIER,false,,false,möglichst Bio
+Cordon Bleu,"Cordon bleu,Cordonbleu",PROTEIN,FLEISCH,false,,false,"Konservative Zwangszerlegung für die Logik: Fleisch + schinkenartige Einlage + Käse + Panade + Ei. Bratfett wird nicht erzwungen.",cordon_bleu,prepared_protein,PROTEIN,PROTEIN,,,,STUFFED_BREADED_PROTEIN_CONFLICT,,,"Schwein,Speck,Käse,Paniermehl,Ei",INTRINSIC_CONFLICT_PRODUCT,true
+Chicken Nuggets,"Chicken Nugget,Hähnchen Nuggets,Hähnchen Nugget",PROTEIN,FLEISCH,false,,false,"Konservative Zwangszerlegung für die Logik: Hähnchen + Panade. Zusätzliche industrielle Binder werden nicht erzwungen.",chicken_nuggets,prepared_protein,PROTEIN,PROTEIN,,,,BREADED_PROTEIN_CONFLICT,UNKNOWN_BINDERS,CHECK_BINDERS,"Hähnchen,Paniermehl",INTRINSIC_CONFLICT_PRODUCT,true
+Fischstäbchen,"Fish sticks,Fish stick",PROTEIN,FISCH,false,,false,"Konservative Zwangszerlegung für die Logik: Fisch + Panade. Bratfett wird nicht erzwungen.",fischstaebchen,prepared_protein,PROTEIN,PROTEIN,,,,BREADED_PROTEIN_CONFLICT,,,"Alaska-Seelachs,Paniermehl",INTRINSIC_CONFLICT_PRODUCT,true
+Paniertes Schnitzel,"Schnitzel paniert,breaded schnitzel",PROTEIN,FLEISCH,false,,false,"Konservative Zwangszerlegung für die Logik: Fleisch + Panade + Ei. Bratfett wird nicht erzwungen.",paniertes_schnitzel,prepared_protein,PROTEIN,PROTEIN,,,,BREADED_PROTEIN_CONFLICT,,,"Schwein,Paniermehl,Ei",INTRINSIC_CONFLICT_PRODUCT,true
 # ═══════════════════════════════════════════════════════════════════════
 # MILCH — Milchprodukte (sauer verstoffwechselt)
 # NUR mit NEUTRAL + kleiner Menge Fett

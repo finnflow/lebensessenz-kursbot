@@ -1,0 +1,35 @@
+{
+  "_doc": "Canonical post-meal wait profiles. Profiles describe how long to wait after eating this item or meal before the next meal.",
+  "wait_profiles": {
+    "RAW_VEG_OR_SALAD_2H": {
+      "min_minutes": 120,
+      "max_minutes": 120,
+      "description": "Raw vegetables or salad; wait about 2 hours before the next meal."
+    },
+    "PROPER_MEAL_NO_MEAT_3H": {
+      "min_minutes": 180,
+      "max_minutes": 180,
+      "description": "Proper meal without meat; wait about 3 hours before the next meal."
+    },
+    "PROPER_MEAL_WITH_MEAT_4H": {
+      "min_minutes": 240,
+      "max_minutes": 240,
+      "description": "Proper meal with meat; wait about 4 hours before the next meal."
+    },
+    "RANDOM_MEAL_UP_TO_8H": {
+      "min_minutes": 300,
+      "max_minutes": 480,
+      "description": "Heavy or random mixed meal; wait 5 to 8 hours before the next meal."
+    },
+    "FRUIT_WATERY_20_30": {
+      "min_minutes": 20,
+      "max_minutes": 30,
+      "description": "Fresh watery fruit; wait 20 to 30 minutes before the next meal."
+    },
+    "FRUIT_DENSE_OR_DRIED_45_60": {
+      "min_minutes": 45,
+      "max_minutes": 60,
+      "description": "Dense fresh fruit or dried fruit; wait 45 to 60 minutes before the next meal."
+    }
+  }
+}

@@ -139,6 +139,16 @@ def normalize_dish(
             if fi.group == FoodGroup.UNKNOWN:
                 unknown_items.append(raw.strip())
             items.append(fi)
+            items.extend(ontology.expand_item_for_logic(fi))
+
+    # ── Step 2b: Exact ontology dish hit for intrinsic-conflict items ─
+    if raw_items is None and not items and not assumed_items:
+        dish_item = ontology.lookup_to_food_item(dish_name.strip())
+        if dish_item.group != FoodGroup.UNKNOWN and (
+            dish_item.decompose_for_logic or dish_item.intrinsic_conflict_code
+        ):
+            items.append(dish_item)
+            items.extend(ontology.expand_item_for_logic(dish_item))
 
     # ── Step 3: No items yet → LLM extraction ──────────────────────
     if not items and not assumed_items and llm_fn is not None:

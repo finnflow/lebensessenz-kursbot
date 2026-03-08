@@ -25,6 +25,20 @@ class FoodGroup(str, Enum):
     UNKNOWN = "UNKNOWN"                    # Not in ontology
 
 
+class CombinationGroup(str, Enum):
+    """Target grouping model for future strict/light combination logic."""
+    FRUIT_WATERY = "FRUIT_WATERY"
+    FRUIT_DENSE = "FRUIT_DENSE"
+    DRIED_FRUIT = "DRIED_FRUIT"
+    NEUTRAL = "NEUTRAL"
+    KH = "KH"
+    HUELSENFRUECHTE = "HUELSENFRUECHTE"
+    PROTEIN = "PROTEIN"
+    MILCH = "MILCH"
+    FETT = "FETT"
+    UNKNOWN = "UNKNOWN"
+
+
 class FoodSubgroup(str, Enum):
     """Subgroups for finer-grained classification."""
     # OBST
@@ -52,10 +66,21 @@ class FoodSubgroup(str, Enum):
     EIER = "EIER"
     # MILCH
     MILCHPRODUKT = "MILCHPRODUKT"
+    KAESE = "KAESE"
+    JOGHURT = "JOGHURT"
+    FRISCHKAESE = "FRISCHKAESE"
     # FETT
     OEL = "OEL"
     NUSS_SAMEN = "NUSS_SAMEN"
     TIERISCHES_FETT = "TIERISCHES_FETT"
+    # Extended ontology values
+    SOJA = "SOJA"
+    UNKNOWN = "UNKNOWN"
+
+
+class RiskSeverity(str, Enum):
+    YELLOW = "YELLOW"
+    RED = "RED"
 
 
 # ── Verdict & Severity ─────────────────────────────────────────────────
@@ -78,9 +103,22 @@ class Severity(str, Enum):
 class FoodItem(BaseModel):
     """A single identified food item."""
     raw_name: str                              # Original name from user/vision
+    item_id: Optional[str] = None
     canonical: Optional[str] = None            # Normalized name from ontology
     group: FoodGroup = FoodGroup.UNKNOWN
     subgroup: Optional[FoodSubgroup] = None
+    food_family: Optional[str] = None
+    group_strict: Optional[CombinationGroup] = None
+    group_light: Optional[CombinationGroup] = None
+    post_meal_wait_profile: Optional[str] = None
+    modifier_policy: Optional[str] = None
+    base_item_id: Optional[str] = None
+    intrinsic_conflict_code: Optional[str] = None
+    forced_components: List[str] = Field(default_factory=list)
+    compound_type: Optional[str] = None
+    decompose_for_logic: bool = False
+    risk_codes: List[str] = Field(default_factory=list)
+    guidance_codes: List[str] = Field(default_factory=list)
     confidence: float = 1.0                    # 0.0-1.0 mapping confidence
     assumed: bool = False                      # True if inferred (not explicitly stated)
     assumption_reason: Optional[str] = None    # Why it was assumed
@@ -155,11 +193,44 @@ class RuleDefinition(BaseModel):
 
 class OntologyEntry(BaseModel):
     """A single entry in the food ontology."""
+    item_id: str
     canonical: str
     synonyms: List[str] = Field(default_factory=list)
-    group: FoodGroup
+    food_family: Optional[str] = None
+    group: FoodGroup = FoodGroup.UNKNOWN
     subgroup: Optional[FoodSubgroup] = None
+    group_strict: Optional[CombinationGroup] = None
+    group_light: Optional[CombinationGroup] = None
+    post_meal_wait_profile: Optional[str] = None
+    modifier_policy: Optional[str] = None
     ambiguity_flag: bool = False
     ambiguity_note: Optional[str] = None
+    base_item_id: Optional[str] = None
+    intrinsic_conflict_code: Optional[str] = None
+    forced_components: List[str] = Field(default_factory=list)
+    compound_type: Optional[str] = None
+    decompose_for_logic: bool = False
+    risk_codes: List[str] = Field(default_factory=list)
+    guidance_codes: List[str] = Field(default_factory=list)
     high_fat: bool = False  # True for Mayo, Aioli, Pesto — quantity-sensitive
     notes: Optional[str] = None
+
+
+class WaitProfile(BaseModel):
+    profile_id: str
+    min_minutes: int
+    max_minutes: int
+    description: str
+
+
+class RiskProfile(BaseModel):
+    code: str
+    severity: RiskSeverity
+    title: str
+    description: str
+
+
+class GuidanceProfile(BaseModel):
+    code: str
+    title: str
+    description: str

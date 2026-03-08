@@ -1,0 +1,21 @@
+{
+  "_doc": "Canonical guidance codes for structured, reusable advice snippets.",
+  "guidance_profiles": {
+    "SOY_IN_MODERATION": {
+      "title": "Use soy in moderation",
+      "description": "The course material recommends being cautious with soy-based foods."
+    },
+    "SMALL_AMOUNT_ONLY": {
+      "title": "Use only small amounts",
+      "description": "This item is typically only acceptable in small condiment-sized portions."
+    },
+    "CHECK_BINDERS": {
+      "title": "Check added binders",
+      "description": "Clarify whether preparation includes milk, butter, starches, or other added binders."
+    },
+    "GLUTEN_AWARE": {
+      "title": "Be gluten-aware",
+      "description": "Suitable as structured guidance for gluten-containing wheat-protein products."
+    }
+  }
+}
