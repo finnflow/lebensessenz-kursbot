@@ -136,6 +136,8 @@ def test_sidecar_profiles_load():
     assert ontology.risk_profiles["HEAVY_FAT_LOAD"].severity.value == "RED"
     assert ontology.guidance_profiles["SMALL_AMOUNT_ONLY"].title
     assert ontology.guidance_profiles["CHECK_BINDERS"].title
+    assert ontology.guidance_profiles["FAT_WITH_NEUTRAL_SMALL_AMOUNT"].title
+    assert ontology.guidance_profiles["FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT"].title
 
 
 def test_canonical_ontology_has_no_validation_issues():

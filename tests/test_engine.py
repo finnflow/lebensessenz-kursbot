@@ -186,12 +186,13 @@ class TestRuleEngine:
         result = engine.evaluate(analysis)
         assert result.verdict == Verdict.OK
 
-    def test_fett_triggers_conditional(self, engine, ontology):
-        """FETT with other concentrated food → CONDITIONAL (quantity dependent)"""
+    def test_fett_with_kh_emits_guidance_but_keeps_ok_verdict(self, engine, ontology):
+        """FETT + KH is now guidance-only unless another rule is violated."""
         analysis = self._make_analysis("Test", ["Reis", "Brokkoli", "Olivenöl"], ontology)
         result = engine.evaluate(analysis)
-        assert result.verdict == Verdict.CONDITIONAL
-        assert any(q for q in result.required_questions if "Fett" in q.question or "fett" in q.question.lower())
+        assert result.verdict == Verdict.OK
+        assert result.required_questions == []
+        assert result.guidance_codes == ["FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT"]
 
     def test_unknown_item_conditional(self, engine, ontology):
         """Unknown items → CONDITIONAL"""

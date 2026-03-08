@@ -127,7 +127,7 @@
       "description": "Obst + Fett vermeiden",
       "condition": {"pair": ["OBST", "FETT"]},
       "verdict": "NOT_OK",
-      "severity": "WARNING",
+      "severity": "CRITICAL",
       "source_ref": "modul-1.2/page-002",
       "explanation": "Obst sollte möglichst pur genossen werden. Fettquellen verlangsamen die schnelle Verdauung von Obst. Beim Frühstück gilt: möglichst ohne Fett (max. 1-2 TL Nussmus in einem anschließenden Frühstück sind OK, aber nicht direkt MIT dem Obst)."
     },
@@ -148,16 +148,6 @@
       "severity": "INFO",
       "source_ref": "modul-1.1/page-004,modul-1.1/page-006",
       "explanation": "Stärkearmes Gemüse, Salate und Kräuter lassen sich mit allem kombinieren und sollten mindestens 50% jeder Mahlzeit ausmachen."
-    },
-    {
-      "rule_id": "R017",
-      "description": "Fett in kleinen Mengen (1-2 TL) ist OK mit allem",
-      "condition": {"group_present": "FETT"},
-      "verdict": "CONDITIONAL",
-      "severity": "WARNING",
-      "source_ref": "modul-1.1/page-004",
-      "explanation": "Fettreiche Lebensmittel sollten nur in geringen Mengen (1-2 TL) verzehrt werden. In kleinen Mengen sind sie mit allen Gruppen kombinierbar. Größere Mengen sollten nur mit Gemüse/Salat kombiniert werden.",
-      "exception_note": "Kleine Mengen (1-2 TL) = OK mit allem. Frage nach Menge wenn unklar."
     },
     {
       "rule_id": "R050",
@@ -183,14 +173,14 @@
     "R001", "R002", "R003", "R004", "R005", "R006",
     "R007", "R008", "R009", "R010",
     "R011", "R012", "R013", "R014",
-    "R015", "R016", "R017",
+    "R015", "R016",
     "R050", "R051"
   ],
 
   "_notes": {
     "pair_rules": "R001-R010: Forbidden combinations (CRITICAL). Order: check forbidden pairs first.",
     "ok_rules": "R011-R016: Explicitly allowed combinations.",
-    "conditional": "R017: Fett quantity-dependent. R050-R051: Uncertainty flags.",
+    "conditional": "R050-R051: Uncertainty flags.",
     "priority": "Higher severity wins. CRITICAL > WARNING > INFO. NOT_OK > CONDITIONAL > OK.",
     "smoothie_exception": "R012 is checked BEFORE R013. If ALL NEUTRAL items are BLATTGRUEN subgroup, R012 applies (OK). Otherwise R013 applies (NOT_OK)."
   }

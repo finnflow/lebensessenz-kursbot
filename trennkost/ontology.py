@@ -74,7 +74,6 @@ STRICT_COMBINATION_TO_LEGACY_GROUP: Dict[CombinationGroup, FoodGroup] = {
 # Explicit stability seam: these items already carry future-facing target mappings,
 # but deterministic evaluation must stay legacy-compatible until follow-up PRs land.
 STRICT_EVALUATION_LEGACY_OVERRIDES: Dict[str, FoodGroup] = {
-    "mayonnaise": FoodGroup.NEUTRAL,
     "tofu": FoodGroup.HUELSENFRUECHTE,
     "tempeh": FoodGroup.HUELSENFRUECHTE,
 }
@@ -461,6 +460,7 @@ class Ontology:
                 decompose_for_logic=entry.decompose_for_logic,
                 risk_codes=list(entry.risk_codes),
                 guidance_codes=list(entry.guidance_codes),
+                high_fat=entry.high_fat,
                 confidence=0.7 if entry.ambiguity_flag else 1.0,
                 assumed=assumed,
                 assumption_reason=assumption_reason,
@@ -485,6 +485,7 @@ class Ontology:
                 decompose_for_logic=False,
                 risk_codes=[],
                 guidance_codes=[],
+                high_fat=False,
                 confidence=0.0,
                 assumed=assumed,
                 assumption_reason=assumption_reason,

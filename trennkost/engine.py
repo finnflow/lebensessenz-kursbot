@@ -19,6 +19,7 @@ from trennkost.models import (
     DishAnalysis,
     RuleProblem,
     RequiredQuestion,
+    GuidanceFact,
     TrennkostResult,
     RuleDefinition,
     RuleCondition,
@@ -34,6 +35,22 @@ RULES_JSON = Path(__file__).parent / "data" / "rules.json"
 SMOOTHIE_SAFE_SUBGROUPS = {
     FoodSubgroup.BLATTGRUEN,
     FoodSubgroup.KRAEUTER,  # Spices, herbs, water don't affect digestion
+}
+
+FAT_GUIDANCE_NEUTRAL_SMALL_AMOUNT = "FAT_WITH_NEUTRAL_SMALL_AMOUNT"
+FAT_GUIDANCE_CONFLICT_TINY_AMOUNT = "FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT"
+FAT_OIL_BUTTER_SUBGROUPS = {
+    FoodSubgroup.OEL,
+    FoodSubgroup.TIERISCHES_FETT,
+}
+FAT_FOOD_SUBGROUPS = {
+    FoodSubgroup.NUSS_SAMEN,
+}
+CONCENTRATED_NON_FRUIT_GROUPS = {
+    "KH",
+    "PROTEIN",
+    "HUELSENFRUECHTE",
+    "MILCH",
 }
 
 
@@ -194,6 +211,10 @@ class TrennkostEngine:
             analysis, groups_found, has_unknown, has_assumed
         )
 
+        # ── Build structured guidance ───────────────────────────────
+        guidance_facts = self._build_guidance(analysis, groups_found)
+        guidance_codes = list(dict.fromkeys(fact.code for fact in guidance_facts))
+
         # ── Determine final verdict ─────────────────────────────────
         verdict = self._determine_verdict(problems, required_questions, has_unknown)
 
@@ -206,6 +227,8 @@ class TrennkostEngine:
             summary=summary,
             problems=problems,
             required_questions=required_questions,
+            guidance_codes=guidance_codes,
+            guidance_facts=guidance_facts,
             ok_combinations=ok_notes,
             groups_found=dict(groups_found),
             debug={
@@ -214,6 +237,7 @@ class TrennkostEngine:
                 "unknown_items": analysis.unknown_items,
                 "assumed_items": [it.raw_name for it in analysis.assumed_items],
                 "group_set": sorted(group_set),
+                "guidance_codes": guidance_codes,
             },
         )
 
@@ -300,6 +324,90 @@ class TrennkostEngine:
 
         return False, {}
 
+    def _build_guidance(
+        self,
+        analysis: DishAnalysis,
+        groups_found: Dict[str, List[str]],
+    ) -> List[GuidanceFact]:
+        """Build structured, verdict-independent guidance facts."""
+        all_items = analysis.items + analysis.assumed_items
+        fat_items = [item for item in all_items if resolve_effective_group(item) == FoodGroup.FETT]
+        if not fat_items:
+            return []
+
+        group_set = set(groups_found.keys())
+        if "OBST" in group_set:
+            return []
+
+        concentrated_groups = sorted(group_set & CONCENTRATED_NON_FRUIT_GROUPS)
+        if concentrated_groups:
+            return [GuidanceFact(
+                code=FAT_GUIDANCE_CONFLICT_TINY_AMOUNT,
+                affected_groups=["FETT", *concentrated_groups],
+                affected_items=[self._format_item_label(item) for item in fat_items],
+                amount_hint="max. ca. 1-2 TL",
+                fat_category="ANY_FAT",
+            )]
+
+        if "NEUTRAL" not in group_set or not group_set.issubset({"FETT", "NEUTRAL"}):
+            return []
+
+        oil_butter_items = []
+        fat_food_items = []
+        condiment_items = []
+
+        for item in fat_items:
+            category = self._classify_fat_guidance_category(item)
+            label = self._format_item_label(item)
+            if category == "OIL_BUTTER":
+                oil_butter_items.append(label)
+            elif category == "NUT_SEED_AVOCADO":
+                fat_food_items.append(label)
+            else:
+                condiment_items.append(label)
+
+        facts: List[GuidanceFact] = []
+        if oil_butter_items:
+            facts.append(GuidanceFact(
+                code=FAT_GUIDANCE_NEUTRAL_SMALL_AMOUNT,
+                affected_groups=["FETT", "NEUTRAL"],
+                affected_items=oil_butter_items,
+                amount_hint="ca. 1-2 EL",
+                fat_category="OIL_BUTTER",
+            ))
+        if fat_food_items:
+            facts.append(GuidanceFact(
+                code=FAT_GUIDANCE_NEUTRAL_SMALL_AMOUNT,
+                affected_groups=["FETT", "NEUTRAL"],
+                affected_items=fat_food_items,
+                amount_hint="bis ca. 1/2 Tasse",
+                fat_category="NUT_SEED_AVOCADO",
+            ))
+        if condiment_items:
+            facts.append(GuidanceFact(
+                code=FAT_GUIDANCE_NEUTRAL_SMALL_AMOUNT,
+                affected_groups=["FETT", "NEUTRAL"],
+                affected_items=condiment_items,
+                amount_hint="ca. 1-2 EL",
+                fat_category="CONDIMENT",
+            ))
+
+        return facts
+
+    def _classify_fat_guidance_category(self, item: FoodItem) -> str:
+        if item.high_fat or item.modifier_policy == "CONDIMENT_ONLY":
+            return "CONDIMENT"
+        if item.subgroup in FAT_OIL_BUTTER_SUBGROUPS:
+            return "OIL_BUTTER"
+        if item.subgroup in FAT_FOOD_SUBGROUPS:
+            return "NUT_SEED_AVOCADO"
+        return "CONDIMENT"
+
+    def _format_item_label(self, item: FoodItem) -> str:
+        if item.canonical and item.canonical != item.raw_name:
+            return f"{item.raw_name} → {item.canonical}"
+        return item.raw_name
+
     def _build_questions(
         self,
         analysis: DishAnalysis,
@@ -338,35 +446,6 @@ class TrennkostEngine:
                 reason="Mehrdeutige Zutat erfordert Klärung für korrekte Zuordnung.",
                 affects_items=[item.raw_name],
             ))
-
-        # Fat quantity question
-        if "FETT" in groups_found and len(groups_found) > 1:
-            fett_items = groups_found["FETT"]
-            other_concentrated = set(groups_found.keys()) - {"FETT", "NEUTRAL", "UNKNOWN"}
-            if other_concentrated:
-                questions.append(RequiredQuestion(
-                    question=f"Wie viel Fett ({', '.join(fett_items)}) ist enthalten? Kleine Mengen (1-2 TL) sind mit allem OK, größere nur mit Gemüse/Salat.",
-                    reason="Die Fettmenge beeinflusst die Bewertung.",
-                    affects_items=fett_items,
-                ))
-
-        # HIGH_FAT items (Mayo, Aioli, Pesto) + KH/PROTEIN quantity question
-        high_fat_items = []
-        for item in all_items:
-            if item.canonical:
-                entry = ontology.lookup(item.canonical)
-                if entry and entry.high_fat:
-                    high_fat_items.append(item.raw_name)
-
-        if high_fat_items:
-            other_concentrated = set(groups_found.keys()) - {"NEUTRAL", "UNKNOWN"}
-            if other_concentrated:
-                item_str = ', '.join(high_fat_items)
-                questions.append(RequiredQuestion(
-                    question=f"Wie viel {item_str} verwendest du? (1-2 TL als Würze sind OK mit allem, größere Mengen nur mit Gemüse/Salat)",
-                    reason=f"{item_str} ist sehr fettreich (häufig Sonnenblumen-/Rapsöl → entzündungsfördernd). Die Menge ist entscheidend.",
-                    affects_items=high_fat_items,
-                ))
 
         # Compound clarification - but ONLY if no explicit ingredients provided
         # If user said "Burger mit Tempeh, Salat", they already answered the clarification

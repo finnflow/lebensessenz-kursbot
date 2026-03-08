@@ -16,6 +16,14 @@
     "GLUTEN_AWARE": {
       "title": "Be gluten-aware",
       "description": "Suitable as structured guidance for gluten-containing wheat-protein products."
+    },
+    "FAT_WITH_NEUTRAL_SMALL_AMOUNT": {
+      "title": "Use moderate fat with neutral foods",
+      "description": "With neutral foods, oils and butter should stay around 1-2 tablespoons, while nuts, seeds, and avocado can be used in a larger but still bounded amount."
+    },
+    "FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT": {
+      "title": "Keep fat very small with concentrated foods",
+      "description": "When fat is combined with KH, PROTEIN, HUELSENFRUECHTE, or MILCH, keep it to about 1-2 teaspoons."
     }
   }
 }

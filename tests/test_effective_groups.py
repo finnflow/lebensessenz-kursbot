@@ -28,7 +28,7 @@ def test_resolve_effective_group_is_strict_only_and_stable(ontology):
     assert resolve_effective_group(banana) == FoodGroup.OBST
     assert resolve_effective_group(dried) == FoodGroup.TROCKENOBST
     assert resolve_effective_group(tofu) == FoodGroup.HUELSENFRUECHTE
-    assert resolve_effective_group(mayo) == FoodGroup.NEUTRAL
+    assert resolve_effective_group(mayo) == FoodGroup.FETT
 
     with pytest.raises(NotImplementedError):
         resolve_effective_group(mayo, mode="light")
@@ -39,21 +39,22 @@ def test_engine_uses_effective_group_resolver(monkeypatch):
 
     def fake_resolver(item, mode="strict"):
         if item.canonical == "Mayonnaise":
-            return FoodGroup.FETT
+            return FoodGroup.NEUTRAL
         return item.group
 
     monkeypatch.setattr("trennkost.engine.resolve_effective_group", fake_resolver)
 
     result = TrennkostEngine().evaluate(analysis)
 
-    assert "FETT" in result.groups_found
-    assert "NEUTRAL" not in result.groups_found
+    assert "NEUTRAL" in result.groups_found
+    assert "FETT" not in result.groups_found
 
 
-def test_mayonnaise_does_not_silently_switch_to_target_group_yet():
+def test_mayonnaise_now_uses_target_group_in_strict_evaluation():
     analysis = normalize_dish("Test", raw_items=["Kartoffel", "Mayonnaise"])
     result = TrennkostEngine().evaluate(analysis)
 
-    assert result.verdict == Verdict.CONDITIONAL
-    assert "NEUTRAL" in result.groups_found
-    assert "FETT" not in result.groups_found
+    assert result.verdict == Verdict.OK
+    assert "FETT" in result.groups_found
+    assert "NEUTRAL" not in result.groups_found
+    assert result.guidance_codes == ["FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT"]

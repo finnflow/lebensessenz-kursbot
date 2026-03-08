@@ -119,6 +119,7 @@ class FoodItem(BaseModel):
     decompose_for_logic: bool = False
     risk_codes: List[str] = Field(default_factory=list)
     guidance_codes: List[str] = Field(default_factory=list)
+    high_fat: bool = False
     confidence: float = 1.0                    # 0.0-1.0 mapping confidence
     assumed: bool = False                      # True if inferred (not explicitly stated)
     assumption_reason: Optional[str] = None    # Why it was assumed
@@ -154,6 +155,15 @@ class RequiredQuestion(BaseModel):
     affects_items: List[str]
 
 
+class GuidanceFact(BaseModel):
+    """Structured guidance emitted alongside the deterministic verdict."""
+    code: str
+    affected_groups: List[str]
+    affected_items: List[str]
+    amount_hint: str
+    fat_category: Optional[str] = None
+
+
 class TrennkostResult(BaseModel):
     """Final output of the rule engine."""
     dish_name: str
@@ -161,6 +171,8 @@ class TrennkostResult(BaseModel):
     summary: str                                            # One-line human summary
     problems: List[RuleProblem] = Field(default_factory=list)
     required_questions: List[RequiredQuestion] = Field(default_factory=list)
+    guidance_codes: List[str] = Field(default_factory=list)
+    guidance_facts: List[GuidanceFact] = Field(default_factory=list)
     ok_combinations: List[str] = Field(default_factory=list)  # What IS ok in this dish
     groups_found: Dict[str, List[str]] = Field(default_factory=dict)  # group → [items]
     debug: Optional[Dict[str, Any]] = None
