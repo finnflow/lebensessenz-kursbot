@@ -299,10 +299,10 @@
       "note": "Pur (ohne KH-Beilage): OK — PROTEIN (Bratwurst) + NEUTRAL (Sauerkraut = fermentierter Weißkohl). Mit Brötchen: NOT_OK (KH + PROTEIN). Mit Kartoffeln: NOT_OK (KH + PROTEIN)."
     },
     "Fischstäbchen mit Pommes": {
-      "base_items": ["Alaska-Seelachs", "Paniermehl", "Kartoffel"],
-      "optional_items": ["Zitrone", "Ketchup", "Mayonnaise"],
+      "base_items": ["Fischstäbchen", "Pommes"],
+      "optional_items": ["Zitronensaft", "Ketchup", "Mayonnaise"],
       "needs_clarification": null,
-      "note": "NOT_OK: PROTEIN (Fisch) + KH (Paniermehl/Panade + Pommes = Kartoffel). Panade enthält Paniermehl (KH). Mit Mayonnaise: zusätzlich high_fat FETT."
+      "note": "NOT_OK: intrinsisch konfliktuelle Fischstäbchen plus Pommes. Nutzt das Prepared-Protein-Canonical direkt statt Fisch+Panade lose nachzubauen. Mit Mayonnaise: zusätzlich high_fat FETT."
     },
 
     "Ratatouille": {

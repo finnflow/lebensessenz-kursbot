@@ -68,3 +68,15 @@ def test_wiener_schnitzel_keeps_breaded_core_without_forcing_generic_potatoes():
     assert {"Schwein", "Paniermehl", "Ei"}.issubset(set(canonicals))
     assert "Kartoffel" not in canonicals
     assert "Kartoffel gekocht" in assumed_canonicals
+
+
+def test_fischstaebchen_mit_pommes_uses_intrinsic_prepared_canonical():
+    analysis = normalize_dish("Fischstäbchen mit Pommes")
+
+    canonicals = [item.canonical for item in analysis.items]
+
+    assert canonicals[0] == "Fischstäbchen"
+    assert "Pommes" in canonicals
+    assert {"Alaska-Seelachs", "Paniermehl"}.issubset(set(canonicals))
+    assert "Kartoffel" not in canonicals
+    assert any(item.canonical == "Zitronensaft" for item in analysis.assumed_items)
