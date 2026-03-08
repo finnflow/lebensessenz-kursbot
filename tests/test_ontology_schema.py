@@ -66,6 +66,58 @@ def test_target_schema_fields_load_from_canonical_ontology():
     assert tempeh.group_light == CombinationGroup.KH
 
 
+def test_fruit_rows_use_consistent_strict_groups_and_wait_profiles():
+    ontology = Ontology()
+
+    watery_examples = [
+        "Apfel",
+        "Orange",
+        "Mango",
+        "Ananas",
+        "Weintraube",
+    ]
+    dense_examples = ["Banane"]
+    dried_examples = [
+        "Dattel",
+        "Rosine",
+        "Feige",
+        "Trockenpflaume",
+        "Trockenapfel",
+    ]
+
+    for canonical in watery_examples:
+        item = ontology.lookup(canonical)
+        assert item is not None
+        assert item.group_strict == CombinationGroup.FRUIT_WATERY
+        assert item.group_light == CombinationGroup.FRUIT_WATERY
+        assert item.post_meal_wait_profile == "FRUIT_WATERY_20_30"
+
+    for canonical in dense_examples:
+        item = ontology.lookup(canonical)
+        assert item is not None
+        assert item.group_strict == CombinationGroup.FRUIT_DENSE
+        assert item.group_light == CombinationGroup.KH
+        assert item.post_meal_wait_profile == "FRUIT_DENSE_OR_DRIED_45_60"
+
+    for canonical in dried_examples:
+        item = ontology.lookup(canonical)
+        assert item is not None
+        assert item.group_strict == CombinationGroup.DRIED_FRUIT
+        assert item.group_light == CombinationGroup.KH
+        assert item.post_meal_wait_profile == "FRUIT_DENSE_OR_DRIED_45_60"
+
+    fruit_items = [
+        entry
+        for entry in ontology.entries
+        if entry.group in {FoodGroup.OBST, FoodGroup.TROCKENOBST}
+    ]
+    assert fruit_items
+    assert all(item.item_id for item in fruit_items)
+    assert all(item.group_strict for item in fruit_items)
+    assert all(item.group_light for item in fruit_items)
+    assert all(item.post_meal_wait_profile for item in fruit_items)
+
+
 def test_potato_variants_have_distinct_canonicals():
     ontology = Ontology()
 
@@ -93,6 +145,36 @@ def test_potato_variants_have_distinct_canonicals():
     assert fries.risk_codes == ["FRIED", "HEAVY_FAT_LOAD"]
     assert mashed.risk_codes == ["UNKNOWN_BINDERS"]
     assert mashed.guidance_codes == ["CHECK_BINDERS"]
+
+
+def test_core_item_risk_and_guidance_references_stay_validation_clean():
+    ontology = Ontology()
+
+    expected_codes = {
+        "Mayonnaise": (["HEAVY_FAT_LOAD"], ["SMALL_AMOUNT_ONLY"]),
+        "Pommes": (["FRIED", "HEAVY_FAT_LOAD"], []),
+        "Bratkartoffeln": (["FRIED"], []),
+        "Kartoffelpüree": (["UNKNOWN_BINDERS"], ["CHECK_BINDERS"]),
+        "Tofu": (["SOY"], ["SOY_IN_MODERATION"]),
+        "Tempeh": (["SOY"], ["SOY_IN_MODERATION"]),
+        "Seitan": (["GLUTEN_HIGH"], ["GLUTEN_AWARE"]),
+        "Veganes Patty": (["UNKNOWN_BINDERS"], ["CHECK_BINDERS"]),
+        "Vegetarisches Patty": (["UNKNOWN_BINDERS"], ["CHECK_BINDERS"]),
+        "Vegane Wurst": (["UNKNOWN_BINDERS"], ["CHECK_BINDERS"]),
+        "Vegetarische Wurst": (["UNKNOWN_BINDERS"], ["CHECK_BINDERS"]),
+        "Chicken Nuggets": (["UNKNOWN_BINDERS"], ["CHECK_BINDERS"]),
+        "Fischstäbchen": ([], []),
+        "Paniertes Schnitzel": ([], []),
+        "Cordon Bleu": ([], []),
+    }
+
+    for canonical, (risk_codes, guidance_codes) in expected_codes.items():
+        item = ontology.lookup(canonical)
+        assert item is not None
+        assert item.risk_codes == risk_codes
+        assert item.guidance_codes == guidance_codes
+        assert all(code in ontology.risk_profiles for code in item.risk_codes)
+        assert all(code in ontology.guidance_profiles for code in item.guidance_codes)
 
 
 def test_mayonnaise_keeps_legacy_group_but_exposes_target_mapping():

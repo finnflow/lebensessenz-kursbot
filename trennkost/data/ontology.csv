@@ -3,26 +3,26 @@ canonical,synonyms,group,subgroup,ambiguity_flag,ambiguity_note,high_fat,notes,i
 # OBST (Fresh Fruit) — eat alone or with BLATTGRUEN/TROCKENOBST
 # ═══════════════════════════════════════════════════════════════════════
 Apfel,"Äpfel,Apple,Apples",OBST,FRISCH,false,,false,,apfel,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
-Birne,"Birnen,Pear,Pears",OBST,FRISCH,false,,false,
+Birne,"Birnen,Pear,Pears",OBST,FRISCH,false,,false,,birne,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
 Banane,"Bananen,Banana,Bananas",OBST,FRISCH,false,,false,längere Verdauung: 45-60 Min,banane,fruit,FRUIT_DENSE,KH,FRUIT_DENSE_OR_DRIED_45_60,,,,,
-Orange,"Orangen,Apfelsine,Apfelsinen",OBST,FRISCH,false,,false,
-Zitrone,"Zitronen,Limette,Limetten,Lime,Lemon,Lemon wedge",OBST,FRISCH,true,Als ganze Frucht (Dessert/Obst-Mahlzeit) = OBST. Als Würzmittel/Saft in Kochrezepten = NEUTRAL (wie Essig). Kurs-Rezepte Ofenhähnchen + Ofenfisch enthalten Zitrone als PROTEIN-Beilage → im Kochkontext OK.,false,Zubereitungskontext entscheidend: Kochrezept → neutral; Obst-Mahlzeit → OBST
-Grapefruit,Grapefruits,OBST,FRISCH,false,,false,
-Mandarine,"Mandarinen,Clementine,Clementinen,Mandarin,Tangerine",OBST,FRISCH,false,,false,
-Mango,Mangos,OBST,FRISCH,false,,false,
-Ananas,Pineapple,OBST,FRISCH,false,,false,
-Kiwi,Kiwis,OBST,FRISCH,false,,false,reich an Vitamin C
-Wassermelone,"Melone,Honigmelone,Watermelon,Melon",OBST,FRISCH,false,,false,
-Weintraube,"Weintrauben,Trauben,Grape,Grapes",OBST,FRISCH,false,,false,
-Pflaume,"Pflaumen,Zwetschge,Zwetschgen,Plum,Plums",OBST,FRISCH,false,,false,
-Pfirsich,"Pfirsiche,Nektarine,Nektarinen,Peach,Nectarine",OBST,FRISCH,false,,false,
-Kirsche,"Kirschen,Cherry,Cherries",OBST,FRISCH,false,,false,reich an Vitamin C
-Erdbeere,"Erdbeeren,Strawberry,Strawberries",OBST,BEEREN,false,,false,reich an Antioxidantien
-Himbeere,"Himbeeren,Raspberry,Raspberries",OBST,BEEREN,false,,false,reich an Antioxidantien
-Blaubeere,"Blaubeeren,Heidelbeere,Heidelbeeren,Blueberry,Blueberries",OBST,BEEREN,false,,false,reich an Antioxidantien
-Brombeere,"Brombeeren,Blackberry,Blackberries",OBST,BEEREN,false,,false,
-Johannisbeere,"Johannisbeeren,Currant,Currants",OBST,BEEREN,false,,false,
-Granatapfel,"Granatäpfel,Pomegranate",OBST,FRISCH,false,,false,
+Orange,"Orangen,Apfelsine,Apfelsinen",OBST,FRISCH,false,,false,,orange,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Zitrone,"Zitronen,Limette,Limetten,Lime,Lemon,Lemon wedge",OBST,FRISCH,true,"Als ganze Frucht (Dessert/Obst-Mahlzeit) = OBST. Als Würzmittel/Saft in Kochrezepten = NEUTRAL (wie Essig). Kurs-Rezepte Ofenhähnchen + Ofenfisch enthalten Zitrone als PROTEIN-Beilage → im Kochkontext OK.",false,"Zubereitungskontext entscheidend: Kochrezept → neutral; Obst-Mahlzeit → OBST",zitrone,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Grapefruit,Grapefruits,OBST,FRISCH,false,,false,,grapefruit,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Mandarine,"Mandarinen,Clementine,Clementinen,Mandarin,Tangerine",OBST,FRISCH,false,,false,,mandarine,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Mango,Mangos,OBST,FRISCH,false,,false,,mango,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Ananas,Pineapple,OBST,FRISCH,false,,false,,ananas,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Kiwi,Kiwis,OBST,FRISCH,false,,false,reich an Vitamin C,kiwi,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Wassermelone,"Melone,Honigmelone,Watermelon,Melon",OBST,FRISCH,false,,false,,wassermelone,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Weintraube,"Weintrauben,Trauben,Grape,Grapes",OBST,FRISCH,false,,false,,weintraube,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Pflaume,"Pflaumen,Zwetschge,Zwetschgen,Plum,Plums",OBST,FRISCH,false,,false,,pflaume,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Pfirsich,"Pfirsiche,Nektarine,Nektarinen,Peach,Nectarine",OBST,FRISCH,false,,false,,pfirsich,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Kirsche,"Kirschen,Cherry,Cherries",OBST,FRISCH,false,,false,reich an Vitamin C,kirsche,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Erdbeere,"Erdbeeren,Strawberry,Strawberries",OBST,BEEREN,false,,false,reich an Antioxidantien,erdbeere,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Himbeere,"Himbeeren,Raspberry,Raspberries",OBST,BEEREN,false,,false,reich an Antioxidantien,himbeere,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Blaubeere,"Blaubeeren,Heidelbeere,Heidelbeeren,Blueberry,Blueberries",OBST,BEEREN,false,,false,reich an Antioxidantien,blaubeere,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Brombeere,"Brombeeren,Blackberry,Blackberries",OBST,BEEREN,false,,false,,brombeere,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Johannisbeere,"Johannisbeeren,Currant,Currants",OBST,BEEREN,false,,false,,johannisbeere,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Granatapfel,"Granatäpfel,Pomegranate",OBST,FRISCH,false,,false,,granatapfel,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
 # ═══════════════════════════════════════════════════════════════════════
 # TROCKENOBST — combinable with OBST, longer digestion (45-60 min)
 # ═══════════════════════════════════════════════════════════════════════
@@ -326,26 +326,26 @@ Lollo Rosso,"Lollo,Rosso lettuce",NEUTRAL,BLATTGRUEN,false,,false,
 Friséesalat,"Frisee,Frisée,Frisee lettuce",NEUTRAL,BLATTGRUEN,false,,false,
 Portulak,"Portulak (Gemüse),Purslane",NEUTRAL,BLATTGRUEN,false,,false,
 # Obst (frisch)
-Aprikose,"Aprikosen,Apricot",OBST,FRISCH,false,,false,
-Kaki,"Persimmon,Sharonfrucht",OBST,FRISCH,false,,false,
-Pomelo,Pomelos,OBST,FRISCH,false,,false,Zitrusfrucht
-Blutorange,Blood orange,OBST,FRISCH,false,,false,
-Sauerkirsche,"Sauerkirschen,Sour cherry",OBST,FRISCH,false,,false,
-Rote Johannisbeere,"Johannisbeere rot,Redcurrant",OBST,FRISCH,false,,false,
-Schwarze Johannisbeere,"Johannisbeere schwarz,Blackcurrant",OBST,FRISCH,false,,false,
-Stachelbeere,"Stachelbeeren,Gooseberry",OBST,FRISCH,false,,false,
-Quitte,"Quitten,Quince",OBST,FRISCH,false,,false,
-Physalis,"Kapstachelbeere,Golden berry",OBST,FRISCH,true,"Eher 'modern', aber verbreitet",false,
-Passionsfrucht,"Maracuja,Passionfruit,Passion fruit",OBST,FRISCH,true,"Eher 'modern', aber verbreitet",false,
-Kumquat,Kumquats,OBST,FRISCH,false,,false,
-Mirabelle,"Mirabellen,Mirabellepflaume",OBST,FRISCH,false,,false,Pflaumenart
-Cranberry frisch,Cranberries frisch,OBST,FRISCH,true,Frisch selten; oft getrocknet/gesüßt,false,
-Holunderbeere,"Holunderbeeren,Elderberry",OBST,FRISCH,true,Meist als Saft/Püree,false,
-Sanddorn,"Sanddornbeere,Sea buckthorn",OBST,FRISCH,true,Meist als Saft/Püree,false,
-Hagebutte,"Hagebutten,Rose hip",OBST,FRISCH,true,Meist als Tee/Marmelade,false,
-Feige frisch,"frische Feige,frische Feigen,Fresh fig",OBST,FRISCH,false,,false,Abgrenzung zu Trockenobst-Feige
-Preiselbeere,"Preiselbeeren,Lingonberry",OBST,FRISCH,true,In DE meist als Konfitüre/Glas; frisch seltener,false,
-Maulbeere frisch,"frische Maulbeeren,Mulberry",OBST,FRISCH,true,Frisch in DE seltener; eher getrocknet,false,
+Aprikose,"Aprikosen,Apricot",OBST,FRISCH,false,,false,,aprikose,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Kaki,"Persimmon,Sharonfrucht",OBST,FRISCH,false,,false,,kaki,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Pomelo,Pomelos,OBST,FRISCH,false,,false,Zitrusfrucht,pomelo,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Blutorange,Blood orange,OBST,FRISCH,false,,false,,blutorange,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Sauerkirsche,"Sauerkirschen,Sour cherry",OBST,FRISCH,false,,false,,sauerkirsche,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Rote Johannisbeere,"Johannisbeere rot,Redcurrant",OBST,FRISCH,false,,false,,rote_johannisbeere,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Schwarze Johannisbeere,"Johannisbeere schwarz,Blackcurrant",OBST,FRISCH,false,,false,,schwarze_johannisbeere,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Stachelbeere,"Stachelbeeren,Gooseberry",OBST,FRISCH,false,,false,,stachelbeere,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Quitte,"Quitten,Quince",OBST,FRISCH,false,,false,,quitte,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Physalis,"Kapstachelbeere,Golden berry",OBST,FRISCH,true,"Eher 'modern', aber verbreitet",false,,physalis,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Passionsfrucht,"Maracuja,Passionfruit,Passion fruit",OBST,FRISCH,true,"Eher 'modern', aber verbreitet",false,,passionsfrucht,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Kumquat,Kumquats,OBST,FRISCH,false,,false,,kumquat,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Mirabelle,"Mirabellen,Mirabellepflaume",OBST,FRISCH,false,,false,Pflaumenart,mirabelle,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Cranberry frisch,Cranberries frisch,OBST,FRISCH,true,Frisch selten; oft getrocknet/gesüßt,false,,cranberry_frisch,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Holunderbeere,"Holunderbeeren,Elderberry",OBST,FRISCH,true,Meist als Saft/Püree,false,,holunderbeere,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Sanddorn,"Sanddornbeere,Sea buckthorn",OBST,FRISCH,true,Meist als Saft/Püree,false,,sanddorn,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Hagebutte,"Hagebutten,Rose hip",OBST,FRISCH,true,Meist als Tee/Marmelade,false,,hagebutte,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Feige frisch,"frische Feige,frische Feigen,Fresh fig",OBST,FRISCH,false,,false,Abgrenzung zu Trockenobst-Feige,feige_frisch,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Preiselbeere,"Preiselbeeren,Lingonberry",OBST,FRISCH,true,In DE meist als Konfitüre/Glas; frisch seltener,false,,preiselbeere,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
+Maulbeere frisch,"frische Maulbeeren,Mulberry",OBST,FRISCH,true,Frisch in DE seltener; eher getrocknet,false,,maulbeere_frisch,fruit,FRUIT_WATERY,FRUIT_WATERY,FRUIT_WATERY_20_30,,,,,
 # Fisch (häufige Sorten)
 Alaska-Seelachs,"Seelachs,Pollock,Alaska pollock",PROTEIN,FISCH,false,,false,Sehr häufig (Filet/Fischstäbchen)
 Rotbarsch,"Redfish,Ocean perch",PROTEIN,FISCH,false,,false,
@@ -378,8 +378,8 @@ Sojabohnen getrocknet,"Sojabohnen,Soja beans,Yellow soybeans,Soybeans",HUELSENFR
 Sojagranulat,"Sojaflocken,Sojagranulat trocken,TVP",HUELSENFRUECHTE,SOJA,false,,false,Soja-Fleischersatz (trocken)
 Miso,"Misopaste,Miso paste",HUELSENFRUECHTE,SOJA,false,,false,Fermentierte Sojabohnen
 # Trockenobst (Ergänzung)
-Trockenpflaume,"Dörrpflaume,Backpflaume,Prunes",TROCKENOBST,TROCKEN,false,,false,
-Trockenapfel,"Apfelringe,Dried apple",TROCKENOBST,TROCKEN,false,,false,
+Trockenpflaume,"Dörrpflaume,Backpflaume,Prunes",TROCKENOBST,TROCKEN,false,,false,,trockenpflaume,fruit,DRIED_FRUIT,KH,FRUIT_DENSE_OR_DRIED_45_60,,,,,
+Trockenapfel,"Apfelringe,Dried apple",TROCKENOBST,TROCKEN,false,,false,,trockenapfel,fruit,DRIED_FRUIT,KH,FRUIT_DENSE_OR_DRIED_45_60,,,,,
 # ═══════════════════════════════════════════════════════════════════════
 # UNKNOWN / KLÄRUNGSBEDARF — Items die noch kategorisiert werden müssen
 # ═══════════════════════════════════════════════════════════════════════
