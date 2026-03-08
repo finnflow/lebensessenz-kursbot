@@ -88,6 +88,11 @@ _BREAKFAST_KEYWORDS = re.compile(
     re.IGNORECASE,
 )
 
+_COMPOUND_MODIFIER_PREFIX = (
+    r"(?:vegan\w*|vegetar\w*|veggie|klassisch\w*|classic|normal\w*|"
+    r"paniert\w*|breaded|natur|frittiert\w*|fried|gebraten\w*)"
+)
+
 
 def detect_breakfast_context(text: str) -> bool:
     """Detect if a user message is about breakfast / morning eating."""
@@ -227,6 +232,7 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
     """
     ontology = get_ontology()
     text_lower = text.lower()
+    modifier_aware_compound = None
 
     # 1. Check for known compound dishes (longest first to avoid partial matches)
     found_compound = None
@@ -234,6 +240,12 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
     for compound_name in sorted(ontology.compounds.keys(), key=len, reverse=True):
         if compound_name.lower() in text_lower:
             found_compound = compound_name
+            modifier_match = re.search(
+                rf"((?:{_COMPOUND_MODIFIER_PREFIX})\s+{re.escape(compound_name)})",
+                text,
+                re.IGNORECASE,
+            )
+            modifier_aware_compound = modifier_match.group(1).strip() if modifier_match else compound_name
             # Remove matched name to avoid double-matching ingredients
             search_text = text_lower.replace(compound_name.lower(), " ")
             break  # Only match one compound per query
@@ -263,10 +275,10 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
     if found_compound and found_items:
         # User mentioned a compound dish AND explicit ingredients
         # e.g., "Burger mit Tempeh, Salat, Gurken"
-        return [{"name": found_compound, "items": found_items}]
+        return [{"name": modifier_aware_compound or found_compound, "items": found_items}]
     elif found_compound:
         # Only compound found, no explicit ingredients
-        return [{"name": found_compound, "items": None}]
+        return [{"name": modifier_aware_compound or found_compound, "items": None}]
     elif len(found_items) >= 1:
         # No compound, but individual items found
         return [{"name": _infer_dish_name(found_items) if len(found_items) > 1 else found_items[0],

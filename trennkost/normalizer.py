@@ -8,14 +8,17 @@ Pipeline:
 
 LLM is ONLY used for extraction/normalization, NEVER for the verdict.
 """
+from dataclasses import dataclass, field
 import json
 import logging
+import re
 from typing import List, Optional, Dict
 
 from trennkost.models import (
     FoodGroup,
     FoodItem,
     DishAnalysis,
+    ModifierTag,
 )
 from trennkost.ontology import get_ontology, Ontology
 
@@ -77,6 +80,151 @@ Zutaten die klar sichtbar/genannt sind: "assumed": false.
 """
 
 
+@dataclass
+class _ModifierInterpretation:
+    raw_name: str
+    normalized_text: str
+    base_text: str
+    tags: List[ModifierTag] = field(default_factory=list)
+
+
+@dataclass
+class _ResolvedModifierItem:
+    lookup_name: str
+    modifier_tags: List[ModifierTag] = field(default_factory=list)
+    raw_name_override: Optional[str] = None
+
+
+_MODIFIER_PATTERNS = [
+    (ModifierTag.VEGAN, re.compile(r"\bvegan(?:er|e|es|en)?\b", re.IGNORECASE)),
+    (ModifierTag.VEGETARIAN, re.compile(r"\b(?:vegetar\w*|veggie)\b", re.IGNORECASE)),
+    (ModifierTag.WITH_MEAT, re.compile(r"\bmit\s+fleisch\b", re.IGNORECASE)),
+    (ModifierTag.WITH_FISH, re.compile(r"\bmit\s+fisch\b", re.IGNORECASE)),
+    (ModifierTag.PREP_BREADED, re.compile(r"\b(?:paniert\w*|breaded)\b", re.IGNORECASE)),
+    (ModifierTag.PREP_NATUR, re.compile(r"\bnatur\b", re.IGNORECASE)),
+    (ModifierTag.PREP_FRIED, re.compile(r"\b(?:frittiert\w*|fried|gebraten\w*)\b", re.IGNORECASE)),
+    (ModifierTag.HINT_CLASSIC, re.compile(r"\b(?:klassisch\w*|classic|normal\w*)\b", re.IGNORECASE)),
+]
+
+_MODIFIER_STRIP_PATTERNS = [
+    re.compile(r"\bvegan(?:er|e|es|en)?\b", re.IGNORECASE),
+    re.compile(r"\b(?:vegetar\w*|veggie)\b", re.IGNORECASE),
+    re.compile(r"\bmit\s+fleisch\b", re.IGNORECASE),
+    re.compile(r"\bmit\s+fisch\b", re.IGNORECASE),
+    re.compile(r"\b(?:paniert\w*|breaded)\b", re.IGNORECASE),
+    re.compile(r"\bnatur\b", re.IGNORECASE),
+    re.compile(r"\b(?:frittiert\w*|fried|gebraten\w*)\b", re.IGNORECASE),
+    re.compile(r"\b(?:klassisch\w*|classic|normal\w*)\b", re.IGNORECASE),
+]
+
+
+def _interpret_modifiers(raw_name: str) -> _ModifierInterpretation:
+    normalized_text = re.sub(r"[-_/]+", " ", raw_name.strip().lower())
+    normalized_text = re.sub(r"\s+", " ", normalized_text).strip()
+
+    tags: List[ModifierTag] = []
+    for tag, pattern in _MODIFIER_PATTERNS:
+        if pattern.search(normalized_text):
+            tags.append(tag)
+
+    base_text = normalized_text
+    for pattern in _MODIFIER_STRIP_PATTERNS:
+        base_text = pattern.sub(" ", base_text)
+    base_text = re.sub(r"\s+", " ", base_text).strip(" ,")
+
+    return _ModifierInterpretation(
+        raw_name=raw_name.strip(),
+        normalized_text=normalized_text,
+        base_text=base_text,
+        tags=tags,
+    )
+
+
+def _build_modifier_item(
+    ontology: Ontology,
+    spec: _ResolvedModifierItem,
+) -> FoodItem:
+    item = ontology.lookup_to_food_item(spec.lookup_name)
+    if spec.raw_name_override:
+        item.raw_name = spec.raw_name_override
+    item.recognized_modifiers = list(spec.modifier_tags)
+    return item
+
+
+def _resolve_modifier_specs(
+    raw_name: str,
+    ontology: Ontology,
+) -> Optional[List[_ResolvedModifierItem]]:
+    interpretation = _interpret_modifiers(raw_name)
+    tags = interpretation.tags
+    normalized_text = interpretation.normalized_text
+
+    if "burger" in normalized_text:
+        if ModifierTag.VEGAN in tags:
+            return [
+                _ResolvedModifierItem("Brötchen"),
+                _ResolvedModifierItem("Veganes Patty", [ModifierTag.VEGAN]),
+            ]
+        if ModifierTag.VEGETARIAN in tags:
+            return [
+                _ResolvedModifierItem("Brötchen"),
+                _ResolvedModifierItem("Vegetarisches Patty", [ModifierTag.VEGETARIAN]),
+            ]
+
+    if "hotdog" in normalized_text or "hot dog" in normalized_text:
+        sausage_tags = [tag for tag in tags if tag in {ModifierTag.VEGAN, ModifierTag.VEGETARIAN, ModifierTag.HINT_CLASSIC}]
+        sausage_name = "Wurst"
+        if ModifierTag.VEGAN in tags:
+            sausage_name = "Vegane Wurst"
+        elif ModifierTag.VEGETARIAN in tags:
+            sausage_name = "Vegetarische Wurst"
+        return [
+            _ResolvedModifierItem("Brot"),
+            _ResolvedModifierItem(sausage_name, sausage_tags),
+        ]
+
+    if "patty" in normalized_text:
+        if ModifierTag.VEGAN in tags:
+            return [_ResolvedModifierItem("Veganes Patty", [ModifierTag.VEGAN], raw_name_override=raw_name.strip())]
+        if ModifierTag.VEGETARIAN in tags:
+            return [_ResolvedModifierItem("Vegetarisches Patty", [ModifierTag.VEGETARIAN], raw_name_override=raw_name.strip())]
+
+    if "schnitzel" in normalized_text:
+        prep_tags = [tag for tag in tags if tag in {ModifierTag.PREP_BREADED, ModifierTag.PREP_NATUR, ModifierTag.PREP_FRIED}]
+        if ModifierTag.VEGAN in tags:
+            return [_ResolvedModifierItem("Veganes Schnitzel", [ModifierTag.VEGAN, *prep_tags], raw_name_override=raw_name.strip())]
+        if ModifierTag.VEGETARIAN in tags:
+            return [_ResolvedModifierItem("Vegetarisches Schnitzel", [ModifierTag.VEGETARIAN, *prep_tags], raw_name_override=raw_name.strip())]
+        if ModifierTag.PREP_BREADED in tags:
+            return [_ResolvedModifierItem("Paniertes Schnitzel", [ModifierTag.PREP_BREADED], raw_name_override=raw_name.strip())]
+        if ModifierTag.PREP_NATUR in tags:
+            return [_ResolvedModifierItem("Schnitzel", [ModifierTag.PREP_NATUR], raw_name_override=raw_name.strip())]
+
+    prep_tags = [
+        tag for tag in tags
+        if tag in {ModifierTag.PREP_BREADED, ModifierTag.PREP_NATUR, ModifierTag.PREP_FRIED}
+    ]
+    if prep_tags:
+        full_match = ontology.lookup(raw_name)
+        if full_match is not None:
+            return [_ResolvedModifierItem(full_match.canonical, prep_tags, raw_name_override=raw_name.strip())]
+        if interpretation.base_text:
+            base_match = ontology.lookup(interpretation.base_text)
+            if base_match is not None:
+                return [_ResolvedModifierItem(base_match.canonical, prep_tags, raw_name_override=raw_name.strip())]
+
+    return None
+
+
+def _append_normalized_item(
+    target_items: List[FoodItem],
+    source_item: FoodItem,
+    ontology: Ontology,
+) -> None:
+    target_items.append(source_item)
+    target_items.extend(ontology.expand_item_for_logic(source_item))
+
+
 def normalize_dish(
     dish_name: str,
     raw_items: Optional[List[str]] = None,
@@ -106,7 +254,13 @@ def normalize_dish(
     assumed_items: List[FoodItem] = []
 
     # ── Step 1: Compound lookup ─────────────────────────────────────
-    compound = ontology.get_compound(dish_name)
+    modifier_specs = _resolve_modifier_specs(dish_name, ontology) if raw_items is None else None
+    if modifier_specs:
+        for spec in modifier_specs:
+            _append_normalized_item(items, _build_modifier_item(ontology, spec), ontology)
+        logger.info(f"Modifier-driven normalization for dish '{dish_name}': {len(items)} item(s)")
+
+    compound = ontology.get_compound(dish_name) if not items else None
     if compound:
         # Always use compound's base ingredients (even if raw_items also provided)
         all_compound_items = compound.get("base_items", [])
@@ -135,11 +289,19 @@ def normalize_dish(
     # ── Step 2: Raw items provided → ontology lookup ────────────────
     if raw_items is not None:
         for raw in raw_items:
+            modifier_specs = _resolve_modifier_specs(raw.strip(), ontology)
+            if modifier_specs:
+                for spec in modifier_specs:
+                    fi = _build_modifier_item(ontology, spec)
+                    if fi.group == FoodGroup.UNKNOWN:
+                        unknown_items.append(fi.raw_name)
+                    _append_normalized_item(items, fi, ontology)
+                continue
+
             fi = ontology.lookup_to_food_item(raw.strip())
             if fi.group == FoodGroup.UNKNOWN:
                 unknown_items.append(raw.strip())
-            items.append(fi)
-            items.extend(ontology.expand_item_for_logic(fi))
+            _append_normalized_item(items, fi, ontology)
 
     # ── Step 2b: Exact ontology dish hit for intrinsic-conflict items ─
     if raw_items is None and not items and not assumed_items:

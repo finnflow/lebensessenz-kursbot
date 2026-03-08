@@ -94,6 +94,17 @@ class EvaluationMode(str, Enum):
     LIGHT = "light"
 
 
+class ModifierTag(str, Enum):
+    VEGAN = "VEGAN"
+    VEGETARIAN = "VEGETARIAN"
+    WITH_MEAT = "WITH_MEAT"
+    WITH_FISH = "WITH_FISH"
+    PREP_BREADED = "PREP_BREADED"
+    PREP_NATUR = "PREP_NATUR"
+    PREP_FRIED = "PREP_FRIED"
+    HINT_CLASSIC = "HINT_CLASSIC"
+
+
 # ── Verdict & Severity ─────────────────────────────────────────────────
 
 class Verdict(str, Enum):
@@ -131,6 +142,7 @@ class FoodItem(BaseModel):
     risk_codes: List[str] = Field(default_factory=list)
     guidance_codes: List[str] = Field(default_factory=list)
     high_fat: bool = False
+    recognized_modifiers: List[ModifierTag] = Field(default_factory=list)
     confidence: float = 1.0                    # 0.0-1.0 mapping confidence
     assumed: bool = False                      # True if inferred (not explicitly stated)
     assumption_reason: Optional[str] = None    # Why it was assumed
