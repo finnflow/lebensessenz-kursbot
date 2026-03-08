@@ -35,8 +35,8 @@
     "Burger": {
       "base_items": ["Brötchen"],
       "optional_items": ["Salat", "Tomate", "Zwiebel", "Gurke"],
-      "needs_clarification": "Fleisch-Burger (Hackfleisch = PROTEIN) oder veganer Burger (z.B. Bohnen-Patty = HUELSENFRUECHTE)?",
-      "note": "Klärung nötig: Patty-Art bestimmt Gruppen"
+      "needs_clarification": "Welche Patty-/Füllungsbasis? Fleisch = PROTEIN. Veggie-/vegan-Cues werden modifier-aware und bewusst vorsichtig behandelt.",
+      "note": "Klärung nötig: Burger-Basis bleibt ohne explizite Patty-Angabe offen."
     },
     "Cheeseburger": {
       "base_items": ["Brötchen", "Hackfleisch", "Käse", "Salat", "Tomate"],
@@ -129,16 +129,16 @@
       "note": "Pur = OK. Mit Joghurt/Sahne = NOT_OK (OBST + MILCH)"
     },
     "Schnitzel mit Pommes": {
-      "base_items": ["Schwein", "Weizenmehl", "Ei", "Kartoffel"],
-      "optional_items": ["Zitrone", "Salat"],
+      "base_items": ["Paniertes Schnitzel", "Pommes"],
+      "optional_items": ["Zitronensaft", "Kopfsalat"],
       "needs_clarification": null,
-      "note": "NOT_OK: PROTEIN (Schnitzel) + KH (Panade + Pommes). Panade enthält Mehl (KH) + Ei (PROTEIN)."
+      "note": "NOT_OK: intrinsisch konfliktuales paniertes Schnitzel plus Pommes. Nutzt die neueren Prepared-/Potato-Canonicals direkt."
     },
     "Wiener Schnitzel": {
-      "base_items": ["Schwein", "Weizenmehl", "Ei", "Kartoffel"],
-      "optional_items": ["Zitrone", "Preiselbeeren"],
-      "needs_clarification": null,
-      "note": "NOT_OK: wie Schnitzel mit Pommes"
+      "base_items": ["Paniertes Schnitzel"],
+      "optional_items": ["Kartoffel gekocht", "Zitronensaft", "Preiselbeeren"],
+      "needs_clarification": "Mit gekochten Kartoffeln als Beilage oder ohne KH-Beilage?",
+      "note": "Schon das panierte Schnitzel selbst bleibt intrinsisch konfliktuell. Gekochte Kartoffeln sind eine häufige, aber nicht erzwungene KH-Beilage."
     },
     "Currywurst mit Pommes": {
       "base_items": ["Wurst", "Kartoffel", "Ketchup"],
@@ -839,10 +839,10 @@
       "note": "Ohne Getreide-Beilage: CONDITIONAL — HUELSENFRUECHTE (Tofu) + NEUTRAL (Gemüse). Mit Reis oder Reisnudeln: NOT_OK (HUELSENFRUECHTE + KH). Sesamöl (kleine Menge): CONDITIONAL auf Fett-Menge."
     },
     "Veggie Burger": {
-      "base_items": ["Brot", "Kichererbsen", "Kopfsalat", "Tomate"],
-      "optional_items": ["Käse", "Avocado", "Senf", "Ketchup", "Gurke"],
-      "needs_clarification": "Kichererbsen-Pattie oder anderer Basis?",
-      "note": "NOT_OK: KH (Brötchen) + HUELSENFRUECHTE (Kichererbsen-/Bohnenpattie). Mit Käse: zusätzlich KH + MILCH. Auch Patty aus schwarzen Bohnen oder Linsen = HUELSENFRUECHTE + KH = NOT_OK."
+      "base_items": ["Brötchen", "Vegetarisches Patty"],
+      "optional_items": ["Kopfsalat", "Tomate", "Gurke", "Senf", "Ketchup"],
+      "needs_clarification": "Welche Patty-Basis genau? Modifier-aware vegetarische Varianten bleiben ohne klare Produktbasis bewusst vorsichtig.",
+      "note": "Modifier-aware Fallback: vegetarischer Burger bleibt absichtlich unscharf, statt automatisch auf Kichererbsen/Bohnen festgelegt zu werden."
     },
     "Gemüsecurry": {
       "base_items": ["Aubergine", "Zucchini", "Tomate", "Paprika", "Kokosmilch", "Zwiebel"],
