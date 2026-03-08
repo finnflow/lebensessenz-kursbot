@@ -23,6 +23,7 @@ from trennkost.models import (
     RuleDefinition,
     RuleCondition,
 )
+from trennkost.ontology import resolve_effective_group
 
 logger = logging.getLogger(__name__)
 
@@ -82,12 +83,13 @@ class TrennkostEngine:
         subgroups_found: Dict[str, Set[FoodSubgroup]] = defaultdict(set)
 
         for item in all_items:
+            effective_group = resolve_effective_group(item)
             label = f"{item.raw_name}"
             if item.canonical and item.canonical != item.raw_name:
                 label = f"{item.raw_name} → {item.canonical}"
-            groups_found[item.group.value].append(label)
+            groups_found[effective_group.value].append(label)
             if item.subgroup:
-                subgroups_found[item.group.value].add(item.subgroup)
+                subgroups_found[effective_group.value].add(item.subgroup)
 
         group_set = set(groups_found.keys())
         has_unknown = bool(analysis.unknown_items)
@@ -165,7 +167,7 @@ class TrennkostEngine:
             # Group items by subgroup to show which protein types are mixed
             subgroup_items = defaultdict(list)
             for item in all_items:
-                if item.group == FoodGroup.PROTEIN and item.subgroup:
+                if resolve_effective_group(item) == FoodGroup.PROTEIN and item.subgroup:
                     label = f"{item.raw_name}"
                     if item.canonical and item.canonical != item.raw_name:
                         label = f"{item.raw_name} → {item.canonical}"

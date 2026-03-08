@@ -18,7 +18,7 @@ from trennkost.models import (
     DishAnalysis,
     TrennkostResult,
 )
-from trennkost.ontology import get_ontology
+from trennkost.ontology import get_ontology, resolve_effective_group
 from trennkost.normalizer import normalize_dish
 from trennkost.engine import evaluate_dish
 
@@ -451,7 +451,7 @@ def analyze_text(
             # But still mention assumed items as questions
             from trennkost.models import RequiredQuestion
             assumed_names = [it.raw_name for it in analysis.assumed_items]
-            assumed_groups = [f"{it.raw_name} ({it.group.value})" for it in analysis.assumed_items]
+            assumed_groups = [f"{it.raw_name} ({resolve_effective_group(it).value})" for it in analysis.assumed_items]
             if assumed_names:
                 # Different message depending on current verdict
                 if result.verdict == Verdict.NOT_OK:
@@ -542,7 +542,12 @@ def analyze_vision(
                 for u in uncertain:
                     ent = ontology.lookup(u)
                     # Only ask about uncertain items that aren't herbs/spices
-                    if not ent or (ent.group != FoodGroup.NEUTRAL or ent.subgroup != FoodSubgroup.KRAEUTER):
+                    if not ent:
+                        relevant_uncertain.append(u)
+                        continue
+
+                    effective_group = resolve_effective_group(ontology.lookup_to_food_item(u))
+                    if effective_group != FoodGroup.NEUTRAL or ent.subgroup != FoodSubgroup.KRAEUTER:
                         relevant_uncertain.append(u)
 
                 if relevant_uncertain:
@@ -575,5 +580,4 @@ def analyze_vision(
 
 
 from trennkost.formatter import format_results_for_llm, build_rag_query  # noqa: F401 (re-export)
-
 

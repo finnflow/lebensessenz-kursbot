@@ -58,6 +58,48 @@ LIGHT_GROUP_DEFAULTS: Dict[FoodGroup, CombinationGroup] = {
     FoodGroup.UNKNOWN: CombinationGroup.UNKNOWN,
 }
 
+STRICT_COMBINATION_TO_LEGACY_GROUP: Dict[CombinationGroup, FoodGroup] = {
+    CombinationGroup.FRUIT_WATERY: FoodGroup.OBST,
+    CombinationGroup.FRUIT_DENSE: FoodGroup.OBST,
+    CombinationGroup.DRIED_FRUIT: FoodGroup.TROCKENOBST,
+    CombinationGroup.NEUTRAL: FoodGroup.NEUTRAL,
+    CombinationGroup.KH: FoodGroup.KH,
+    CombinationGroup.HUELSENFRUECHTE: FoodGroup.HUELSENFRUECHTE,
+    CombinationGroup.PROTEIN: FoodGroup.PROTEIN,
+    CombinationGroup.MILCH: FoodGroup.MILCH,
+    CombinationGroup.FETT: FoodGroup.FETT,
+    CombinationGroup.UNKNOWN: FoodGroup.UNKNOWN,
+}
+
+# Explicit stability seam: these items already carry future-facing target mappings,
+# but deterministic evaluation must stay legacy-compatible until follow-up PRs land.
+STRICT_EVALUATION_LEGACY_OVERRIDES: Dict[str, FoodGroup] = {
+    "mayonnaise": FoodGroup.NEUTRAL,
+    "tofu": FoodGroup.HUELSENFRUECHTE,
+    "tempeh": FoodGroup.HUELSENFRUECHTE,
+}
+
+
+def resolve_effective_group(item: FoodItem, mode: str = "strict") -> FoodGroup:
+    """
+    Central resolver for the group used in deterministic evaluation.
+
+    Strict mode is the only supported mode for now. It uses strict ontology groups
+    where that is behaviorally safe, while preserving explicit legacy overrides for
+    known split items until later PRs intentionally change verdict behavior.
+    """
+    if mode != "strict":
+        raise NotImplementedError(f"Evaluation group mode '{mode}' is not activated yet")
+
+    if item.group == FoodGroup.UNKNOWN:
+        return FoodGroup.UNKNOWN
+
+    if item.item_id and item.item_id in STRICT_EVALUATION_LEGACY_OVERRIDES:
+        return STRICT_EVALUATION_LEGACY_OVERRIDES[item.item_id]
+
+    strict_group = item.group_strict or STRICT_GROUP_DEFAULTS.get(item.group, CombinationGroup.UNKNOWN)
+    return STRICT_COMBINATION_TO_LEGACY_GROUP.get(strict_group, item.group)
+
 
 class Ontology:
     """In-memory food ontology with synonym lookup."""
