@@ -42,12 +42,6 @@ _ADJECTIVES_TO_IGNORE = {
     "normaler", "normale", "normales", "normal",
     "frischer", "frische", "frisches", "frisch",
     "roher", "rohe", "rohes", "roh",
-    "gekochter", "gekochte", "gekochtes", "gekocht",
-    "gebratener", "gebratene", "gebratenes", "gebraten",
-    "gegrillter", "gegrillte", "gegrilltes", "gegrillt",
-    "gedünsteter", "gedünstete", "gedünstetes", "gedünstet",
-    "geschmorter", "geschmorte", "geschmortes", "geschmort",
-    "gebackener", "gebackene", "gebackenes", "gebacken",
     "veganer", "vegane", "veganes", "vegan",
     "vegetarischer", "vegetarische", "vegetarisches", "vegetarisch",
     "glutenfreier", "glutenfreie", "glutenfreies", "glutenfrei",
@@ -92,6 +86,27 @@ _COMPOUND_MODIFIER_PREFIX = (
     r"(?:vegan\w*|vegetar\w*|veggie|klassisch\w*|classic|normal\w*|"
     r"paniert\w*|breaded|natur|frittiert\w*|fried|gebraten\w*)"
 )
+
+_PREPARATION_SIGNAL_PREFIX = (
+    r"(?:frittiert\w*|gebraten\w*|gekocht\w*|gegrillt\w*|gedünstet\w*|"
+    r"gedaempft\w*|gedämpft\w*|geschmort\w*|gebacken\w*|paniert\w*|"
+    r"fried|deep[-\s]?fried|pan[-\s]?fried|grilled|boiled|poached|"
+    r"steamed|saut[eé]ed)"
+)
+
+
+def _preserve_preparation_signal(text: str, item_name: str) -> str:
+    """
+    Keep preparation wording attached to a matched food item when present.
+    """
+    prep_pattern = re.compile(
+        r'(?:^|[\s,;.("\'])'
+        rf'(({_PREPARATION_SIGNAL_PREFIX})\s+{re.escape(item_name)})'
+        r'(?:[\s,;.?!)"\'"]|$)',
+        re.IGNORECASE,
+    )
+    match = prep_pattern.search(text)
+    return match.group(1).strip() if match else item_name
 
 
 def detect_breakfast_context(text: str) -> bool:
@@ -263,9 +278,13 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
             # Include quotes (") and apostrophes (') in boundaries
             pattern = r'(?:^|[\s,;.("\'])' + re.escape(name) + r'(?:[\s,;.?!)"\'"]|$)'
             # Use search_text (with compound removed) instead of original text
-            if re.search(pattern, search_text, re.IGNORECASE) and entry.canonical not in seen:
-                found_items.append(entry.canonical)
-                seen.add(entry.canonical)
+            if re.search(pattern, search_text, re.IGNORECASE):
+                preserved_item = _preserve_preparation_signal(search_text, name)
+                item_key = preserved_item.lower()
+                if item_key in seen:
+                    break
+                found_items.append(preserved_item)
+                seen.add(item_key)
                 break
 
     # Filter out adjectives that are not food items
@@ -281,8 +300,7 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
         return [{"name": modifier_aware_compound or found_compound, "items": None}]
     elif len(found_items) >= 1:
         # No compound, but individual items found
-        return [{"name": _infer_dish_name(found_items) if len(found_items) > 1 else found_items[0],
-                 "items": found_items if len(found_items) > 1 else None}]
+        return [{"name": _infer_dish_name(found_items), "items": found_items}]
 
     return None
 

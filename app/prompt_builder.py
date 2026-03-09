@@ -269,12 +269,6 @@ def build_prompt_food_analysis(
         return build_prompt_menu_overview(trennkost_results, user_message)
 
     verdict_str = trennkost_results[0].verdict.value if trennkost_results else "UNKNOWN"
-    verdict_display = {
-        "OK": "OK",
-        "NOT_OK": "NICHT OK",
-        "CONDITIONAL": "BEDINGT OK",
-        "UNKNOWN": "UNKLAR",
-    }.get(verdict_str, verdict_str)
 
     groups_present: set = set()
     for r in trennkost_results:
@@ -286,11 +280,11 @@ def build_prompt_food_analysis(
     return (
         f"USER'S ORIGINAL MESSAGE: {user_message}\n\n"
         "ANTWORT-ANWEISUNGEN:\n"
-        f"KRITISCH: Das Verdict lautet '{verdict_display}'. Gib dies EXAKT so wieder.\n"
-        "- Offene Fragen bedeuten NICHT, dass das Verdict 'bedingt' ist.\n"
-        "- Bei 'NICHT OK': Auch wenn Rückfragen bestehen, bleibt es NICHT OK.\n"
-        "- Bei 'BEDINGT OK': Nur dann 'bedingt' sagen, wenn oben CONDITIONAL steht.\n"
-        "- Das Verdict wurde DETERMINISTISCH ermittelt und darf NICHT interpretiert werden.\n"
+        f"KRITISCH: Das deterministische Verdict lautet '{verdict_str}' und ist verbindlich.\n"
+        "- Das Verdict wurde DETERMINISTISCH ermittelt und darf NICHT überschrieben, abgeschwächt oder umgekehrt werden.\n"
+        "- Formuliere für den User natürlich, aber halte die Bedeutung des Verdicts exakt stabil (kein exaktes Legacy-Wording nötig).\n"
+        "- Trenne klar: (1) Verdict, (2) Offene Fragen/Klärung, (3) Guidance/Hinweise.\n"
+        "- Offene Fragen sind Klärung und ändern das deterministische Verdict nicht.\n"
         "- KRITISCH: Wenn oben 'KEINE OFFENEN FRAGEN' steht, dann gibt es NULL weitere Fragen.\n"
         "  Erwähne NICHTS über 'typische Zutaten', 'weitere Zutaten', oder 'könnte die Bewertung ändern'.\n"
         "  Sprich NUR über Zutaten die in der 'Gruppen'-Liste oben stehen. IGNORIERE Infos aus RAG-Snippets\n"
@@ -300,7 +294,7 @@ def build_prompt_food_analysis(
         "- Bei INFO-Level Problemen (z.B. Zucker-Empfehlung):\n"
         "  Diese sind KEINE Trennkost-Verstöße, sondern Gesundheits-Empfehlungen aus dem Kurs.\n"
         "  Erwähne sie KURZ und freundlich am Ende (z.B. 'Kleiner Tipp: Honig oder Ahornsirup wären gesünder als Zucker.').\n"
-        "  Das Verdict bleibt OK oder BEDINGT OK, nicht NICHT OK wegen INFO-Problemen!\n"
+        "  Das Verdict bleibt beim Engine-Wert (z.B. OK/CONDITIONAL), nicht NOT_OK wegen INFO-Problemen!\n"
         "\nSTIL & FORMAT:\n"
         "- Schreibe natürlich und freundlich, wie ein Ernährungsberater — KEIN Bericht-Format.\n"
         "- Beginne mit dem Verdict als kurze, klare Aussage (z.B. 'Spaghetti Carbonara ist leider **nicht trennkost-konform**.').\n"
@@ -330,7 +324,7 @@ def build_prompt_food_analysis(
         "  'Behalte PROTEIN' → NUR Fleisch/Fisch/Ei + Gemüse. KEINE KH, KEINE Milch!\n"
         "  'Behalte KH' → NUR Brot/Reis/Pasta + Gemüse. KEIN Protein, KEINE Milch!\n"
         + _breakfast_section(is_breakfast, has_obst_kh)
-        + "- Bei BEDINGT OK:\n"
+        + "- Bei CONDITIONAL (Klärungsfall):\n"
         "  1. Erkläre kurz, warum es bedingt ist\n"
         "  2. Stelle die offene Frage aus 'Offene Fragen' (z.B. 'Wie viel Fett ist enthalten?')\n"
         "  3. WICHTIG: Schlage KEINE zusätzlichen Zutaten oder Alternativen vor!\n"

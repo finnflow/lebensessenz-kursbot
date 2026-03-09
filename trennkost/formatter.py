@@ -125,16 +125,10 @@ def format_results_for_llm(results: List[TrennkostResult], breakfast_context: bo
     parts.append("")
 
     for r in results:
-        verdict_emoji = {
-            Verdict.OK: "OK",
-            Verdict.NOT_OK: "NICHT OK",
-            Verdict.CONDITIONAL: "BEDINGT",
-            Verdict.UNKNOWN: "UNKLAR",
-        }
-
         parts.append(f"── {r.dish_name} ──")
-        parts.append(f"Verdict: {verdict_emoji.get(r.verdict, r.verdict.value)}")
+        parts.append(f"Verdict: {r.verdict.value}")
         parts.append(f"Zusammenfassung: {r.summary}")
+        parts.append(f"Ampel: {r.traffic_light.value}")
 
         if r.groups_found:
             group_strs = []
@@ -165,6 +159,21 @@ def format_results_for_llm(results: List[TrennkostResult], breakfast_context: bo
 
         if r.ok_combinations:
             parts.append("OK-Kombinationen: " + "; ".join(r.ok_combinations))
+
+        if r.guidance_facts or r.guidance_codes:
+            parts.append("Guidance:")
+            seen_codes = set()
+            for fact in r.guidance_facts:
+                seen_codes.add(fact.code)
+                groups = ", ".join(fact.affected_groups) if fact.affected_groups else "-"
+                items = ", ".join(fact.affected_items) if fact.affected_items else "-"
+                line = f"  [{fact.code}] Gruppen: {groups} | Items: {items} | Hinweis: {fact.amount_hint}"
+                if fact.fat_category:
+                    line += f" | Kategorie: {fact.fat_category}"
+                parts.append(line)
+            for code in r.guidance_codes:
+                if code not in seen_codes:
+                    parts.append(f"  [{code}]")
 
         fix_dirs = _generate_fix_directions(r)
         if fix_dirs:

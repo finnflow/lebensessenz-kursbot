@@ -304,7 +304,13 @@ class TrennkostEngine:
         )
 
         # ── Build structured guidance ───────────────────────────────
-        guidance_facts = self._build_guidance(analysis, combination_groups_found, mode=mode)
+        fat_guidance_facts = self._build_guidance(analysis, combination_groups_found, mode=mode)
+        profile_guidance_facts = self._build_profile_guidance_facts(
+            all_items=all_items,
+            mode=mode,
+            existing_fat_guidance=bool(fat_guidance_facts),
+        )
+        guidance_facts = fat_guidance_facts + profile_guidance_facts
         guidance_codes = list(dict.fromkeys(fact.code for fact in guidance_facts))
 
         # ── Determine final verdict ─────────────────────────────────
@@ -547,6 +553,56 @@ class TrennkostEngine:
         if item.canonical and item.canonical != item.raw_name:
             return f"{item.raw_name} → {item.canonical}"
         return item.raw_name
+
+    def _build_profile_guidance_facts(
+        self,
+        all_items: List[FoodItem],
+        mode: EvaluationMode,
+        existing_fat_guidance: bool = False,
+    ) -> List[GuidanceFact]:
+        """
+        Translate ontology guidance codes into structured guidance facts.
+        """
+        ontology = get_ontology()
+        guidance_profiles = ontology.guidance_profiles
+        grouped: Dict[str, Dict[str, object]] = {}
+
+        for item in all_items:
+            item_group = resolve_combination_group(item, mode=mode)
+            # Fat-only combos already use the dedicated synthetic fat guidance path.
+            if existing_fat_guidance and item_group == CombinationGroup.FETT:
+                continue
+
+            label = self._format_item_label(item)
+            for code in item.guidance_codes:
+                profile = guidance_profiles.get(code)
+                if not profile:
+                    logger.warning("Ignoring unknown guidance code '%s' on item '%s'", code, item.raw_name)
+                    continue
+
+                bucket = grouped.setdefault(
+                    code,
+                    {
+                        "groups": set(),
+                        "items": [],
+                        "hint": profile.title,
+                    },
+                )
+                bucket["groups"].add(item_group.value)
+                if label not in bucket["items"]:
+                    bucket["items"].append(label)
+
+        facts: List[GuidanceFact] = []
+        for code, bucket in grouped.items():
+            facts.append(
+                GuidanceFact(
+                    code=code,
+                    affected_groups=sorted(bucket["groups"]),
+                    affected_items=bucket["items"],
+                    amount_hint=bucket["hint"],
+                )
+            )
+        return facts
 
     def _build_questions(
         self,

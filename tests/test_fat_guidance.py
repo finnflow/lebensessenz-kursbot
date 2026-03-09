@@ -48,10 +48,26 @@ def test_mayonnaise_uses_fat_guidance_with_kh(engine):
     result = engine.evaluate(analysis)
 
     assert result.verdict == Verdict.OK
+    assert result.required_questions == []
     assert "FETT" in result.groups_found
     assert result.guidance_codes == ["FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT"]
     assert result.guidance_facts[0].amount_hint == "max. ca. 1-2 TL"
     assert "Mayonnaise" in result.guidance_facts[0].affected_items[0]
+
+
+@pytest.mark.parametrize("items", [
+    ["Kartoffel", "Olivenöl"],
+    ["Hähnchen", "Olivenöl"],
+    ["Joghurt", "Olivenöl"],
+    ["Linsen", "Olivenöl"],
+])
+def test_non_fruit_fat_does_not_drive_conditional_or_clarification(items, engine):
+    analysis = normalize_dish("Test", raw_items=items)
+    result = engine.evaluate(analysis)
+
+    assert result.verdict == Verdict.OK
+    assert result.required_questions == []
+    assert result.guidance_codes == ["FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT"]
 
 
 def test_non_fat_rule_behavior_stays_stable(engine):
