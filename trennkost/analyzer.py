@@ -54,7 +54,7 @@ _ADJECTIVES_TO_IGNORE = {
 }
 
 # Separators for ingredient lists
-_ITEM_SEPARATORS = re.compile(r"[,;]\s*|\s+und\s+|\s+mit\s+|\s+&\s+", re.IGNORECASE)
+_ITEM_SEPARATORS = re.compile(r"[,;]\s*|\s+und\s+|\s+mit\s+|\s+&\s+|\s+\+\s+", re.IGNORECASE)
 
 # Pattern: "IngredientName (optional notes): quantity/description"
 # Matches "Haferflocken: 60g", "Kokosjoghurt (vegan): 2-3 EL", "Banane: ½ Stück"
