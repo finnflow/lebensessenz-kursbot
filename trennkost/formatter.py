@@ -16,7 +16,16 @@ _GROUP_DISPLAY = {
     "OBST": "Obst",
     "FETT": "Fette",
     "TROCKENOBST": "Trockenobst",
+    "FRUIT_WATERY": "wasserreiches Obst",
+    "FRUIT_DENSE": "dichtes Obst",
+    "DRIED_FRUIT": "Trockenobst",
 }
+
+
+def _group_items(result: TrennkostResult, group: str) -> List[str]:
+    if result.strict_groups_found and group in result.strict_groups_found:
+        return result.strict_groups_found[group]
+    return result.groups_found.get(group, [])
 
 
 def _generate_fix_directions(result: TrennkostResult) -> List[str]:
@@ -41,15 +50,15 @@ def _generate_fix_directions(result: TrennkostResult) -> List[str]:
 
     directions = []
     for keep_group in sorted(conflicting_groups):
-        keep_items = result.groups_found.get(keep_group, [])
+        keep_items = _group_items(result, keep_group)
         if not keep_items:
             continue
 
         keep_display = _GROUP_DISPLAY.get(keep_group, keep_group)
         clean = lambda items: ", ".join(i.split(" → ")[0] for i in items)
         keep_items_str = clean(keep_items)
-        replace_str = ", ".join(clean(result.groups_found.get(g, [])) for g in sorted(conflicting_groups) if g != keep_group and result.groups_found.get(g))
-        forbidden_displays = [_GROUP_DISPLAY.get(g, g) for g in sorted(conflicting_groups) if g != keep_group]
+        replace_str = ", ".join(clean(_group_items(result, g)) for g in sorted(conflicting_groups) if g != keep_group and _group_items(result, g))
+        forbidden_displays = [_GROUP_DISPLAY.get(g, g) for g in sorted(conflicting_groups) if g != keep_group and _group_items(result, g)]
 
         directions.append(
             f"Behalte {keep_display} ({keep_items_str}) "
@@ -116,16 +125,10 @@ def format_results_for_llm(results: List[TrennkostResult], breakfast_context: bo
     parts.append("")
 
     for r in results:
-        verdict_emoji = {
-            Verdict.OK: "OK",
-            Verdict.NOT_OK: "NICHT OK",
-            Verdict.CONDITIONAL: "BEDINGT",
-            Verdict.UNKNOWN: "UNKLAR",
-        }
-
         parts.append(f"── {r.dish_name} ──")
-        parts.append(f"Verdict: {verdict_emoji.get(r.verdict, r.verdict.value)}")
+        parts.append(f"Verdict: {r.verdict.value}")
         parts.append(f"Zusammenfassung: {r.summary}")
+        parts.append(f"Ampel: {r.traffic_light.value}")
 
         if r.groups_found:
             group_strs = []
@@ -156,6 +159,21 @@ def format_results_for_llm(results: List[TrennkostResult], breakfast_context: bo
 
         if r.ok_combinations:
             parts.append("OK-Kombinationen: " + "; ".join(r.ok_combinations))
+
+        if r.guidance_facts or r.guidance_codes:
+            parts.append("Guidance:")
+            seen_codes = set()
+            for fact in r.guidance_facts:
+                seen_codes.add(fact.code)
+                groups = ", ".join(fact.affected_groups) if fact.affected_groups else "-"
+                items = ", ".join(fact.affected_items) if fact.affected_items else "-"
+                line = f"  [{fact.code}] Gruppen: {groups} | Items: {items} | Hinweis: {fact.amount_hint}"
+                if fact.fat_category:
+                    line += f" | Kategorie: {fact.fat_category}"
+                parts.append(line)
+            for code in r.guidance_codes:
+                if code not in seen_codes:
+                    parts.append(f"  [{code}]")
 
         fix_dirs = _generate_fix_directions(r)
         if fix_dirs:
@@ -196,6 +214,9 @@ def build_rag_query(results: List[TrennkostResult], breakfast_context: bool = Fa
         "MILCH": "Milchprodukte Käse sauer verstoffwechselt",
         "HUELSENFRUECHTE": "Hülsenfrüchte schwer verdaulich",
         "OBST": "Obst allein nüchterner Magen Verdauung schnell",
+        "FRUIT_WATERY": "wasserreiches Obst 20-30 Minuten nüchterner Magen",
+        "FRUIT_DENSE": "Banane dichtes Obst 45-60 Minuten",
+        "DRIED_FRUIT": "Trockenobst 45-60 Minuten",
         "FETT": "Fette kleine Mengen Öle",
         "NEUTRAL": "stärkearmes Gemüse Salat neutral kombinierbar",
     }

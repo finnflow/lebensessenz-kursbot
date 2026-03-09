@@ -18,7 +18,7 @@ from trennkost.models import (
     DishAnalysis,
     TrennkostResult,
 )
-from trennkost.ontology import get_ontology
+from trennkost.ontology import get_ontology, resolve_effective_group
 from trennkost.normalizer import normalize_dish
 from trennkost.engine import evaluate_dish
 
@@ -42,12 +42,6 @@ _ADJECTIVES_TO_IGNORE = {
     "normaler", "normale", "normales", "normal",
     "frischer", "frische", "frisches", "frisch",
     "roher", "rohe", "rohes", "roh",
-    "gekochter", "gekochte", "gekochtes", "gekocht",
-    "gebratener", "gebratene", "gebratenes", "gebraten",
-    "gegrillter", "gegrillte", "gegrilltes", "gegrillt",
-    "gedünsteter", "gedünstete", "gedünstetes", "gedünstet",
-    "geschmorter", "geschmorte", "geschmortes", "geschmort",
-    "gebackener", "gebackene", "gebackenes", "gebacken",
     "veganer", "vegane", "veganes", "vegan",
     "vegetarischer", "vegetarische", "vegetarisches", "vegetarisch",
     "glutenfreier", "glutenfreie", "glutenfreies", "glutenfrei",
@@ -60,7 +54,7 @@ _ADJECTIVES_TO_IGNORE = {
 }
 
 # Separators for ingredient lists
-_ITEM_SEPARATORS = re.compile(r"[,;]\s*|\s+und\s+|\s+mit\s+|\s+&\s+", re.IGNORECASE)
+_ITEM_SEPARATORS = re.compile(r"[,;]\s*|\s+und\s+|\s+mit\s+|\s+&\s+|\s+\+\s+", re.IGNORECASE)
 
 # Pattern: "IngredientName (optional notes): quantity/description"
 # Matches "Haferflocken: 60g", "Kokosjoghurt (vegan): 2-3 EL", "Banane: ½ Stück"
@@ -87,6 +81,32 @@ _BREAKFAST_KEYWORDS = re.compile(
     r"|haferflocken|porridge|müsli|muesli|overnight|granola|oatmeal",
     re.IGNORECASE,
 )
+
+_COMPOUND_MODIFIER_PREFIX = (
+    r"(?:vegan\w*|vegetar\w*|veggie|klassisch\w*|classic|normal\w*|"
+    r"paniert\w*|breaded|natur|frittiert\w*|fried|gebraten\w*)"
+)
+
+_PREPARATION_SIGNAL_PREFIX = (
+    r"(?:frittiert\w*|gebraten\w*|gekocht\w*|gegrillt\w*|gedünstet\w*|"
+    r"gedaempft\w*|gedämpft\w*|geschmort\w*|gebacken\w*|paniert\w*|"
+    r"fried|deep[-\s]?fried|pan[-\s]?fried|grilled|boiled|poached|"
+    r"steamed|saut[eé]ed)"
+)
+
+
+def _preserve_preparation_signal(text: str, item_name: str) -> str:
+    """
+    Keep preparation wording attached to a matched food item when present.
+    """
+    prep_pattern = re.compile(
+        r'(?:^|[\s,;.("\'])'
+        rf'(({_PREPARATION_SIGNAL_PREFIX})\s+{re.escape(item_name)})'
+        r'(?:[\s,;.?!)"\'"]|$)',
+        re.IGNORECASE,
+    )
+    match = prep_pattern.search(text)
+    return match.group(1).strip() if match else item_name
 
 
 def detect_breakfast_context(text: str) -> bool:
@@ -227,6 +247,7 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
     """
     ontology = get_ontology()
     text_lower = text.lower()
+    modifier_aware_compound = None
 
     # 1. Check for known compound dishes (longest first to avoid partial matches)
     found_compound = None
@@ -234,6 +255,12 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
     for compound_name in sorted(ontology.compounds.keys(), key=len, reverse=True):
         if compound_name.lower() in text_lower:
             found_compound = compound_name
+            modifier_match = re.search(
+                rf"((?:{_COMPOUND_MODIFIER_PREFIX})\s+{re.escape(compound_name)})",
+                text,
+                re.IGNORECASE,
+            )
+            modifier_aware_compound = modifier_match.group(1).strip() if modifier_match else compound_name
             # Remove matched name to avoid double-matching ingredients
             search_text = text_lower.replace(compound_name.lower(), " ")
             break  # Only match one compound per query
@@ -251,9 +278,13 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
             # Include quotes (") and apostrophes (') in boundaries
             pattern = r'(?:^|[\s,;.("\'])' + re.escape(name) + r'(?:[\s,;.?!)"\'"]|$)'
             # Use search_text (with compound removed) instead of original text
-            if re.search(pattern, search_text, re.IGNORECASE) and entry.canonical not in seen:
-                found_items.append(entry.canonical)
-                seen.add(entry.canonical)
+            if re.search(pattern, search_text, re.IGNORECASE):
+                preserved_item = _preserve_preparation_signal(search_text, name)
+                item_key = preserved_item.lower()
+                if item_key in seen:
+                    break
+                found_items.append(preserved_item)
+                seen.add(item_key)
                 break
 
     # Filter out adjectives that are not food items
@@ -263,14 +294,13 @@ def _extract_foods_from_question(text: str) -> Optional[List[Dict[str, Any]]]:
     if found_compound and found_items:
         # User mentioned a compound dish AND explicit ingredients
         # e.g., "Burger mit Tempeh, Salat, Gurken"
-        return [{"name": found_compound, "items": found_items}]
+        return [{"name": modifier_aware_compound or found_compound, "items": found_items}]
     elif found_compound:
         # Only compound found, no explicit ingredients
-        return [{"name": found_compound, "items": None}]
+        return [{"name": modifier_aware_compound or found_compound, "items": None}]
     elif len(found_items) >= 1:
         # No compound, but individual items found
-        return [{"name": _infer_dish_name(found_items) if len(found_items) > 1 else found_items[0],
-                 "items": found_items if len(found_items) > 1 else None}]
+        return [{"name": _infer_dish_name(found_items), "items": found_items}]
 
     return None
 
@@ -412,6 +442,7 @@ def analyze_text(
     text: str,
     llm_fn: Optional[Callable] = None,
     mode: str = "strict",
+    evaluation_mode: str = "strict",
 ) -> List[TrennkostResult]:
     """
     Analyze food items from text input.
@@ -420,6 +451,7 @@ def analyze_text(
         text: User input (ingredient list, dish name, or menu text)
         llm_fn: Optional LLM callable for unknown item classification
         mode: "strict" = only explicit ingredients, "assumption" = include assumed
+        evaluation_mode: deterministic evaluation mode ("strict" or "light")
 
     Returns:
         List of TrennkostResult (one per dish)
@@ -447,11 +479,14 @@ def analyze_text(
                 unknown_items=analysis.unknown_items,
                 assumed_items=[],  # Don't include in verdict
             )
-            result = evaluate_dish(strict_analysis)
+            result = evaluate_dish(strict_analysis, mode=evaluation_mode)
             # But still mention assumed items as questions
             from trennkost.models import RequiredQuestion
             assumed_names = [it.raw_name for it in analysis.assumed_items]
-            assumed_groups = [f"{it.raw_name} ({it.group.value})" for it in analysis.assumed_items]
+            assumed_groups = [
+                f"{it.raw_name} ({resolve_effective_group(it, mode=evaluation_mode).value})"
+                for it in analysis.assumed_items
+            ]
             if assumed_names:
                 # Different message depending on current verdict
                 if result.verdict == Verdict.NOT_OK:
@@ -478,15 +513,16 @@ def analyze_text(
                         unknown_items=analysis.unknown_items,
                         assumed_items=analysis.assumed_items,
                     )
-                    assumption_result = evaluate_dish(assumption_analysis)
+                    assumption_result = evaluate_dish(assumption_analysis, mode=evaluation_mode)
                     if assumption_result.verdict == Verdict.NOT_OK:
                         result.verdict = Verdict.CONDITIONAL
+                        result.active_mode_verdict = Verdict.CONDITIONAL
                         result.summary = (
                             f"{dish_name}: Bedingt OK — "
                             f"mit typischen Zusatz-Zutaten wäre es NOT_OK."
                         )
         else:
-            result = evaluate_dish(analysis)
+            result = evaluate_dish(analysis, mode=evaluation_mode)
 
         results.append(result)
 
@@ -497,6 +533,7 @@ def analyze_vision(
     vision_dishes: List[Dict[str, Any]],
     llm_fn: Optional[Callable] = None,
     mode: str = "strict",
+    evaluation_mode: str = "strict",
 ) -> List[TrennkostResult]:
     """
     Analyze dishes extracted from a vision API response.
@@ -505,6 +542,7 @@ def analyze_vision(
         vision_dishes: List of {"name": str, "items": [str], "uncertain_items": [str]}
         llm_fn: Optional LLM callable
         mode: "strict" or "assumption"
+        evaluation_mode: deterministic evaluation mode ("strict" or "light")
 
     Returns:
         List of TrennkostResult
@@ -534,7 +572,7 @@ def analyze_vision(
                 dish_name=name, items=items,
                 unknown_items=unknowns, assumed_items=[],
             )
-            result = evaluate_dish(analysis)
+            result = evaluate_dish(analysis, mode=evaluation_mode)
             # Add uncertain items as questions — but skip irrelevant ones (herbs/spices)
             if uncertain:
                 # Filter out herbs/spices (NEUTRAL/KRAEUTER) that don't affect verdict
@@ -542,7 +580,15 @@ def analyze_vision(
                 for u in uncertain:
                     ent = ontology.lookup(u)
                     # Only ask about uncertain items that aren't herbs/spices
-                    if not ent or (ent.group != FoodGroup.NEUTRAL or ent.subgroup != FoodSubgroup.KRAEUTER):
+                    if not ent:
+                        relevant_uncertain.append(u)
+                        continue
+
+                    effective_group = resolve_effective_group(
+                        ontology.lookup_to_food_item(u),
+                        mode=evaluation_mode,
+                    )
+                    if effective_group != FoodGroup.NEUTRAL or ent.subgroup != FoodSubgroup.KRAEUTER:
                         relevant_uncertain.append(u)
 
                 if relevant_uncertain:
@@ -554,20 +600,21 @@ def analyze_vision(
                     ))
                 if result.verdict == Verdict.OK and relevant_uncertain:
                     result.verdict = Verdict.CONDITIONAL
+                    result.active_mode_verdict = Verdict.CONDITIONAL
                     result.summary = f"{name}: Bedingt OK — einige Zutaten unsicher."
         else:
             analysis = DishAnalysis(
                 dish_name=name, items=items,
                 unknown_items=unknowns, assumed_items=assumed,
             )
-            result = evaluate_dish(analysis)
+            result = evaluate_dish(analysis, mode=evaluation_mode)
 
         # LLM-classify any remaining unknowns
         if unknowns and llm_fn:
             analysis_with_llm = normalize_dish(
                 dish_name=name, raw_items=visible_items, llm_fn=llm_fn,
             )
-            result = evaluate_dish(analysis_with_llm)
+            result = evaluate_dish(analysis_with_llm, mode=evaluation_mode)
 
         results.append(result)
 
@@ -575,5 +622,3 @@ def analyze_vision(
 
 
 from trennkost.formatter import format_results_for_llm, build_rag_query  # noqa: F401 (re-export)
-
-

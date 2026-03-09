@@ -7,21 +7,33 @@ NO LLM calls. Pure logic.
 import json
 import logging
 from pathlib import Path
-from typing import List, Dict, Set, Optional, Tuple
+from typing import List, Dict, Set, Optional, Tuple, Union
 from collections import defaultdict
 
 from trennkost.models import (
+    CombinationGroup,
+    EvaluationMode,
     FoodGroup,
     FoodSubgroup,
+    RiskSeverity,
+    TrafficLight,
     Verdict,
     Severity,
     FoodItem,
     DishAnalysis,
+    ItemRiskFact,
     RuleProblem,
     RequiredQuestion,
+    GuidanceFact,
     TrennkostResult,
     RuleDefinition,
     RuleCondition,
+)
+from trennkost.ontology import (
+    STRICT_FRUIT_GROUPS,
+    combination_group_to_display_group,
+    get_ontology,
+    resolve_combination_group,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,6 +46,36 @@ SMOOTHIE_SAFE_SUBGROUPS = {
     FoodSubgroup.BLATTGRUEN,
     FoodSubgroup.KRAEUTER,  # Spices, herbs, water don't affect digestion
 }
+
+FAT_GUIDANCE_NEUTRAL_SMALL_AMOUNT = "FAT_WITH_NEUTRAL_SMALL_AMOUNT"
+FAT_GUIDANCE_CONFLICT_TINY_AMOUNT = "FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT"
+FAT_OIL_BUTTER_SUBGROUPS = {
+    FoodSubgroup.OEL,
+    FoodSubgroup.TIERISCHES_FETT,
+}
+FAT_FOOD_SUBGROUPS = {
+    FoodSubgroup.NUSS_SAMEN,
+}
+CONCENTRATED_NON_FRUIT_GROUPS = {
+    CombinationGroup.KH.value,
+    CombinationGroup.PROTEIN.value,
+    CombinationGroup.HUELSENFRUECHTE.value,
+    CombinationGroup.MILCH.value,
+}
+
+SUMMARY_GROUP_LABELS = {
+    CombinationGroup.FRUIT_WATERY.value: "wasserreiches Obst",
+    CombinationGroup.FRUIT_DENSE.value: "dichtes Obst",
+    CombinationGroup.DRIED_FRUIT.value: "Trockenobst",
+    CombinationGroup.NEUTRAL.value: "stärkearmes Gemüse/Salat",
+    CombinationGroup.KH.value: "Kohlenhydrate",
+    CombinationGroup.HUELSENFRUECHTE.value: "Hülsenfrüchte",
+    CombinationGroup.PROTEIN.value: "Proteine",
+    CombinationGroup.MILCH.value: "Milchprodukte",
+    CombinationGroup.FETT.value: "Fette",
+}
+
+MODE_RELAXATION_CODE = "LIGHT_MODE_RELAXED"
 
 
 class TrennkostEngine:
@@ -69,27 +111,96 @@ class TrennkostEngine:
         self.rule_priority = data.get("rule_priority", [r.rule_id for r in self.rules])
         logger.info(f"Loaded {len(self.rules)} rules")
 
-    def evaluate(self, analysis: DishAnalysis) -> TrennkostResult:
+    def evaluate(
+        self,
+        analysis: DishAnalysis,
+        mode: Union[str, EvaluationMode] = EvaluationMode.STRICT,
+    ) -> TrennkostResult:
         """
         Evaluate a DishAnalysis against all rules.
 
         Returns TrennkostResult with verdict, problems, and required questions.
         """
+        active_mode = mode if isinstance(mode, EvaluationMode) else EvaluationMode(mode)
+        all_items = analysis.items + analysis.assumed_items
+
+        strict_result = self._evaluate_mode(analysis, mode=EvaluationMode.STRICT)
+        active_result = (
+            strict_result
+            if active_mode == EvaluationMode.STRICT
+            else self._evaluate_mode(analysis, mode=active_mode)
+        )
+
+        # ── Build structured risk / ampel ───────────────────────────
+        risk_facts = self._build_risk_facts(all_items)
+        risk_codes = list(dict.fromkeys(fact.risk_code for fact in risk_facts))
+        traffic_light = self._aggregate_traffic_light(risk_facts)
+
+        mode_relaxation_applied = (
+            active_mode == EvaluationMode.LIGHT
+            and active_result["verdict"] != strict_result["verdict"]
+        )
+        mode_delta_codes = [MODE_RELAXATION_CODE] if mode_relaxation_applied else []
+
+        return TrennkostResult(
+            dish_name=analysis.dish_name,
+            verdict=active_result["verdict"],
+            active_mode=active_mode,
+            strict_verdict=strict_result["verdict"],
+            active_mode_verdict=active_result["verdict"],
+            mode_relaxation_applied=mode_relaxation_applied,
+            mode_delta_codes=mode_delta_codes,
+            traffic_light=traffic_light,
+            summary=active_result["summary"],
+            problems=active_result["problems"],
+            required_questions=active_result["required_questions"],
+            risk_codes=risk_codes,
+            risk_facts=risk_facts,
+            guidance_codes=active_result["guidance_codes"],
+            guidance_facts=active_result["guidance_facts"],
+            ok_combinations=active_result["ok_notes"],
+            groups_found=active_result["display_groups_found"],
+            strict_groups_found=strict_result["combination_groups_found"],
+            debug={
+                "rules_checked": len(self.rules),
+                "rules_triggered": active_result["rules_triggered"],
+                "unknown_items": analysis.unknown_items,
+                "assumed_items": [it.raw_name for it in analysis.assumed_items],
+                "group_set": sorted(active_result["group_set"]),
+                "display_group_set": sorted(active_result["display_groups_found"].keys()),
+                "strict_group_set": sorted(strict_result["group_set"]),
+                "active_mode": active_mode.value,
+                "strict_verdict": strict_result["verdict"].value,
+                "active_mode_verdict": active_result["verdict"].value,
+                "mode_delta_codes": mode_delta_codes,
+                "traffic_light": traffic_light.value,
+                "risk_codes": risk_codes,
+                "guidance_codes": active_result["guidance_codes"],
+            },
+        )
+
+    def _evaluate_mode(
+        self,
+        analysis: DishAnalysis,
+        mode: EvaluationMode,
+    ) -> Dict[str, object]:
         all_items = analysis.items + analysis.assumed_items
 
         # ── Build group sets ────────────────────────────────────────
-        groups_found: Dict[str, List[str]] = defaultdict(list)
+        display_groups_found: Dict[str, List[str]] = defaultdict(list)
+        combination_groups_found: Dict[str, List[str]] = defaultdict(list)
         subgroups_found: Dict[str, Set[FoodSubgroup]] = defaultdict(set)
 
         for item in all_items:
-            label = f"{item.raw_name}"
-            if item.canonical and item.canonical != item.raw_name:
-                label = f"{item.raw_name} → {item.canonical}"
-            groups_found[item.group.value].append(label)
+            combination_group = resolve_combination_group(item, mode=mode)
+            display_group = combination_group_to_display_group(combination_group, fallback=item.group)
+            label = self._format_item_label(item)
+            combination_groups_found[combination_group.value].append(label)
+            display_groups_found[display_group.value].append(label)
             if item.subgroup:
-                subgroups_found[item.group.value].add(item.subgroup)
+                subgroups_found[combination_group.value].add(item.subgroup)
 
-        group_set = set(groups_found.keys())
+        group_set = set(combination_groups_found.keys())
         has_unknown = bool(analysis.unknown_items)
         has_assumed = bool(analysis.assumed_items)
 
@@ -104,7 +215,8 @@ class TrennkostEngine:
                 continue
 
             fired, detail = self._check_rule(
-                rule, group_set, subgroups_found, groups_found,
+                rule, group_set, subgroups_found, display_groups_found,
+                combination_groups_found,
                 has_unknown, has_assumed, triggered_pairs
             )
 
@@ -121,14 +233,15 @@ class TrennkostEngine:
                 if detail.get("pair"):
                     for g in detail["pair"]:
                         affected_groups.append(g)
-                        for item_label in groups_found.get(g, []):
+                        for item_label in combination_groups_found.get(g, []):
                             affected_items.append(f"{item_label} ({g})")
                     triggered_pairs.add(tuple(sorted(detail["pair"])))
                 elif detail.get("group"):
-                    g = detail["group"]
-                    affected_groups.append(g)
-                    for item_label in groups_found.get(g, []):
-                        affected_items.append(f"{item_label} ({g})")
+                    matched_groups = detail.get("matched_groups") or [detail["group"]]
+                    for g in matched_groups:
+                        affected_groups.append(g)
+                        for item_label in combination_groups_found.get(g, []):
+                            affected_items.append(f"{item_label} ({g})")
 
                 problems.append(RuleProblem(
                     rule_id=rule.rule_id,
@@ -160,15 +273,13 @@ class TrennkostEngine:
 
         # ── Check for multiple PROTEIN subgroups (R018) ─────────────
         # Different protein sources (FLEISCH, FISCH, EIER) should not be combined
-        protein_subgroups = subgroups_found.get("PROTEIN", set())
+        protein_subgroups = subgroups_found.get(CombinationGroup.PROTEIN.value, set())
         if len(protein_subgroups) >= 2:
             # Group items by subgroup to show which protein types are mixed
             subgroup_items = defaultdict(list)
             for item in all_items:
-                if item.group == FoodGroup.PROTEIN and item.subgroup:
-                    label = f"{item.raw_name}"
-                    if item.canonical and item.canonical != item.raw_name:
-                        label = f"{item.raw_name} → {item.canonical}"
+                if resolve_combination_group(item, mode=mode) == CombinationGroup.PROTEIN and item.subgroup:
+                    label = self._format_item_label(item)
                     subgroup_items[item.subgroup.value].append(label)
 
             # Build affected items list showing subgroups
@@ -189,31 +300,37 @@ class TrennkostEngine:
 
         # ── Build required questions ────────────────────────────────
         required_questions = self._build_questions(
-            analysis, groups_found, has_unknown, has_assumed
+            analysis, display_groups_found, has_unknown, has_assumed
         )
+
+        # ── Build structured guidance ───────────────────────────────
+        fat_guidance_facts = self._build_guidance(analysis, combination_groups_found, mode=mode)
+        profile_guidance_facts = self._build_profile_guidance_facts(
+            all_items=all_items,
+            mode=mode,
+            existing_fat_guidance=bool(fat_guidance_facts),
+        )
+        guidance_facts = fat_guidance_facts + profile_guidance_facts
+        guidance_codes = list(dict.fromkeys(fact.code for fact in guidance_facts))
 
         # ── Determine final verdict ─────────────────────────────────
         verdict = self._determine_verdict(problems, required_questions, has_unknown)
 
         # ── Build summary ───────────────────────────────────────────
         summary = self._build_summary(analysis.dish_name, verdict, problems, required_questions)
-
-        return TrennkostResult(
-            dish_name=analysis.dish_name,
-            verdict=verdict,
-            summary=summary,
-            problems=problems,
-            required_questions=required_questions,
-            ok_combinations=ok_notes,
-            groups_found=dict(groups_found),
-            debug={
-                "rules_checked": len(self.rules),
-                "rules_triggered": len(problems) + len(ok_notes),
-                "unknown_items": analysis.unknown_items,
-                "assumed_items": [it.raw_name for it in analysis.assumed_items],
-                "group_set": sorted(group_set),
-            },
-        )
+        return {
+            "verdict": verdict,
+            "summary": summary,
+            "problems": problems,
+            "required_questions": required_questions,
+            "guidance_codes": guidance_codes,
+            "guidance_facts": guidance_facts,
+            "ok_notes": ok_notes,
+            "display_groups_found": dict(display_groups_found),
+            "combination_groups_found": dict(combination_groups_found),
+            "group_set": group_set,
+            "rules_triggered": len(problems) + len(ok_notes),
+        }
 
     def _get_rule(self, rule_id: str) -> Optional[RuleDefinition]:
         for r in self.rules:
@@ -227,6 +344,7 @@ class TrennkostEngine:
         group_set: Set[str],
         subgroups_found: Dict[str, Set[FoodSubgroup]],
         groups_found: Dict[str, List[str]],
+        strict_groups_found: Dict[str, List[str]],
         has_unknown: bool,
         has_assumed: bool,
         triggered_pairs: Set[Tuple[str, str]],
@@ -243,14 +361,18 @@ class TrennkostEngine:
 
             # Same-group pair (e.g. KH+KH) → check if multiple items in that group
             if g1 == g2:
-                if g1 in group_set and len(groups_found.get(g1, [])) >= 2:
+                matched = self._matching_groups(group_set, g1)
+                if len(matched) == 1 and len(strict_groups_found.get(next(iter(matched)), [])) >= 2:
                     pair_key = tuple(sorted([g1, g2]))
                     if pair_key not in triggered_pairs:
-                        return True, {"pair": [g1, g2]}
+                        return True, {"pair": sorted(matched)}
                 return False, {}
 
+            matched_g1 = self._matching_groups(group_set, g1)
+            matched_g2 = self._matching_groups(group_set, g2)
+
             # Check if both groups present
-            if g1 not in group_set or g2 not in group_set:
+            if not matched_g1 or not matched_g2:
                 return False, {}
 
             pair_key = tuple(sorted([g1, g2]))
@@ -265,23 +387,24 @@ class TrennkostEngine:
             if cond.except_subgroups:
                 # This is R012: OBST + NEUTRAL where NEUTRAL is BLATTGRUEN
                 allowed_subs = {FoodSubgroup(s) for s in cond.except_subgroups}
-                neutral_subs = subgroups_found.get("NEUTRAL", set())
+                neutral_subs = subgroups_found.get(CombinationGroup.NEUTRAL.value, set())
                 if neutral_subs and neutral_subs.issubset(allowed_subs):
-                    return True, {"pair": [g1, g2]}
+                    return True, {"pair": sorted(matched_g1 | matched_g2)}
                 return False, {}
 
             # For R013 (OBST + NEUTRAL without exception): only fire if NOT all smoothie-safe
             if rule.rule_id == "R013":
-                neutral_subs = subgroups_found.get("NEUTRAL", set())
+                neutral_subs = subgroups_found.get(CombinationGroup.NEUTRAL.value, set())
                 if neutral_subs and neutral_subs.issubset(SMOOTHIE_SAFE_SUBGROUPS):
                     return False, {}  # R012 handles this case (smoothie exception)
 
-            return True, {"pair": [g1, g2]}
+            return True, {"pair": sorted(matched_g1 | matched_g2)}
 
         # ── Single group check ──────────────────────────────────────
         if cond.group_present:
-            if cond.group_present in group_set:
-                return True, {"group": cond.group_present}
+            matched = self._matching_groups(group_set, cond.group_present)
+            if matched:
+                return True, {"group": cond.group_present, "matched_groups": sorted(matched)}
             return False, {}
 
         # ── Unknown check ───────────────────────────────────────────
@@ -297,6 +420,189 @@ class TrennkostEngine:
             return False, {}
 
         return False, {}
+
+    def _matching_groups(self, group_set: Set[str], rule_token: str) -> Set[str]:
+        """Resolve which strict evaluation groups satisfy a rule token."""
+        if rule_token == FoodGroup.OBST.value:
+            return {
+                group for group in group_set
+                if group in {strict_group.value for strict_group in STRICT_FRUIT_GROUPS}
+            }
+
+        if rule_token == FoodGroup.TROCKENOBST.value:
+            return {
+                group for group in group_set
+                if group == CombinationGroup.DRIED_FRUIT.value
+            }
+
+        return {group for group in group_set if group == rule_token}
+
+    def _build_risk_facts(self, all_items: List[FoodItem]) -> List[ItemRiskFact]:
+        """Build structured item-level risk facts from ontology metadata."""
+        ontology = get_ontology()
+        risk_profiles = ontology.risk_profiles
+        facts: List[ItemRiskFact] = []
+
+        for item in all_items:
+            for risk_code in item.risk_codes:
+                profile = risk_profiles.get(risk_code)
+                if not profile:
+                    logger.warning("Ignoring unknown risk code '%s' on item '%s'", risk_code, item.raw_name)
+                    continue
+                facts.append(ItemRiskFact(
+                    item=self._format_item_label(item),
+                    risk_code=risk_code,
+                    severity=profile.severity,
+                    title=profile.title,
+                    description=profile.description,
+                ))
+
+        return facts
+
+    def _aggregate_traffic_light(self, risk_facts: List[ItemRiskFact]) -> TrafficLight:
+        if any(fact.severity == RiskSeverity.RED for fact in risk_facts):
+            return TrafficLight.RED
+        if any(fact.severity == RiskSeverity.YELLOW for fact in risk_facts):
+            return TrafficLight.YELLOW
+        return TrafficLight.GREEN
+
+    def _build_guidance(
+        self,
+        analysis: DishAnalysis,
+        groups_found: Dict[str, List[str]],
+        mode: EvaluationMode = EvaluationMode.STRICT,
+    ) -> List[GuidanceFact]:
+        """Build structured, verdict-independent guidance facts."""
+        all_items = analysis.items + analysis.assumed_items
+        fat_items = [
+            item for item in all_items
+            if resolve_combination_group(item, mode=mode) == CombinationGroup.FETT
+        ]
+        if not fat_items:
+            return []
+
+        group_set = set(groups_found.keys())
+        if group_set & {strict_group.value for strict_group in STRICT_FRUIT_GROUPS}:
+            return []
+
+        concentrated_groups = sorted(group_set & CONCENTRATED_NON_FRUIT_GROUPS)
+        if concentrated_groups:
+            return [GuidanceFact(
+                code=FAT_GUIDANCE_CONFLICT_TINY_AMOUNT,
+                affected_groups=["FETT", *concentrated_groups],
+                affected_items=[self._format_item_label(item) for item in fat_items],
+                amount_hint="max. ca. 1-2 TL",
+                fat_category="ANY_FAT",
+            )]
+
+        if "NEUTRAL" not in group_set or not group_set.issubset({"FETT", "NEUTRAL"}):
+            return []
+
+        oil_butter_items = []
+        fat_food_items = []
+        condiment_items = []
+
+        for item in fat_items:
+            category = self._classify_fat_guidance_category(item)
+            label = self._format_item_label(item)
+            if category == "OIL_BUTTER":
+                oil_butter_items.append(label)
+            elif category == "NUT_SEED_AVOCADO":
+                fat_food_items.append(label)
+            else:
+                condiment_items.append(label)
+
+        facts: List[GuidanceFact] = []
+        if oil_butter_items:
+            facts.append(GuidanceFact(
+                code=FAT_GUIDANCE_NEUTRAL_SMALL_AMOUNT,
+                affected_groups=["FETT", "NEUTRAL"],
+                affected_items=oil_butter_items,
+                amount_hint="ca. 1-2 EL",
+                fat_category="OIL_BUTTER",
+            ))
+        if fat_food_items:
+            facts.append(GuidanceFact(
+                code=FAT_GUIDANCE_NEUTRAL_SMALL_AMOUNT,
+                affected_groups=["FETT", "NEUTRAL"],
+                affected_items=fat_food_items,
+                amount_hint="bis ca. 1/2 Tasse",
+                fat_category="NUT_SEED_AVOCADO",
+            ))
+        if condiment_items:
+            facts.append(GuidanceFact(
+                code=FAT_GUIDANCE_NEUTRAL_SMALL_AMOUNT,
+                affected_groups=["FETT", "NEUTRAL"],
+                affected_items=condiment_items,
+                amount_hint="ca. 1-2 EL",
+                fat_category="CONDIMENT",
+            ))
+
+        return facts
+
+    def _classify_fat_guidance_category(self, item: FoodItem) -> str:
+        if item.high_fat or item.modifier_policy == "CONDIMENT_ONLY":
+            return "CONDIMENT"
+        if item.subgroup in FAT_OIL_BUTTER_SUBGROUPS:
+            return "OIL_BUTTER"
+        if item.subgroup in FAT_FOOD_SUBGROUPS:
+            return "NUT_SEED_AVOCADO"
+        return "CONDIMENT"
+
+    def _format_item_label(self, item: FoodItem) -> str:
+        if item.canonical and item.canonical != item.raw_name:
+            return f"{item.raw_name} → {item.canonical}"
+        return item.raw_name
+
+    def _build_profile_guidance_facts(
+        self,
+        all_items: List[FoodItem],
+        mode: EvaluationMode,
+        existing_fat_guidance: bool = False,
+    ) -> List[GuidanceFact]:
+        """
+        Translate ontology guidance codes into structured guidance facts.
+        """
+        ontology = get_ontology()
+        guidance_profiles = ontology.guidance_profiles
+        grouped: Dict[str, Dict[str, object]] = {}
+
+        for item in all_items:
+            item_group = resolve_combination_group(item, mode=mode)
+            # Fat-only combos already use the dedicated synthetic fat guidance path.
+            if existing_fat_guidance and item_group == CombinationGroup.FETT:
+                continue
+
+            label = self._format_item_label(item)
+            for code in item.guidance_codes:
+                profile = guidance_profiles.get(code)
+                if not profile:
+                    logger.warning("Ignoring unknown guidance code '%s' on item '%s'", code, item.raw_name)
+                    continue
+
+                bucket = grouped.setdefault(
+                    code,
+                    {
+                        "groups": set(),
+                        "items": [],
+                        "hint": profile.title,
+                    },
+                )
+                bucket["groups"].add(item_group.value)
+                if label not in bucket["items"]:
+                    bucket["items"].append(label)
+
+        facts: List[GuidanceFact] = []
+        for code, bucket in grouped.items():
+            facts.append(
+                GuidanceFact(
+                    code=code,
+                    affected_groups=sorted(bucket["groups"]),
+                    affected_items=bucket["items"],
+                    amount_hint=bucket["hint"],
+                )
+            )
+        return facts
 
     def _build_questions(
         self,
@@ -336,35 +642,6 @@ class TrennkostEngine:
                 reason="Mehrdeutige Zutat erfordert Klärung für korrekte Zuordnung.",
                 affects_items=[item.raw_name],
             ))
-
-        # Fat quantity question
-        if "FETT" in groups_found and len(groups_found) > 1:
-            fett_items = groups_found["FETT"]
-            other_concentrated = set(groups_found.keys()) - {"FETT", "NEUTRAL", "UNKNOWN"}
-            if other_concentrated:
-                questions.append(RequiredQuestion(
-                    question=f"Wie viel Fett ({', '.join(fett_items)}) ist enthalten? Kleine Mengen (1-2 TL) sind mit allem OK, größere nur mit Gemüse/Salat.",
-                    reason="Die Fettmenge beeinflusst die Bewertung.",
-                    affects_items=fett_items,
-                ))
-
-        # HIGH_FAT items (Mayo, Aioli, Pesto) + KH/PROTEIN quantity question
-        high_fat_items = []
-        for item in all_items:
-            if item.canonical:
-                entry = ontology.lookup(item.canonical)
-                if entry and entry.high_fat:
-                    high_fat_items.append(item.raw_name)
-
-        if high_fat_items:
-            other_concentrated = set(groups_found.keys()) - {"NEUTRAL", "UNKNOWN"}
-            if other_concentrated:
-                item_str = ', '.join(high_fat_items)
-                questions.append(RequiredQuestion(
-                    question=f"Wie viel {item_str} verwendest du? (1-2 TL als Würze sind OK mit allem, größere Mengen nur mit Gemüse/Salat)",
-                    reason=f"{item_str} ist sehr fettreich (häufig Sonnenblumen-/Rapsöl → entzündungsfördernd). Die Menge ist entscheidend.",
-                    affects_items=high_fat_items,
-                ))
 
         # Compound clarification - but ONLY if no explicit ingredients provided
         # If user said "Burger mit Tempeh, Salat", they already answered the clarification
@@ -422,7 +699,9 @@ class TrennkostEngine:
                 groups = set()
                 for p in critical:
                     groups.update(p.affected_groups)
-                group_str = " + ".join(sorted(groups))
+                group_str = " + ".join(
+                    SUMMARY_GROUP_LABELS.get(group, group) for group in sorted(groups)
+                )
                 return f"{dish_name}: NICHT OK — {group_str} sollten nicht kombiniert werden."
             return f"{dish_name}: NICHT OK nach Trennkost-Prinzip."
 
@@ -446,6 +725,9 @@ def get_engine() -> TrennkostEngine:
     return _engine
 
 
-def evaluate_dish(analysis: DishAnalysis) -> TrennkostResult:
+def evaluate_dish(
+    analysis: DishAnalysis,
+    mode: Union[str, EvaluationMode] = EvaluationMode.STRICT,
+) -> TrennkostResult:
     """Convenience: evaluate a DishAnalysis using the singleton engine."""
-    return get_engine().evaluate(analysis)
+    return get_engine().evaluate(analysis, mode=mode)

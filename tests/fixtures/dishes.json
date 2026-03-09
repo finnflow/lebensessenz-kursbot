@@ -6,9 +6,9 @@
       "id": "D01",
       "name": "Quinoa-Bowl mit Brokkoli und Avocado",
       "items": ["Quinoa", "Brokkoli", "Avocado", "Olivenöl"],
-      "expected_verdict": "CONDITIONAL",
+      "expected_verdict": "OK",
       "expected_groups": ["KH", "NEUTRAL", "FETT"],
-      "note": "KH + NEUTRAL + FETT. CONDITIONAL wegen Fettmenge (Avocado ist keine 1-2 TL)."
+      "note": "KH + NEUTRAL + FETT. Verdict bleibt OK; Fettmenge wird als strukturierte Guidance ausgegeben."
     },
     {
       "id": "D02",
@@ -38,9 +38,9 @@
       "id": "D05",
       "name": "Salat mit gegrilltem Hähnchen",
       "items": ["Kopfsalat", "Hähnchen", "Tomate", "Gurke", "Olivenöl"],
-      "expected_verdict": "CONDITIONAL",
+      "expected_verdict": "OK",
       "expected_groups": ["NEUTRAL", "PROTEIN", "FETT"],
-      "note": "PROTEIN + NEUTRAL = OK. CONDITIONAL nur wegen FETT-Menge."
+      "note": "PROTEIN + NEUTRAL = OK. Fettmenge erzeugt nur noch Guidance, keinen Conditional-Verdict."
     },
     {
       "id": "D06",
@@ -64,15 +64,15 @@
       "items": ["Apfel", "Banane", "Erdbeere", "Kiwi"],
       "expected_verdict": "OK",
       "expected_groups": ["OBST"],
-      "note": "Only OBST → OK"
+      "note": "Mixed fruit salad stays OK even though strict fruit subtypes remain distinct in the model."
     },
     {
       "id": "D09",
       "name": "Kartoffel-Gemüse-Pfanne",
       "items": ["Kartoffel", "Zucchini", "Paprika", "Zwiebel", "Olivenöl"],
-      "expected_verdict": "CONDITIONAL",
+      "expected_verdict": "OK",
       "expected_groups": ["KH", "NEUTRAL", "FETT"],
-      "note": "KH + NEUTRAL = OK. CONDITIONAL wegen FETT-Menge."
+      "note": "KH + NEUTRAL = OK. Fettmenge erzeugt nur noch Guidance, keinen Conditional-Verdict."
     },
     {
       "id": "D10",
@@ -134,9 +134,9 @@
       "id": "D17",
       "name": "Hummus mit Gemüsesticks",
       "items": ["Kichererbsen", "Sesam", "Gurke", "Paprika", "Olivenöl"],
-      "expected_verdict": "CONDITIONAL",
+      "expected_verdict": "OK",
       "expected_groups": ["HUELSENFRUECHTE", "FETT", "NEUTRAL"],
-      "note": "HUELSENFRUECHTE + NEUTRAL + FETT. CONDITIONAL wegen Fett-Menge (Tahini+Öl)."
+      "note": "HUELSENFRUECHTE + NEUTRAL + FETT. Verdict bleibt OK; Fettmenge wird als strukturierte Guidance ausgegeben."
     },
     {
       "id": "D18",
