@@ -1,29 +1,29 @@
 {
   "_doc": "Canonical guidance codes for structured, reusable advice snippets.",
   "guidance_profiles": {
-    "SOY_IN_MODERATION": {
-      "title": "Use soy in moderation",
-      "description": "The course material recommends being cautious with soy-based foods."
-    },
-    "SMALL_AMOUNT_ONLY": {
-      "title": "Use only small amounts",
-      "description": "This item is typically only acceptable in small condiment-sized portions."
-    },
     "CHECK_BINDERS": {
-      "title": "Check added binders",
-      "description": "Clarify whether preparation includes milk, butter, starches, or other added binders."
-    },
-    "GLUTEN_AWARE": {
-      "title": "Be gluten-aware",
-      "description": "Suitable as structured guidance for gluten-containing wheat-protein products."
-    },
-    "FAT_WITH_NEUTRAL_SMALL_AMOUNT": {
-      "title": "Use moderate fat with neutral foods",
-      "description": "With neutral foods, oils and butter should stay around 1-2 tablespoons, while nuts, seeds, and avocado can be used in a larger but still bounded amount."
+      "description": "Clarify whether preparation includes milk, butter, starches, or other added binders.",
+      "title": "Check added binders"
     },
     "FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT": {
-      "title": "Keep fat very small with concentrated foods",
-      "description": "When fat is combined with KH, PROTEIN, HUELSENFRUECHTE, or MILCH, keep it to about 1-2 teaspoons."
+      "description": "When fat is combined with KH, PROTEIN, HUELSENFRUECHTE, or MILCH, keep it to about 1-2 teaspoons.",
+      "title": "Keep fat very small with concentrated foods"
+    },
+    "FAT_WITH_NEUTRAL_SMALL_AMOUNT": {
+      "description": "With neutral foods, oils and butter should stay around 1-2 tablespoons, while nuts, seeds, and avocado can be used in a larger but still bounded amount.",
+      "title": "Use moderate fat with neutral foods"
+    },
+    "GLUTEN_AWARE": {
+      "description": "Suitable as structured guidance for gluten-containing wheat-protein products.",
+      "title": "Be gluten-aware"
+    },
+    "SMALL_AMOUNT_ONLY": {
+      "description": "This item is typically only acceptable in small condiment-sized portions.",
+      "title": "Use only small amounts"
+    },
+    "SOY_IN_MODERATION": {
+      "description": "The course material recommends being cautious with soy-based foods.",
+      "title": "Use soy in moderation"
     }
   }
 }

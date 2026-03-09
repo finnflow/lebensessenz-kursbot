@@ -1,30 +1,30 @@
 {
   "_doc": "Canonical risk codes. Only YELLOW and RED are explicit severities; GREEN is implicit when no risks apply.",
   "risk_profiles": {
-    "GLUTEN_HIGH": {
-      "severity": "YELLOW",
-      "title": "High gluten load",
-      "description": "Relevant for items centered on concentrated wheat gluten, such as seitan."
-    },
-    "UNKNOWN_BINDERS": {
-      "severity": "YELLOW",
-      "title": "Unknown binders or additions",
-      "description": "Prepared versions can contain milk, butter, starches, or industrial binders that are not obvious from the name alone."
-    },
-    "SOY": {
-      "severity": "YELLOW",
-      "title": "Soy-based food",
-      "description": "Relevant because the course material advises caution with soy-based foods."
-    },
     "FRIED": {
+      "description": "Deep-fried or pan-fried preparations are treated as a stronger explicit risk in the target model.",
       "severity": "RED",
-      "title": "Fried preparation",
-      "description": "Deep-fried or pan-fried preparations are treated as a stronger explicit risk in the target model."
+      "title": "Fried preparation"
+    },
+    "GLUTEN_HIGH": {
+      "description": "Relevant for items centered on concentrated wheat gluten, such as seitan.",
+      "severity": "YELLOW",
+      "title": "High gluten load"
     },
     "HEAVY_FAT_LOAD": {
+      "description": "Used for items that are typically fat-dense enough to warrant an explicit high-risk marker in the target model.",
       "severity": "RED",
-      "title": "Heavy fat load",
-      "description": "Used for items that are typically fat-dense enough to warrant an explicit high-risk marker in the target model."
+      "title": "Heavy fat load"
+    },
+    "SOY": {
+      "description": "Relevant because the course material advises caution with soy-based foods.",
+      "severity": "YELLOW",
+      "title": "Soy-based food"
+    },
+    "UNKNOWN_BINDERS": {
+      "description": "Prepared versions can contain milk, butter, starches, or industrial binders that are not obvious from the name alone.",
+      "severity": "YELLOW",
+      "title": "Unknown binders or additions"
     }
   }
 }

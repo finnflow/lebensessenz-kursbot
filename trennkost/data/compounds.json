@@ -1,1313 +1,3207 @@
 {
   "_doc": "Common compound dishes with known base ingredients. Used to quickly decompose dishes without LLM when possible. The normalizer checks here FIRST before calling LLM.",
-
   "compounds": {
-    "Pizza": {
-      "base_items": ["Weizenteig", "Tomatensauce", "Käse"],
-      "optional_items": ["Olivenöl"],
-      "needs_clarification": "Welcher Belag? (z.B. Salami, Gemüse, Schinken)",
-      "note": "Basis allein schon NOT_OK: KH (Teig) + MILCH (Käse)"
-    },
-    "Pizza Margherita": {
-      "base_items": ["Weizenteig", "Tomatensauce", "Mozzarella", "Basilikum", "Olivenöl"],
-      "optional_items": [],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Teig) + MILCH (Mozzarella)"
-    },
-    "Spaghetti Carbonara": {
-      "base_items": ["Pasta", "Ei", "Speck", "Parmesan"],
-      "optional_items": ["Sahne"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Pasta) + PROTEIN (Ei, Speck) + MILCH (Parmesan, evtl. Sahne)"
-    },
-    "Spaghetti Bolognese": {
-      "base_items": ["Pasta", "Hackfleisch", "Tomatensauce", "Zwiebel"],
-      "optional_items": ["Parmesan", "Olivenöl", "Möhre", "Sellerie"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Pasta) + PROTEIN (Hackfleisch)"
-    },
-    "Spaghetti Aglio e Olio": {
-      "base_items": ["Pasta", "Knoblauch", "Olivenöl", "Chili"],
-      "optional_items": ["Petersilie"],
-      "needs_clarification": null,
-      "note": "OK wenn Fett-Menge klein (1-2 TL Olivenöl): KH + NEUTRAL + kleine Menge FETT"
-    },
-    "Burger": {
-      "base_items": ["Brötchen"],
-      "optional_items": ["Salat", "Tomate", "Zwiebel", "Gurke"],
-      "needs_clarification": "Welche Patty-/Füllungsbasis? Fleisch = PROTEIN. Veggie-/vegan-Cues werden modifier-aware und bewusst vorsichtig behandelt.",
-      "note": "Klärung nötig: Burger-Basis bleibt ohne explizite Patty-Angabe offen."
-    },
-    "Hotdog": {
-      "base_items": ["Brot", "Wurst"],
-      "optional_items": ["Senf", "Ketchup"],
-      "needs_clarification": "Klassisch, vegetarisch oder vegan? Explizite modifier-aware Varianten bleiben stärker als dieser generische Restaurant-Fallback.",
-      "note": "Generischer Hotdog-Fallback: Brot + Wurst. Vegetarische/vegane Hotdogs bleiben bewusst über die bestehenden Wurst-Varianten modelliert."
-    },
-    "Hotdog mit Pommes": {
-      "base_items": ["Brot", "Wurst", "Pommes"],
-      "optional_items": ["Senf", "Ketchup", "Mayonnaise"],
-      "needs_clarification": "Klassisch, vegetarisch oder vegan? Explizite modifier-aware Varianten bleiben stärker als dieser generische Restaurant-Fallback.",
-      "note": "Generischer Restaurant-Fallback: Hotdog plus Pommes. Modifier-aware Varianten wie vegetarischer oder veganer Hotdog mit Pommes bleiben vorsichtig über die bestehenden Wurst-Canonicals modelliert."
-    },
-    "Cheeseburger": {
-      "base_items": ["Brötchen", "Hackfleisch", "Käse", "Salat", "Tomate"],
-      "optional_items": ["Ketchup", "Senf", "Zwiebel", "Gurke"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Brötchen) + PROTEIN (Hackfleisch) + MILCH (Käse)"
-    },
-    "Döner Kebab": {
-      "base_items": ["Fladenbrot", "Hähnchen", "Salat", "Tomate", "Zwiebel"],
-      "optional_items": ["Joghurtsauce", "Rotkohl"],
-      "needs_clarification": "Welches Fleisch? Mit Joghurtsauce (MILCH)?",
-      "note": "NOT_OK: KH (Fladenbrot) + PROTEIN (Fleisch), evtl. + MILCH (Joghurtsauce)"
-    },
-    "Caesar Salad": {
-      "base_items": ["Kopfsalat", "Parmesan", "Croutons"],
-      "optional_items": ["Hähnchen", "Ei", "Olivenöl"],
-      "needs_clarification": "Mit Hähnchen oder ohne?",
-      "note": "Croutons = KH, Parmesan = MILCH → schon NOT_OK. Mit Hähnchen zusätzlich PROTEIN."
-    },
-    "Sushi": {
-      "base_items": ["Reis"],
-      "optional_items": ["Sojasoße", "Wasabi", "Ingwer"],
-      "needs_clarification": "Welche Sorte? Nigiri/Maki mit Fisch (PROTEIN) oder vegetarisch (z.B. Avocado, Gurke)?",
-      "note": "Fisch-Sushi = NOT_OK: KH (Reis) + PROTEIN (Fisch). Avocado-Maki = KH + FETT (CONDITIONAL auf Menge)"
-    },
-    "Müsli mit Milch": {
-      "base_items": ["Müsli", "Milch"],
-      "optional_items": ["Banane", "Honig"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Müsli) + MILCH. Mit Banane zusätzlich OBST."
-    },
-    "Overnight Oats": {
-      "base_items": ["Hafer"],
-      "optional_items": ["Ahornsirup", "Zimt", "Nussmus"],
-      "needs_clarification": "Mit Milch/Joghurt (NOT_OK) oder mit Wasser/Pflanzenmilch?",
-      "note": "Kurs empfiehlt: Hafer + Wasser + Ahornsirup + max 1-2 TL Nussmus = OK"
-    },
-    "Porridge": {
-      "base_items": ["Hafer"],
-      "optional_items": ["Ahornsirup", "Zimt"],
-      "needs_clarification": "Mit Milch oder mit Wasser gekocht?",
-      "note": "Mit Wasser = OK (KH). Mit Milch = NOT_OK (KH + MILCH)"
-    },
-    "Käsebrot": {
-      "base_items": ["Brot", "Käse"],
-      "optional_items": ["Butter"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Brot) + MILCH (Käse)"
-    },
-    "Wurstbrot": {
-      "base_items": ["Brot", "Wurst"],
-      "optional_items": ["Butter"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Brot) + PROTEIN (Wurst). Standard-Wurst = FLEISCH/PROTEIN."
-    },
-    "Schinkenbrot": {
-      "base_items": ["Brot", "Schinken"],
-      "optional_items": ["Butter"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Brot) + PROTEIN (Schinken)"
-    },
-    "Rührei mit Toast": {
-      "base_items": ["Ei", "Brot"],
-      "optional_items": ["Butter"],
-      "needs_clarification": null,
-      "note": "NOT_OK: PROTEIN (Ei) + KH (Brot)"
-    },
-    "Hummus mit Gemüsesticks": {
-      "base_items": ["Kichererbsen", "Sesam", "Olivenöl", "Gurke", "Paprika", "Möhre"],
-      "optional_items": ["Knoblauch", "Zitrone"],
-      "needs_clarification": null,
-      "note": "Möhre = KH (stärkehaltig)! Prüfen: HUELSENFRUECHTE + KH (Möhre). Ohne Möhre: CONDITIONAL (HUELSENFRUECHTE + FETT Menge). Besser: Hummus nur mit stärkearmen Gemüsesticks (Gurke, Paprika, Sellerie)"
-    },
-    "Linsensuppe": {
-      "base_items": ["Linsen", "Möhre", "Zwiebel", "Sellerie"],
-      "optional_items": ["Kartoffel", "Olivenöl"],
-      "needs_clarification": "Mit Kartoffeln oder Brot dazu?",
-      "note": "Ohne KH-Beilagen: CONDITIONAL (HUELSENFRUECHTE + Möhre als stärkehaltiges Gemüse). Kurs: Hülsenfrüchte nur mit Gemüse/Salat + kleine Menge Fett."
-    },
-    "Grüner Smoothie": {
-      "base_items": ["Banane", "Spinat"],
-      "optional_items": ["Apfel", "Ingwer", "Wasser"],
-      "needs_clarification": null,
-      "note": "OK: OBST + BLATTGRUEN (Smoothie-Ausnahme)"
-    },
-    "Obstsalat": {
-      "base_items": [],
-      "optional_items": [],
-      "needs_clarification": "Welche Obstsorten? Purer Obstsalat oder mit Joghurt/Sahne?",
-      "note": "Pur = OK. Mit Joghurt/Sahne = NOT_OK (OBST + MILCH)"
-    },
-    "Schnitzel mit Pommes": {
-      "base_items": ["Paniertes Schnitzel", "Pommes"],
-      "optional_items": ["Zitronensaft", "Kopfsalat"],
-      "needs_clarification": null,
-      "note": "NOT_OK: intrinsisch konfliktuales paniertes Schnitzel plus Pommes. Nutzt die neueren Prepared-/Potato-Canonicals direkt."
-    },
-    "Wiener Schnitzel": {
-      "base_items": ["Paniertes Schnitzel"],
-      "optional_items": ["Kartoffel gekocht", "Zitronensaft", "Preiselbeeren"],
-      "needs_clarification": "Mit gekochten Kartoffeln als Beilage oder ohne KH-Beilage?",
-      "note": "Schon das panierte Schnitzel selbst bleibt intrinsisch konfliktuell. Gekochte Kartoffeln sind eine häufige, aber nicht erzwungene KH-Beilage."
-    },
-    "Currywurst mit Pommes": {
-      "base_items": ["Wurst", "Kartoffel", "Ketchup"],
-      "optional_items": ["Currypulver"],
-      "needs_clarification": null,
-      "note": "NOT_OK: PROTEIN (Wurst) + KH (Pommes). Ketchup enthält Zucker."
-    },
-    "Wrap": {
-      "base_items": ["Tortilla"],
-      "optional_items": ["Salat", "Tomate"],
-      "needs_clarification": "Welche Füllung? Fleisch, Falafel, Gemüse?",
-      "note": "Tortilla = KH. Je nach Füllung: Fleisch = NOT_OK (KH+PROTEIN), Falafel = NOT_OK (KH+HUELSENFRUECHTE), rein Gemüse = OK"
-    },
-    "Lasagne": {
-      "base_items": ["Pasta", "Hackfleisch", "Tomatensauce", "Käse", "Sahne"],
-      "optional_items": ["Zwiebel", "Möhre"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Pasta) + PROTEIN (Hackfleisch) + MILCH (Käse, Sahne)"
-    },
-    "Pad Thai": {
-      "base_items": ["Reisnudeln", "Ei", "Tofu"],
-      "optional_items": ["Erdnüsse", "Sojasprossen", "Frühlingszwiebel", "Limette", "Fischsauce", "Tamarinde"],
-      "needs_clarification": "Vegetarisch (mit Ei/Tofu) oder vegan (ohne Ei)?",
-      "note": "Standard: NOT_OK wegen KH (Reisnudeln) + PROTEIN (Ei/Tofu). Vegan ohne Ei/Tofu = OK (nur KH + Gemüse + Erdnüsse/Fett)"
-    },
-    "Shakshuka": {
-      "base_items": ["Tomaten", "Eier", "Paprika", "Zwiebeln", "Olivenöl"],
-      "optional_items": ["Spinat", "Harissa", "Koriander"],
-      "needs_clarification": null,
-      "note": "Standard: OK — PROTEIN (Eier) + NEUTRAL (Tomaten, Paprika, Zwiebeln) + kleine Menge FETT (Olivenöl, 1-2 EL OK). ACHTUNG: Mit Feta = NOT_OK (PROTEIN + MILCH). Mit Kichererbsen = CONDITIONAL (HUELSENFRUECHTE + PROTEIN). Mit Brot zum Dippen = NOT_OK (KH + PROTEIN)."
-    },
-    "Rührei": {
-      "base_items": ["Eier"],
-      "optional_items": ["Butter", "Salz", "Schnittlauch"],
-      "needs_clarification": null,
-      "note": "OK — reines PROTEIN. Mit Butter (kleine Menge FETT): CONDITIONAL aber praktisch OK. Mit Brot/Toast: NOT_OK (KH + PROTEIN)."
-    },
-    "Spiegelei": {
-      "base_items": ["Eier", "Olivenöl"],
-      "optional_items": ["Salz", "Pfeffer"],
-      "needs_clarification": null,
-      "note": "OK — PROTEIN + kleine Menge FETT. Mit Brot/Toast: NOT_OK (KH + PROTEIN)."
-    },
-    "Avocadotoast": {
-      "base_items": ["Brot", "Avocado"],
-      "optional_items": ["Zitrone", "Salz", "Chiliflocken"],
-      "needs_clarification": null,
-      "note": "CONDITIONAL — KH (Brot) + FETT (Avocado). Avocado ist eine größere Fettmenge, daher nur bedingt OK. Mit Ei obendrauf: NOT_OK (KH + PROTEIN)."
-    },
     "Acai Bowl": {
-      "base_items": ["Acai", "Banane"],
-      "optional_items": ["Erdbeeren", "Blaubeeren", "Granola", "Kokosraspeln", "Honig"],
+      "base_items": [
+        "Acai",
+        "Banane"
+      ],
       "needs_clarification": "Mit Granola/Müsli als Topping?",
-      "note": "Pur (nur Obst): OK — reines OBST. Mit Granola (KH) als Topping: NOT_OK (OBST + KH). Granola weglassen oder separat essen."
+      "note": "Pur (nur Obst): OK — reines OBST. Mit Granola (KH) als Topping: NOT_OK (OBST + KH). Granola weglassen oder separat essen.",
+      "optional_items": [
+        "Erdbeeren",
+        "Blaubeeren",
+        "Granola",
+        "Kokosraspeln",
+        "Honig"
+      ]
     },
-    "Chia Pudding": {
-      "base_items": ["Chiasamen"],
-      "optional_items": ["Vanille", "Ahornsirup"],
-      "needs_clarification": "Mit Pflanzenmilch (z.B. Mandelmilch) oder Joghurt?",
-      "note": "Mit Pflanzenmilch: KH-nah, CONDITIONAL. Mit Früchten: OBST darf nicht gemischt werden. Mit Joghurt: MILCH-Kombination prüfen."
-    },
-
-    "Pancakes": {
-      "base_items": ["Weizenmehl", "Ei", "Milch", "Butter"],
-      "optional_items": ["Ahornsirup", "Erdbeere", "Blaubeere", "Honig"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizenmehl) + PROTEIN (Ei) + MILCH (Milch, Butter). Dreifach-Verletzung. Mit Beeren als Topping zusätzlich OBST + MILCH (R009)."
-    },
-    "Crêpes": {
-      "base_items": ["Weizenmehl", "Ei", "Milch", "Butter"],
-      "optional_items": ["Zitrone", "Ahornsirup", "Käse", "Schinken"],
-      "needs_clarification": "Süß (mit Obst/Sirup) oder salzig (mit Käse/Schinken)?",
-      "note": "NOT_OK: KH (Weizenmehl) + PROTEIN (Ei) + MILCH (Milch, Butter). Salzige Variante mit Schinken: noch mehr PROTEIN. Süße Variante mit Obst: zusätzlich OBST + MILCH."
-    },
-    "French Toast": {
-      "base_items": ["Brot", "Ei", "Milch"],
-      "optional_items": ["Butter", "Zimt", "Ahornsirup", "Puderzucker"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Brot) + PROTEIN (Ei) + MILCH. Auch bekannt als Arme Ritter. Mit Früchten als Topping: zusätzlich OBST + MILCH (R009)."
-    },
-    "Waffeln": {
-      "base_items": ["Weizenmehl", "Ei", "Milch", "Butter"],
-      "optional_items": ["Puderzucker", "Sahne", "Erdbeere", "Ahornsirup"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizenmehl) + PROTEIN (Ei) + MILCH (Milch, Butter). Mit Sahne als Topping: mehr MILCH. Mit Erdbeeren: zusätzlich OBST."
-    },
-    "Quark mit Früchten": {
-      "base_items": ["Quark", "Erdbeere"],
-      "optional_items": ["Honig", "Blaubeere", "Himbeere", "Nussmus"],
-      "needs_clarification": null,
-      "note": "NOT_OK: MILCH (Quark) + OBST (Früchte). Obst muss allein und auf nüchternen Magen gegessen werden, nicht mit Milchprodukten."
-    },
-    "Joghurt mit Früchten": {
-      "base_items": ["Joghurt", "Erdbeere"],
-      "optional_items": ["Honig", "Blaubeere", "Banane", "Chiasamen"],
-      "needs_clarification": null,
-      "note": "NOT_OK: MILCH (Joghurt) + OBST (Früchte). Obst muss allein gegessen werden, nicht mit Milchprodukten."
-    },
-    "Joghurt mit Müsli": {
-      "base_items": ["Joghurt", "Müsli"],
-      "optional_items": ["Honig", "Erdbeere", "Blaubeere"],
-      "needs_clarification": "Mit oder ohne Früchte als Topping?",
-      "note": "NOT_OK: MILCH (Joghurt) + KH (Müsli). Mit Früchten: zusätzlich OBST + MILCH (R009)."
-    },
-    "Bircher Müsli": {
-      "base_items": ["Hafer", "Joghurt", "Apfel"],
-      "optional_items": ["Zitrone", "Walnüsse", "Honig", "Erdbeere", "Blaubeere"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Hafer) + MILCH (Joghurt) + OBST (Apfel). Dreifache Kombinations-Verletzung. Mit Beeren: noch mehr OBST."
-    },
-
-    "Flammkuchen": {
-      "base_items": ["Weizenmehl", "Sahne", "Speck", "Zwiebel"],
-      "optional_items": ["Schnittlauch", "Rucola", "Käse"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizenmehl-Teig) + MILCH (Schmand/Sahne) + PROTEIN (Speck). Auch bekannt als Tarte flambée. Vegetarisch (ohne Speck): NOT_OK wegen KH + MILCH."
-    },
-    "Käsespätzle": {
-      "base_items": ["Weizenmehl", "Ei", "Käse", "Zwiebel"],
-      "optional_items": ["Butter", "Schnittlauch"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizenmehl im Spätzle-Teig) + PROTEIN (Ei im Teig) + MILCH (Käse). Klassisches Schwäbisches Gericht — leider dreifache Verletzung."
-    },
-    "Maultaschen": {
-      "base_items": ["Weizenmehl", "Hackfleisch", "Spinat", "Zwiebel"],
-      "optional_items": ["Ei", "Butter", "Parmesan"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizenmehl-Teig) + PROTEIN (Hackfleisch, Ei im Teig). Spinat = NEUTRAL macht es nicht besser. Mit Parmesan: zusätzlich MILCH."
-    },
-    "Gulasch": {
-      "base_items": ["Rindfleisch", "Paprika", "Zwiebel", "Tomatensauce"],
-      "optional_items": ["Paprikapulver", "Lorbeer", "Kartoffel", "Pasta"],
-      "needs_clarification": "Mit welcher Beilage? Kartoffeln/Nudeln = NOT_OK. Gulasch pur = OK.",
-      "note": "Gulasch pur (ohne KH-Beilage): OK — PROTEIN (Rindfleisch) + NEUTRAL (Paprika, Zwiebel, Tomatensauce). Mit Kartoffeln oder Nudeln: NOT_OK (KH + PROTEIN)."
-    },
-    "Kartoffelsuppe": {
-      "base_items": ["Kartoffel", "Möhre", "Sellerie", "Zwiebel"],
-      "optional_items": ["Sahne", "Speck", "Petersilie", "Schnittlauch"],
-      "needs_clarification": "Mit Sahne und/oder Speck?",
-      "note": "Pur (ohne Milch/Protein): OK — KH (Kartoffel, Möhre) + NEUTRAL (Sellerie, Zwiebel). Mit Sahne: NOT_OK (KH + MILCH). Mit Speck: NOT_OK (KH + PROTEIN)."
-    },
-    "Erbsensuppe": {
-      "base_items": ["Erbsen", "Möhre", "Sellerie", "Zwiebel"],
-      "optional_items": ["Speck", "Wurst", "Petersilie"],
-      "needs_clarification": "Vegetarisch oder mit Speck/Wurst?",
-      "note": "Hier: getrocknete Erbsen = HUELSENFRUECHTE (nicht frische grüne Erbsen = NEUTRAL!). Vegetarisch: CONDITIONAL — HUELSENFRUECHTE + KH (Möhre) + NEUTRAL. Mit Speck/Wurst: NOT_OK (HUELSENFRUECHTE + PROTEIN)."
-    },
-    "Kartoffelsalat": {
-      "base_items": ["Kartoffel", "Zwiebel"],
-      "optional_items": ["Mayonnaise", "Senf", "Essig", "Gurke", "Schnittlauch", "Speck"],
-      "needs_clarification": "Mit Mayonnaise (FETT) oder Essig-Dressing? Mit Speck?",
-      "note": "Ohne Fleisch: CONDITIONAL — KH (Kartoffel) + FETT (Mayonnaise, high_fat). Mayonnaise = größere Fettmenge → nur NEUTRAL-Beilage empfohlen. Mit Speck: NOT_OK (KH + PROTEIN)."
-    },
-    "Bratwurst mit Sauerkraut": {
-      "base_items": ["Wurst", "Weißkohl"],
-      "optional_items": ["Senf"],
-      "needs_clarification": "Mit Brötchen oder Kartoffeln als Beilage?",
-      "note": "Pur (ohne KH-Beilage): OK — PROTEIN (Bratwurst) + NEUTRAL (Sauerkraut = fermentierter Weißkohl). Mit Brötchen: NOT_OK (KH + PROTEIN). Mit Kartoffeln: NOT_OK (KH + PROTEIN)."
-    },
-    "Fischstäbchen mit Pommes": {
-      "base_items": ["Fischstäbchen", "Pommes"],
-      "optional_items": ["Zitronensaft", "Ketchup", "Mayonnaise"],
-      "needs_clarification": null,
-      "note": "NOT_OK: intrinsisch konfliktuelle Fischstäbchen plus Pommes. Nutzt das Prepared-Protein-Canonical direkt statt Fisch+Panade lose nachzubauen. Mit Mayonnaise: zusätzlich high_fat FETT."
-    },
-    "Chicken Nuggets mit Pommes": {
-      "base_items": ["Chicken Nuggets", "Pommes"],
-      "optional_items": ["Ketchup", "Mayonnaise"],
-      "needs_clarification": null,
-      "note": "NOT_OK: intrinsisch konfliktuelle Chicken Nuggets plus Pommes. Nutzt das Prepared-Protein-Canonical direkt statt Nuggets+Panade lose nachzubauen."
-    },
-    "Nuggets mit Pommes": {
-      "base_items": ["Chicken Nuggets", "Pommes"],
-      "optional_items": ["Ketchup", "Mayonnaise"],
-      "needs_clarification": "Chicken Nuggets oder andere Nuggets-Variante?",
-      "note": "Restaurant-Default: ohne weitere Präzisierung wird dies vorsichtig als Chicken Nuggets mit Pommes behandelt."
-    },
-
-    "Ratatouille": {
-      "base_items": ["Aubergine", "Zucchini", "Paprika", "Tomate", "Zwiebel", "Knoblauch"],
-      "optional_items": ["Olivenöl", "Thymian", "Basilikum"],
-      "needs_clarification": null,
-      "note": "OK — ausschließlich NEUTRAL (stärkearmes Gemüse + Kräuter). Klassisches Trennkost-freundliches Gericht. Mit kleiner Menge Olivenöl (1-2 TL): OK."
-    },
-    "Griechischer Salat": {
-      "base_items": ["Tomate", "Gurke", "Paprika", "Oliven", "Käse", "Zwiebel"],
-      "optional_items": ["Olivenöl", "Oregano", "Zitrone"],
-      "needs_clarification": "Mit Brot/Pita als Beilage?",
-      "note": "Ohne Brot: OK — MILCH (Feta) + NEUTRAL (Gemüse, Oliven). Mit Pita/Brot: NOT_OK (KH + MILCH). Olivenöl = kleine Menge FETT: CONDITIONAL auf Menge."
-    },
-    "Caprese Salat": {
-      "base_items": ["Tomate", "Käse", "Basilikum", "Olivenöl"],
-      "optional_items": ["Essig"],
-      "needs_clarification": null,
-      "note": "OK: MILCH (Mozzarella) + NEUTRAL (Tomate, Basilikum) + kleine Menge FETT (Olivenöl). Klassisches erlaubtes Trennkost-Gericht. Mit Balsamico (Essig = NEUTRAL): ebenfalls OK."
-    },
-    "Quiche Lorraine": {
-      "base_items": ["Weizenmehl", "Ei", "Sahne", "Speck", "Käse"],
-      "optional_items": ["Butter", "Zwiebel", "Schnittlauch"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Mürbeteig aus Weizenmehl) + PROTEIN (Ei, Speck) + MILCH (Sahne, Käse). Dreifache Kombinations-Verletzung."
-    },
-    "Risotto": {
-      "base_items": ["Reis", "Parmesan", "Butter", "Zwiebel"],
-      "optional_items": ["Pilze", "Spargel", "Garnele", "Hähnchen"],
-      "needs_clarification": "Mit Meeresfrüchten oder Fleisch?",
-      "note": "Standard: NOT_OK — KH (Reis) + MILCH (Parmesan, Butter). Mit Garnelen oder Hähnchen: zusätzlich PROTEIN. Auch vegetarisches Risotto bleibt NOT_OK (KH + MILCH)."
-    },
-    "Paella": {
-      "base_items": ["Reis", "Hähnchen", "Garnele"],
-      "optional_items": ["Paprika", "Tomate", "Safran", "Olivenöl", "Zitrone"],
-      "needs_clarification": "Fleisch-Paella, Seafood-Paella oder vegetarisch?",
-      "note": "Standard: NOT_OK — KH (Reis) + PROTEIN (Hähnchen, Garnelen). Vegetarische Paella ohne PROTEIN: KH + NEUTRAL = OK."
-    },
-    "Tacos": {
-      "base_items": ["Mais"],
-      "optional_items": ["Kopfsalat", "Tomate", "Avocado", "Sahne"],
-      "needs_clarification": "Welche Füllung? Fleisch (PROTEIN), Bohnen (HUELSENFRUECHTE) oder nur Gemüse?",
-      "note": "Mais-Tacoschale = KH. Mit Fleisch: NOT_OK (KH + PROTEIN). Mit Bohnen: NOT_OK (KH + HUELSENFRUECHTE). Mit Käse/Sauerrahm: NOT_OK (KH + MILCH). Rein vegane Gemüse-Füllung: OK (KH + NEUTRAL)."
-    },
-    "Quesadilla": {
-      "base_items": ["Tortilla", "Käse"],
-      "optional_items": ["Hähnchen", "Paprika", "Zwiebel", "Sahne"],
-      "needs_clarification": "Mit oder ohne Fleisch?",
-      "note": "Ohne Fleisch: NOT_OK — KH (Tortilla) + MILCH (Käse). Mit Hähnchen: zusätzlich PROTEIN (KH + MILCH + PROTEIN)."
-    },
-    "Burrito": {
-      "base_items": ["Tortilla", "Reis", "Kidneybohnen"],
-      "optional_items": ["Hähnchen", "Käse", "Sahne", "Avocado", "Kopfsalat", "Tomate"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Tortilla, Reis) + HUELSENFRUECHTE (Bohnen). Mit Fleisch: zusätzlich PROTEIN. Mit Käse/Sauerrahm: zusätzlich MILCH. Mehrfach-Verletzung."
-    },
-    "Falafel": {
-      "base_items": ["Kichererbsen", "Zwiebel", "Koriander", "Kreuzkümmel"],
-      "optional_items": ["Petersilie", "Sesam", "Knoblauch"],
-      "needs_clarification": "Pur als Beilage, in Pita/Brot oder mit Tahini-Sauce?",
-      "note": "Pur (ohne Brot): CONDITIONAL — HUELSENFRUECHTE (Kichererbsen) + NEUTRAL (Kräuter/Gewürze). In Pita/Brot: NOT_OK (HUELSENFRUECHTE + KH). Mit Hummus: OK (HUELSENFRUECHTE + HUELSENFRUECHTE). Mit kleiner Menge Tahini: CONDITIONAL auf Fett-Menge."
-    },
-    "Rotes Linsen-Dal": {
-      "base_items": ["Linsen", "Zwiebel", "Tomate", "Knoblauch", "Ingwer"],
-      "optional_items": ["Kokosmilch", "Kreuzkümmel", "Kurkuma", "Koriander"],
-      "needs_clarification": "Mit Reis oder Brot als Beilage?",
-      "note": "Pur (ohne Beilage): CONDITIONAL — HUELSENFRUECHTE (Linsen) + NEUTRAL (Gemüse, Gewürze). Mit Reis: NOT_OK (HUELSENFRUECHTE + KH). Mit Brot: NOT_OK (HUELSENFRUECHTE + KH). Mit viel Kokosmilch: FETT-Menge prüfen."
-    },
-    "Gyros mit Tzatziki": {
-      "base_items": ["Hähnchen", "Joghurt", "Gurke", "Knoblauch"],
-      "optional_items": ["Olivenöl", "Tomate", "Zwiebel"],
-      "needs_clarification": "Mit oder ohne Pita?",
-      "note": "Gyros + Tzatziki allein: NOT_OK — PROTEIN (Hähnchen) + MILCH (Joghurt im Tzatziki). Mit Pita: zusätzlich KH. Gyros pur ohne Tzatziki + Gemüsebeilage: OK (PROTEIN + NEUTRAL)."
+    "Aloo Gobi": {
+      "base_items": [
+        "Kartoffel",
+        "Blumenkohl",
+        "Tomate",
+        "Zwiebel",
+        "Knoblauch"
+      ],
+      "needs_clarification": "Mit Reis oder Naan als Beilage?",
+      "note": "Pur: OK — KH (Kartoffel) + NEUTRAL (Blumenkohl, Tomate, Zwiebel). Indisches Kartoffel-Blumenkohl-Curry — ohne Milch oder Fleisch Trennkost-freundlich! Mit Naan: KH + KH = OK. Mit Reis: KH + KH = OK. Mit Sahne/Joghurt: NOT_OK (KH + MILCH).",
+      "optional_items": [
+        "Ingwer",
+        "Kurkuma",
+        "Kreuzkümmel",
+        "Koriander",
+        "Olivenöl"
+      ]
     },
     "Antipasti": {
       "base_items": [],
-      "optional_items": ["Aubergine", "Zucchini", "Paprika", "Artischocke", "Oliven", "Käse", "Speck", "Schinken"],
       "needs_clarification": "Welche Zutaten? Nur Gemüse, mit Käse (Mozzarella) oder mit Schinken/Salami?",
-      "note": "Nur Gemüse + Oliven: OK (NEUTRAL + kleine Menge FETT). Mit Mozzarella (MILCH) + kein Fleisch: OK. Mit Schinken/Salami (PROTEIN) + Mozzarella (MILCH): NOT_OK (R006: PROTEIN + MILCH). Mit Brot/Bruschetta: KH-Kombination prüfen."
+      "note": "Nur Gemüse + Oliven: OK (NEUTRAL + kleine Menge FETT). Mit Mozzarella (MILCH) + kein Fleisch: OK. Mit Schinken/Salami (PROTEIN) + Mozzarella (MILCH): NOT_OK (R006: PROTEIN + MILCH). Mit Brot/Bruschetta: KH-Kombination prüfen.",
+      "optional_items": [
+        "Aubergine",
+        "Zucchini",
+        "Paprika",
+        "Artischocke",
+        "Oliven",
+        "Käse",
+        "Speck",
+        "Schinken"
+      ]
     },
-
-    "Tomatensuppe": {
-      "base_items": ["Tomate", "Zwiebel", "Knoblauch"],
-      "optional_items": ["Sahne", "Olivenöl", "Basilikum"],
+    "Apfelmus": {
+      "base_items": [
+        "Apfel"
+      ],
       "needs_clarification": null,
-      "note": "OK — ausschließlich NEUTRAL (Tomate, Zwiebeln, Knoblauch). Mit Sahne: ebenfalls OK (NEUTRAL + MILCH, kein Kombinationsverbot). Mit Olivenöl (1-2 TL): CONDITIONAL auf Menge."
+      "note": "OK — reines OBST. Pur (ohne Zucker) das perfekte Trennkost-Dessert. Mit Zimt (NEUTRAL): weiterhin OK. Mit Zucker (KH): OBST + KH = NOT_OK (R007). Als Beilage zu Reibekuchen: nicht separat, sondern zusammen = OBST + KH (NOT_OK).",
+      "optional_items": [
+        "Zimt",
+        "Zitrone",
+        "Zucker"
+      ]
     },
-    "Kürbissuppe": {
-      "base_items": ["Kürbis", "Zwiebel", "Ingwer"],
-      "optional_items": ["Sahne", "Kokosmilch", "Olivenöl"],
-      "needs_clarification": "Mit Sahne (MILCH → NOT_OK) oder Kokosmilch (FETT → CONDITIONAL)?",
-      "note": "Pur (ohne Milchprodukte): OK — KH (Kürbis) + NEUTRAL (Zwiebel, Ingwer). Mit Sahne: NOT_OK (KH + MILCH). Mit Kokosmilch (FETT, größere Menge): CONDITIONAL (KH + FETT, kein explizites Verbot, aber Fett-Menge prüfen)."
-    },
-    "Minestrone": {
-      "base_items": ["Pasta", "Weiße Bohnen", "Tomate", "Zucchini", "Möhre", "Sellerie"],
-      "optional_items": ["Parmesan", "Olivenöl", "Basilikum"],
+    "Apfelstrudel": {
+      "base_items": [
+        "Weizenmehl",
+        "Apfel",
+        "Butter",
+        "Zimt"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Pasta, Möhre) + HUELSENFRUECHTE (Weiße Bohnen). Hülsenfrüchte dürfen nicht mit anderen KH kombiniert werden. Mit Parmesan: zusätzlich MILCH."
+      "note": "NOT_OK: KH (Weizenmehl-Teig) + OBST (Apfel). Obst darf nicht mit Kohlenhydraten kombiniert werden (R007). Mit Sahne: zusätzlich MILCH + OBST (R009). Mit Rosinen: zusätzlich TROCKENOBST.",
+      "optional_items": [
+        "Rosinen",
+        "Walnüsse",
+        "Sahne",
+        "Puderzucker"
+      ]
     },
-    "Gazpacho": {
-      "base_items": ["Tomate", "Gurke", "Paprika", "Zwiebel", "Knoblauch"],
-      "optional_items": ["Olivenöl", "Essig", "Brot"],
+    "Arancini": {
+      "base_items": [
+        "Reis",
+        "Mozzarella",
+        "Hackfleisch",
+        "Weizenmehl"
+      ],
       "needs_clarification": null,
-      "note": "OK — ausschließlich NEUTRAL (stärkearmes Gemüse + Kräuter). Klassisch Trennkost-freundlich. Auch mit etwas Brot als Einlage: OK (KH + NEUTRAL ist erlaubt). Mit Olivenöl: CONDITIONAL auf Menge."
+      "note": "NOT_OK: KH (Reis, Weizenpanade) + MILCH (Mozzarella) + PROTEIN (Hackfleisch). R001 (KH+PROTEIN) + R002 (KH+MILCH). Sizilianische gefüllte Reisbällchen — dreifache Trennkost-Verletzung.",
+      "optional_items": [
+        "Erbsen",
+        "Tomate",
+        "Safran",
+        "Ei"
+      ]
     },
-
-    "Gebratener Reis": {
-      "base_items": ["Reis", "Ei", "Frühlingszwiebel"],
-      "optional_items": ["Hähnchen", "Garnele", "Möhre", "Erbsen", "Sojasoße"],
-      "needs_clarification": "Vegetarisch oder mit Fleisch/Meeresfrüchten?",
-      "note": "NOT_OK: KH (Reis) + PROTEIN (Ei). Mit Hähnchen/Garnelen: zusätzlich PROTEIN. Auch bekannt als Fried Rice."
-    },
-    "Ramen": {
-      "base_items": ["Pasta", "Ei", "Speck"],
-      "optional_items": ["Sojasprossen", "Frühlingszwiebel", "Nori", "Mais", "Sojasoße"],
+    "Avocadotoast": {
+      "base_items": [
+        "Brot",
+        "Avocado"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizennudeln) + PROTEIN (Ei, Schweinebauch/Chashu). Mit Mais: zusätzlich KH. Mit Sojasprossen/Nori: NEUTRAL, ändert nichts am Verdikt."
+      "note": "CONDITIONAL — KH (Brot) + FETT (Avocado). Avocado ist eine größere Fettmenge, daher nur bedingt OK. Mit Ei obendrauf: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Zitrone",
+        "Salz",
+        "Chiliflocken"
+      ]
     },
-    "Gyoza": {
-      "base_items": ["Weizenmehl", "Schwein", "Weißkohl", "Ingwer", "Knoblauch"],
-      "optional_items": ["Sojasoße", "Reisessig", "Sesamöl"],
+    "Baba Ghanoush": {
+      "base_items": [
+        "Aubergine",
+        "Sesam",
+        "Knoblauch",
+        "Olivenöl"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizenteig) + PROTEIN (Schweinehack). Auch bekannt als Dim Sum, Dumplings oder Jiaozi. Gedämpft, gebraten oder gekocht — immer KH + PROTEIN."
+      "note": "CONDITIONAL: NEUTRAL (Aubergine, Knoblauch) + FETT (Tahini/Sesam, Olivenöl). Kein verbotenes Paar. Fett-Menge beachten: größere Sesam/Öl-Mengen → nur noch NEUTRAL empfohlen.",
+      "optional_items": [
+        "Zitrone",
+        "Petersilie"
+      ]
     },
-    "Pho": {
-      "base_items": ["Reisnudeln", "Rindfleisch"],
-      "optional_items": ["Sojasprossen", "Frühlingszwiebel", "Basilikum", "Limette", "Chili"],
+    "Bagel mit Lachs": {
+      "base_items": [
+        "Brot",
+        "Lachs",
+        "Käse"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Reisnudeln) + PROTEIN (Rindfleisch). Vietnamesische Rindfleischsuppe. Frische Kräuter/Sprossen = NEUTRAL, ändern nichts am Verdikt."
+      "note": "NOT_OK: KH (Bagel) + PROTEIN (Lachs) + MILCH (Frischkäse/Cream Cheese). Dreifach-Verletzung. Auch ohne Käse: KH + PROTEIN = NOT_OK.",
+      "optional_items": [
+        "Kapern",
+        "Zwiebel",
+        "Gurke",
+        "Dill",
+        "Zitrone"
+      ]
     },
-    "Nasi Goreng": {
-      "base_items": ["Reis", "Ei", "Hähnchen"],
-      "optional_items": ["Frühlingszwiebel", "Knoblauch", "Sojasoße", "Chili", "Garnele"],
+    "Banana Bread": {
+      "base_items": [
+        "Weizenmehl",
+        "Banane",
+        "Ei",
+        "Butter"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Reis) + PROTEIN (Ei, Hähnchen). Indonesisches Gebratenes-Reis-Gericht. Mit Garnelen zusätzlich PROTEIN."
+      "note": "NOT_OK: KH (Weizenmehl) + OBST (Banane) + PROTEIN (Ei) + FETT (Butter). R001 (KH+PROTEIN) + R007 (KH+OBST). Auch vegane Variante ohne Ei: KH + OBST = NOT_OK bleibt.",
+      "optional_items": [
+        "Walnüsse",
+        "Schokolade",
+        "Honig",
+        "Zimt"
+      ]
     },
-
-    "Chili con Carne": {
-      "base_items": ["Kidneybohnen", "Hackfleisch", "Tomate", "Zwiebel", "Mais"],
-      "optional_items": ["Käse", "Sauerrahm", "Avocado", "Paprika"],
+    "Banh Mi": {
+      "base_items": [
+        "Brot",
+        "Hähnchen"
+      ],
+      "needs_clarification": "Mit Tofu oder Fleisch als Füllung?",
+      "note": "NOT_OK: KH (Baguette) + PROTEIN (Hähnchen/Schwein) bzw. HUELSENFRUECHTE (Tofu-Variante, R003). R001 (KH+PROTEIN). Mit Möhre: weiteres KH. Vietnamesisches Sandwich — durch Brot + Füllung immer NOT_OK.",
+      "optional_items": [
+        "Möhre",
+        "Gurke",
+        "Koriander",
+        "Chili",
+        "Mayonnaise"
+      ]
+    },
+    "Bibimbap": {
+      "base_items": [
+        "Reis",
+        "Ei",
+        "Rindfleisch",
+        "Spinat",
+        "Möhre"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: HUELSENFRUECHTE (Bohnen) + PROTEIN (Hackfleisch) + KH (Mais). Dreifach-Verletzung. Mit Käse/Sauerrahm: zusätzlich MILCH. Mit Brot/Tortilla als Beilage: noch mehr KH."
+      "note": "NOT_OK: KH (Reis) + PROTEIN (Ei, Rindfleisch) + KH (Möhre). Koreanisches Reisgericht. Vegetarisch ohne Ei/Fleisch: KH + NEUTRAL = OK — dann Trennkost-freundlich!",
+      "optional_items": [
+        "Zucchini",
+        "Pilze",
+        "Sojasprossen",
+        "Gochujang",
+        "Sesamöl"
+      ]
     },
-    "Chili sin Carne": {
-      "base_items": ["Kidneybohnen", "Tomate", "Paprika", "Zwiebel"],
-      "optional_items": ["Mais", "Süßkartoffel", "Avocado", "Käse"],
-      "needs_clarification": "Mit Mais oder Süßkartoffel?",
-      "note": "Pur (ohne KH): CONDITIONAL — HUELSENFRUECHTE + NEUTRAL. Mit Mais oder Süßkartoffel: NOT_OK (HUELSENFRUECHTE + KH). Mit Käse: NOT_OK (HUELSENFRUECHTE + MILCH)."
+    "Bienenstich": {
+      "base_items": [
+        "Weizenmehl",
+        "Milch",
+        "Butter",
+        "Mandeln",
+        "Sahne"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Hefeteig aus Weizenmehl) + MILCH (Milch im Teig, Vanillesahne-Füllung). R002 (KH+MILCH). Mit Ei im Teig: zusätzlich KH+PROTEIN (R001). Mandeln = FETT. Klassisches deutsches Blechkuchen-Dessert.",
+      "optional_items": [
+        "Ei",
+        "Hefe",
+        "Zucker",
+        "Vanille"
+      ]
     },
-    "Poke Bowl": {
-      "base_items": ["Reis", "Lachs"],
-      "optional_items": ["Avocado", "Edamame", "Gurke", "Sesam", "Sojasoße", "Mango"],
-      "needs_clarification": "Welcher Protein? Mit Edamame?",
-      "note": "Standard: NOT_OK — KH (Reis) + PROTEIN (Lachs). Mit Edamame: zusätzlich HUELSENFRUECHTE + KH. Mit Mango: zusätzlich OBST + KH. Vegane Variante ohne Fisch: KH + NEUTRAL/HUELSENFRUECHTE prüfen."
+    "Bircher Müsli": {
+      "base_items": [
+        "Hafer",
+        "Joghurt",
+        "Apfel"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Hafer) + MILCH (Joghurt) + OBST (Apfel). Dreifache Kombinations-Verletzung. Mit Beeren: noch mehr OBST.",
+      "optional_items": [
+        "Zitrone",
+        "Walnüsse",
+        "Honig",
+        "Erdbeere",
+        "Blaubeere"
+      ]
+    },
+    "Biryani": {
+      "base_items": [
+        "Reis",
+        "Hähnchen",
+        "Zwiebel"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Reis) + PROTEIN (Hähnchen). Mit Joghurt in der Marinade: zusätzlich PROTEIN + MILCH. Vegetarisches Biryani (ohne Fleisch): KH + NEUTRAL = OK.",
+      "optional_items": [
+        "Joghurt",
+        "Safran",
+        "Rosine",
+        "Cashewnüsse",
+        "Garam Masala"
+      ]
+    },
+    "Boeuf Bourguignon": {
+      "base_items": [
+        "Rindfleisch",
+        "Pilze",
+        "Zwiebel",
+        "Speck"
+      ],
+      "needs_clarification": "Mit Möhre oder Kartoffeln?",
+      "note": "Ohne Möhre/Kartoffel: OK — PROTEIN (Rindfleisch, Speck) + NEUTRAL (Pilze, Zwiebeln). Mit Möhre: NOT_OK (PROTEIN + KH). Französischer Schmorfleisch-Klassiker — pur ohne KH Trennkost-freundlich.",
+      "optional_items": [
+        "Möhre",
+        "Knoblauch",
+        "Rotwein",
+        "Kartoffel"
+      ]
+    },
+    "Borschtsch": {
+      "base_items": [
+        "Rote Bete",
+        "Weißkohl",
+        "Tomate",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Rindfleisch, Kartoffeln und/oder Saure Sahne?",
+      "note": "Variiert: Vegetarisch ohne Kartoffel: OK — NEUTRAL (Rote Bete, Weißkohl, Tomate). Mit Kartoffeln: CONDITIONAL (KH). Mit Rindfleisch + Kartoffeln: NOT_OK (KH+PROTEIN, R001). Mit Saure Sahne: MILCH. Ukrainischer Klassiker — vegetarisch purste Variante Trennkost-freundlich.",
+      "optional_items": [
+        "Rindfleisch",
+        "Kartoffel",
+        "Saure Sahne",
+        "Möhre",
+        "Dill"
+      ]
+    },
+    "Brathähnchen": {
+      "base_items": [
+        "Hähnchen",
+        "Knoblauch",
+        "Rosmarin",
+        "Olivenöl"
+      ],
+      "needs_clarification": "Mit Kartoffeln als Beilage oder pur?",
+      "note": "Pur: OK — PROTEIN (Hähnchen) + NEUTRAL (Knoblauch, Rosmarin). Mit Kartoffeln: NOT_OK (KH + PROTEIN). Mit Olivenöl (kleine Menge): CONDITIONAL. Klassisches Sonntagsgericht — pur Trennkost-freundlich!",
+      "optional_items": [
+        "Kartoffel",
+        "Thymian",
+        "Zitrone",
+        "Zwiebel"
+      ]
+    },
+    "Bratkartoffeln mit Ei": {
+      "base_items": [
+        "Kartoffel",
+        "Ei",
+        "Zwiebel",
+        "Olivenöl"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Kartoffel) + PROTEIN (Ei). Typisches deutsches Restessen. Mit Speck: zusätzlich PROTEIN. Bratkartoffeln pur (ohne Ei, ohne Speck): CONDITIONAL — KH + NEUTRAL + FETT.",
+      "optional_items": [
+        "Speck",
+        "Paprika",
+        "Schnittlauch"
+      ]
+    },
+    "Bratwurst mit Sauerkraut": {
+      "base_items": [
+        "Wurst",
+        "Weißkohl"
+      ],
+      "needs_clarification": "Mit Brötchen oder Kartoffeln als Beilage?",
+      "note": "Pur (ohne KH-Beilage): OK — PROTEIN (Bratwurst) + NEUTRAL (Sauerkraut = fermentierter Weißkohl). Mit Brötchen: NOT_OK (KH + PROTEIN). Mit Kartoffeln: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Senf"
+      ]
+    },
+    "Bruschetta": {
+      "base_items": [
+        "Brot",
+        "Tomate",
+        "Knoblauch",
+        "Olivenöl",
+        "Basilikum"
+      ],
+      "needs_clarification": null,
+      "note": "OK/CONDITIONAL: KH (Brot) + NEUTRAL (Tomate, Knoblauch, Basilikum) + FETT (Olivenöl). KH + NEUTRAL = OK (R016). Olivenöl (1-2 TL): CONDITIONAL. Positives Trennkost-Beispiel!",
+      "optional_items": [
+        "Essig",
+        "Salz",
+        "Pfeffer"
+      ]
     },
     "Buddha Bowl": {
       "base_items": [],
-      "optional_items": ["Reis", "Kichererbsen", "Avocado", "Spinat", "Süßkartoffel", "Tofu", "Tahini"],
       "needs_clarification": "Welche Basis und Zutaten? Jede Kombination ergibt ein anderes Verdikt.",
-      "note": "Klassik: Reis (KH) + Kichererbsen (HUELSENFRUECHTE) = NOT_OK. Ohne Getreide: HUELSENFRUECHTE + NEUTRAL = CONDITIONAL. Tofu + Reis: HUELSENFRUECHTE + KH = NOT_OK. Rein gemüsebasiert mit Avocado: NEUTRAL + FETT = CONDITIONAL."
-    },
-
-    "Coleslaw": {
-      "base_items": ["Weißkohl", "Möhre", "Mayonnaise"],
-      "optional_items": ["Essig", "Senf", "Honig", "Schnittlauch"],
-      "needs_clarification": null,
-      "note": "CONDITIONAL: NEUTRAL (Weißkohl) + KH (Möhre) + FETT (Mayonnaise, high_fat). KH + NEUTRAL = OK. Mayonnaise = große Fett-Menge → nur noch mit NEUTRAL empfohlen. Auf Mayonnaise-Menge achten."
-    },
-    "Waldorf Salat": {
-      "base_items": ["Sellerie", "Apfel", "Walnüsse", "Mayonnaise"],
-      "optional_items": ["Joghurt", "Zitrone", "Petersilie"],
-      "needs_clarification": null,
-      "note": "NOT_OK: OBST (Apfel) + FETT (Walnüsse, Mayonnaise). Obst darf nicht mit Fett kombiniert werden (R014). Außerdem OBST + NEUTRAL (Sellerie) = NOT_OK, da nur Blattgrün als Ausnahme gilt (R013). Mit Joghurt: zusätzlich OBST + MILCH."
-    },
-    "Tabbouleh": {
-      "base_items": ["Bulgur", "Petersilie", "Tomate", "Gurke", "Minze"],
-      "optional_items": ["Olivenöl", "Zitrone"],
-      "needs_clarification": null,
-      "note": "CONDITIONAL: KH (Bulgur) + NEUTRAL (Petersilie, Tomate, Gurke, Minze) + kleine Menge FETT (Olivenöl). KH + NEUTRAL = OK. Olivenöl (1-2 TL): OK. Zitronensaft (paar Tropfen) gilt als NEUTRAL. Insgesamt Trennkost-freundlich."
-    },
-    "Baba Ghanoush": {
-      "base_items": ["Aubergine", "Sesam", "Knoblauch", "Olivenöl"],
-      "optional_items": ["Zitrone", "Petersilie"],
-      "needs_clarification": null,
-      "note": "CONDITIONAL: NEUTRAL (Aubergine, Knoblauch) + FETT (Tahini/Sesam, Olivenöl). Kein verbotenes Paar. Fett-Menge beachten: größere Sesam/Öl-Mengen → nur noch NEUTRAL empfohlen."
-    },
-
-    "Butter Chicken": {
-      "base_items": ["Hähnchen", "Butter", "Sahne", "Tomate", "Zwiebel", "Knoblauch"],
-      "optional_items": ["Ingwer", "Garam Masala", "Naan", "Reis"],
-      "needs_clarification": "Mit Naan oder Reis als Beilage?",
-      "note": "NOT_OK: PROTEIN (Hähnchen) + MILCH (Butter, Sahne). Auch bekannt als Murgh Makhani. Mit Naan: zusätzlich KH + PROTEIN. Mit Reis: zusätzlich KH + PROTEIN."
-    },
-    "Sauerbraten": {
-      "base_items": ["Rindfleisch", "Kartoffel", "Rotkohl"],
-      "optional_items": ["Rosinen", "Essig", "Lorbeer", "Zwiebel"],
-      "needs_clarification": null,
-      "note": "Traditionell mit Kartoffelklößen: NOT_OK — PROTEIN (Rindfleisch) + KH (Kartoffel). Rotkohl = NEUTRAL, ändert nichts. Sauerbraten pur (ohne Klöße, nur mit Rotkohl): OK (PROTEIN + NEUTRAL)."
-    },
-    "Tortilla Española": {
-      "base_items": ["Kartoffel", "Ei", "Olivenöl", "Zwiebel"],
-      "optional_items": ["Paprika", "Chorizo"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Kartoffel) + PROTEIN (Ei). Spanisches Kartoffel-Omelett. Mit Chorizo: zusätzlich PROTEIN. Mit kleiner Menge Olivenöl in der Pfanne: CONDITIONAL auf Menge."
-    },
-    "Tom Yum": {
-      "base_items": ["Garnele", "Pilze", "Tomate", "Zitronengras"],
-      "optional_items": ["Kokosmilch", "Chili", "Limette", "Ingwer"],
-      "needs_clarification": "Tom Yum Nam Sai (klar, ohne Kokosmilch) oder Tom Kha (mit Kokosmilch)?",
-      "note": "Klar (ohne Kokosmilch): OK — PROTEIN (Garnelen) + NEUTRAL (Pilze, Gemüse, Kräuter). Mit Kokosmilch: CONDITIONAL — PROTEIN + NEUTRAL + FETT (kein explizites Verbot, Menge prüfen)."
-    },
-    "Miso Suppe": {
-      "base_items": ["Miso", "Tofu", "Frühlingszwiebel"],
-      "optional_items": ["Nori", "Pilze", "Ingwer"],
-      "needs_clarification": null,
-      "note": "CONDITIONAL: HUELSENFRUECHTE (Miso + Tofu = fermentierte/verarbeitete Soja) + NEUTRAL (Frühlingszwiebeln, Algen). Kein verbotenes Paar — HUELSENFRUECHTE dürfen mit NEUTRAL kombiniert werden. Kurs warnt generell vor Soja. Ohne KH oder Protein: Trennkost-konform."
-    },
-
-    "Apfelstrudel": {
-      "base_items": ["Weizenmehl", "Apfel", "Butter", "Zimt"],
-      "optional_items": ["Rosinen", "Walnüsse", "Sahne", "Puderzucker"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizenmehl-Teig) + OBST (Apfel). Obst darf nicht mit Kohlenhydraten kombiniert werden (R007). Mit Sahne: zusätzlich MILCH + OBST (R009). Mit Rosinen: zusätzlich TROCKENOBST."
-    },
-    "Käsekuchen": {
-      "base_items": ["Weizenmehl", "Quark", "Ei", "Butter"],
-      "optional_items": ["Sahne", "Zitrone", "Vanille", "Zucker"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Mürbeteig aus Weizenmehl) + MILCH (Quark) + PROTEIN (Ei). Dreifach-Verletzung. Mit Früchten als Belag: zusätzlich OBST."
-    },
-    "Schwarzwälder Kirschtorte": {
-      "base_items": ["Weizenmehl", "Ei", "Sahne", "Kirsche"],
-      "optional_items": ["Butter", "Zucker", "Kakao", "Kirschwasser"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Biskuit-Teig) + PROTEIN (Ei) + MILCH (Sahne) + OBST (Kirschen). Vierfache Verletzung. Sahne + Kirschen allein = MILCH + OBST = NOT_OK (R009)."
-    },
-
-    "Eggs Benedict": {
-      "base_items": ["Brot", "Ei", "Speck", "Butter"],
-      "optional_items": ["Spinat", "Zitrone"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (English Muffin/Brötchen) + PROTEIN (Ei, Schinken) + FETT (Hollandaise aus Butter + Eigelb). Hauptverletzung: KH + PROTEIN. Eggs Florentine (mit Spinat statt Schinken): ebenfalls NOT_OK (KH + PROTEIN durch Ei)."
-    },
-    "Granola Bowl": {
-      "base_items": ["Müsli", "Joghurt", "Erdbeere"],
-      "optional_items": ["Banane", "Blaubeere", "Honig", "Chiasamen"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Granola/Müsli) + MILCH (Joghurt) + OBST (Beeren). Dreifach-Verletzung. Granola mit Pflanzenmilch: KH + KH/FETT = besser. Reine Obst-Bowl ohne Granola: OK (nur OBST)."
-    },
-    "Frucht-Smoothie": {
-      "base_items": ["Banane", "Erdbeere"],
-      "optional_items": ["Mango", "Ananas", "Blaubeere", "Wasser", "Eis"],
-      "needs_clarification": "Nur Früchte oder mit Joghurt/Milch/Protein-Pulver?",
-      "note": "Pur (nur Obst + Wasser/Eis): OK — reines OBST. Mit Joghurt/Milch: NOT_OK (OBST + MILCH). Mit Bananenmilch/Hafermilch: OBST + MILCH/KH = NOT_OK. Grüner Smoothie (Blattgrün): OK."
-    },
-    "Reibekuchen": {
-      "base_items": ["Kartoffel", "Ei", "Zwiebel"],
-      "optional_items": ["Weizenmehl", "Apfelmus", "Sahne", "Speck"],
-      "needs_clarification": "Mit Apfelmus oder Schmand/Speck gereicht?",
-      "note": "NOT_OK: KH (Kartoffel) + PROTEIN (Ei). Auch bekannt als Kartoffelpuffer oder Latkes. Mit Apfelmus: zusätzlich OBST + KH (R007). Mit Schmand: zusätzlich MILCH + KH (R002). Mit Speck: mehr PROTEIN."
-    },
-
-    "Käsefondue": {
-      "base_items": ["Käse", "Brot", "Knoblauch"],
-      "optional_items": ["Weißwein", "Kirschwasser", "Kartoffel"],
-      "needs_clarification": null,
-      "note": "NOT_OK: MILCH (Käse) + KH (Brot als Dipper). Mit Kartoffeln als Alternative: ebenfalls KH + MILCH = NOT_OK. Käsefondue als reines MILCH-Gericht (ohne Brot/KH-Dipper) wäre möglich, aber unüblich."
-    },
-    "Raclette": {
-      "base_items": ["Käse", "Kartoffel"],
-      "optional_items": ["Schinken", "Speck", "Paprika", "Pilze", "Essiggurke"],
-      "needs_clarification": "Mit Fleisch-Beilagen?",
-      "note": "NOT_OK: MILCH (Raclette-Käse) + KH (Kartoffeln). Mit Schinken/Speck: zusätzlich PROTEIN + MILCH = NOT_OK (R006). Nur Käse + NEUTRAL Gemüse (Paprika, Pilze) = OK (MILCH + NEUTRAL)."
-    },
-    "Grießbrei": {
-      "base_items": ["Grieß", "Milch"],
-      "optional_items": ["Zucker", "Zimt", "Butter", "Vanille"],
-      "needs_clarification": "Mit Milch oder mit Wasser gekocht?",
-      "note": "Mit Milch: NOT_OK — KH (Grieß) + MILCH. Mit Wasser: OK — reines KH. Ähnlich wie Porridge. Süße Toppings (Zucker, Honig) = weitere KH, aber keine neue Verletzung."
-    },
-    "Couscous mit Gemüse": {
-      "base_items": ["Couscous", "Zucchini", "Paprika", "Tomate", "Zwiebel"],
-      "optional_items": ["Olivenöl", "Koriander", "Zitrone", "Rosine"],
-      "needs_clarification": "Mit Kichererbsen oder Fleisch?",
-      "note": "Pur: OK/CONDITIONAL — KH (Couscous) + NEUTRAL (Gemüse). Mit Olivenöl (kleine Menge): CONDITIONAL. Mit Kichererbsen: NOT_OK (KH + HUELSENFRUECHTE). Mit Fleisch: NOT_OK (KH + PROTEIN). Mit Rosinen: TROCKENOBST + KH (R007-Geist)."
-    },
-
-    "Moussaka": {
-      "base_items": ["Aubergine", "Hackfleisch", "Weizenmehl", "Sahne", "Käse"],
-      "optional_items": ["Kartoffel", "Tomate", "Zwiebel", "Knoblauch"],
-      "needs_clarification": null,
-      "note": "NOT_OK: PROTEIN (Hackfleisch) + MILCH (Béchamel aus Sahne + Käse) + KH (Mehl in Béchamel). Dreifach-Verletzung. Aubergine = NEUTRAL, ändert nichts. Mit Kartoffelschichten: noch mehr KH."
-    },
-    "Spanakopita": {
-      "base_items": ["Weizenmehl", "Käse", "Spinat", "Ei"],
-      "optional_items": ["Butter", "Zwiebel", "Dill"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Filo-Teig aus Weizenmehl) + MILCH (Feta) + PROTEIN (Ei). Griechische Spinat-Käse-Pastete. Spinat = NEUTRAL, macht es nicht besser."
-    },
-    "Börek": {
-      "base_items": ["Weizenmehl"],
-      "optional_items": ["Käse", "Spinat", "Hackfleisch", "Ei", "Butter"],
-      "needs_clarification": "Mit Käse (Feta), Hackfleisch oder Spinat-Füllung?",
-      "note": "Immer NOT_OK: KH (Yufka/Filo-Teig). Mit Käse: KH + MILCH (R002). Mit Hackfleisch: KH + PROTEIN (R001). Mit Ei: KH + PROTEIN (R001). Spinat-Börek ohne andere Füllung: OK (KH + NEUTRAL)."
-    },
-
-    "Thai Green Curry": {
-      "base_items": ["Hähnchen", "Kokosmilch", "Paprika", "Zucchini", "Basilikum"],
-      "optional_items": ["Reis", "Aubergine", "Bambussprosse", "Chili", "Ingwer"],
-      "needs_clarification": "Mit Reis als Beilage?",
-      "note": "Pur (ohne Reis): CONDITIONAL — PROTEIN (Hähnchen) + FETT (Kokosmilch, größere Menge) + NEUTRAL (Gemüse). Kein explizites Verbot für PROTEIN + FETT. Mit Reis: NOT_OK (KH + PROTEIN)."
-    },
-    "Saag Paneer": {
-      "base_items": ["Käse", "Spinat", "Zwiebel", "Knoblauch", "Ingwer"],
-      "optional_items": ["Sahne", "Naan", "Reis", "Garam Masala"],
-      "needs_clarification": "Mit Naan oder Reis als Beilage?",
-      "note": "Pur (ohne Brot/Reis): OK — MILCH (Paneer) + NEUTRAL (Spinat, Gemüse, Gewürze). Mit Sahne: mehr MILCH, bleibt OK. Mit Naan oder Reis: NOT_OK (KH + MILCH)."
-    },
-    "Biryani": {
-      "base_items": ["Reis", "Hähnchen", "Zwiebel"],
-      "optional_items": ["Joghurt", "Safran", "Rosine", "Cashewnüsse", "Garam Masala"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Reis) + PROTEIN (Hähnchen). Mit Joghurt in der Marinade: zusätzlich PROTEIN + MILCH. Vegetarisches Biryani (ohne Fleisch): KH + NEUTRAL = OK."
-    },
-    "Sashimi": {
-      "base_items": ["Lachs"],
-      "optional_items": ["Thunfisch", "Sojasoße", "Ingwer", "Wasabi"],
-      "needs_clarification": null,
-      "note": "OK — reines PROTEIN (roher Fisch ohne Reis). Im Gegensatz zu Sushi (mit Reis = KH + PROTEIN = NOT_OK) ist Sashimi Trennkost-konform. Sojasoße (kleine Menge als Würze) = NEUTRAL."
+      "note": "Klassik: Reis (KH) + Kichererbsen (HUELSENFRUECHTE) = NOT_OK. Ohne Getreide: HUELSENFRUECHTE + NEUTRAL = CONDITIONAL. Tofu + Reis: HUELSENFRUECHTE + KH = NOT_OK. Rein gemüsebasiert mit Avocado: NEUTRAL + FETT = CONDITIONAL.",
+      "optional_items": [
+        "Reis",
+        "Kichererbsen",
+        "Avocado",
+        "Spinat",
+        "Süßkartoffel",
+        "Tofu",
+        "Tahini"
+      ]
     },
     "Bulgogi": {
-      "base_items": ["Rindfleisch", "Sojasoße", "Sesam", "Knoblauch", "Frühlingszwiebel"],
-      "optional_items": ["Birne", "Ingwer", "Sesamöl", "Salat", "Reis"],
+      "base_items": [
+        "Rindfleisch",
+        "Sojasoße",
+        "Sesam",
+        "Knoblauch",
+        "Frühlingszwiebel"
+      ],
       "needs_clarification": "Mit Reis oder in Salatblättern?",
-      "note": "Pur (ohne Reis): CONDITIONAL — PROTEIN (Rindfleisch) + NEUTRAL (Knoblauch, Frühlingszwiebeln) + kleine Menge FETT (Sesam, Sesamöl). Mit Salatblättern: OK. Mit Reis: NOT_OK (KH + PROTEIN). Birne in Marinade (kleine Menge): unkritisch."
+      "note": "Pur (ohne Reis): CONDITIONAL — PROTEIN (Rindfleisch) + NEUTRAL (Knoblauch, Frühlingszwiebeln) + kleine Menge FETT (Sesam, Sesamöl). Mit Salatblättern: OK. Mit Reis: NOT_OK (KH + PROTEIN). Birne in Marinade (kleine Menge): unkritisch.",
+      "optional_items": [
+        "Birne",
+        "Ingwer",
+        "Sesamöl",
+        "Salat",
+        "Reis"
+      ]
     },
-    "Frühlingsrollen frisch": {
-      "base_items": ["Reis", "Garnele", "Kopfsalat", "Reisnudeln"],
-      "optional_items": ["Minze", "Koriander", "Möhre", "Gurke", "Erdnusssoße"],
-      "needs_clarification": "Vegetarisch oder mit Garnelen/Fleisch?",
-      "note": "Standard: NOT_OK — KH (Reispapier + Reisnudeln) + PROTEIN (Garnelen). Vegetarisch (nur Gemüse, keine Nudeln): OK — KH (Reispapier) + NEUTRAL. Mit Erdnusssoße: FETT-Menge prüfen."
+    "Burger": {
+      "base_items": [
+        "Brötchen"
+      ],
+      "needs_clarification": "Welche Patty-/Füllungsbasis? Fleisch = PROTEIN. Veggie-/vegan-Cues werden modifier-aware und bewusst vorsichtig behandelt.",
+      "note": "Klärung nötig: Burger-Basis bleibt ohne explizite Patty-Angabe offen.",
+      "optional_items": [
+        "Salat",
+        "Tomate",
+        "Zwiebel",
+        "Gurke"
+      ]
     },
-
-    "Tiramisu": {
-      "base_items": ["Weizenmehl", "Ei", "Käse", "Kaffee"],
-      "optional_items": ["Zucker", "Kakao", "Amaretto"],
+    "Burrito": {
+      "base_items": [
+        "Tortilla",
+        "Reis",
+        "Kidneybohnen"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Löffelbiskuit aus Weizenmehl) + PROTEIN (Ei) + MILCH (Mascarpone). Dreifach-Verletzung. Käse steht hier für Mascarpone (MILCH). Klassisches Dessert — leider Trennkost-inkompatibel."
+      "note": "NOT_OK: KH (Tortilla, Reis) + HUELSENFRUECHTE (Bohnen). Mit Fleisch: zusätzlich PROTEIN. Mit Käse/Sauerrahm: zusätzlich MILCH. Mehrfach-Verletzung.",
+      "optional_items": [
+        "Hähnchen",
+        "Käse",
+        "Sahne",
+        "Avocado",
+        "Kopfsalat",
+        "Tomate"
+      ]
+    },
+    "Butter Chicken": {
+      "base_items": [
+        "Hähnchen",
+        "Butter",
+        "Sahne",
+        "Tomate",
+        "Zwiebel",
+        "Knoblauch"
+      ],
+      "needs_clarification": "Mit Naan oder Reis als Beilage?",
+      "note": "NOT_OK: PROTEIN (Hähnchen) + MILCH (Butter, Sahne). Auch bekannt als Murgh Makhani. Mit Naan: zusätzlich KH + PROTEIN. Mit Reis: zusätzlich KH + PROTEIN.",
+      "optional_items": [
+        "Ingwer",
+        "Garam Masala",
+        "Naan",
+        "Reis"
+      ]
+    },
+    "Börek": {
+      "base_items": [
+        "Weizenmehl"
+      ],
+      "needs_clarification": "Mit Käse (Feta), Hackfleisch oder Spinat-Füllung?",
+      "note": "Immer NOT_OK: KH (Yufka/Filo-Teig). Mit Käse: KH + MILCH (R002). Mit Hackfleisch: KH + PROTEIN (R001). Mit Ei: KH + PROTEIN (R001). Spinat-Börek ohne andere Füllung: OK (KH + NEUTRAL).",
+      "optional_items": [
+        "Käse",
+        "Spinat",
+        "Hackfleisch",
+        "Ei",
+        "Butter"
+      ]
+    },
+    "Caesar Salad": {
+      "base_items": [
+        "Kopfsalat",
+        "Parmesan",
+        "Croutons"
+      ],
+      "needs_clarification": "Mit Hähnchen oder ohne?",
+      "note": "Croutons = KH, Parmesan = MILCH → schon NOT_OK. Mit Hähnchen zusätzlich PROTEIN.",
+      "optional_items": [
+        "Hähnchen",
+        "Ei",
+        "Olivenöl"
+      ]
+    },
+    "Calzone": {
+      "base_items": [
+        "Weizenmehl",
+        "Käse",
+        "Tomatensauce"
+      ],
+      "needs_clarification": "Nur Käse oder auch Schinken/Salami?",
+      "note": "NOT_OK: KH (Teig) + MILCH (Käse). Mit Schinken/Salami: zusätzlich PROTEIN (KH + MILCH + PROTEIN). Wie Pizza, nur gefaltet — gleiche Trennkost-Problematik.",
+      "optional_items": [
+        "Schinken",
+        "Salami",
+        "Pilze",
+        "Olivenöl"
+      ]
+    },
+    "Caprese Salat": {
+      "base_items": [
+        "Tomate",
+        "Käse",
+        "Basilikum",
+        "Olivenöl"
+      ],
+      "needs_clarification": null,
+      "note": "OK: MILCH (Mozzarella) + NEUTRAL (Tomate, Basilikum) + kleine Menge FETT (Olivenöl). Klassisches erlaubtes Trennkost-Gericht. Mit Balsamico (Essig = NEUTRAL): ebenfalls OK.",
+      "optional_items": [
+        "Essig"
+      ]
+    },
+    "Cheeseburger": {
+      "base_items": [
+        "Brötchen",
+        "Hackfleisch",
+        "Käse",
+        "Salat",
+        "Tomate"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Brötchen) + PROTEIN (Hackfleisch) + MILCH (Käse)",
+      "optional_items": [
+        "Ketchup",
+        "Senf",
+        "Zwiebel",
+        "Gurke"
+      ]
+    },
+    "Chia Pudding": {
+      "base_items": [
+        "Chiasamen"
+      ],
+      "needs_clarification": "Mit Pflanzenmilch (z.B. Mandelmilch) oder Joghurt?",
+      "note": "Mit Pflanzenmilch: KH-nah, CONDITIONAL. Mit Früchten: OBST darf nicht gemischt werden. Mit Joghurt: MILCH-Kombination prüfen.",
+      "optional_items": [
+        "Vanille",
+        "Ahornsirup"
+      ]
+    },
+    "Chicken Nuggets mit Pommes": {
+      "base_items": [
+        "Chicken Nuggets",
+        "Pommes"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: intrinsisch konfliktuelle Chicken Nuggets plus Pommes. Nutzt das Prepared-Protein-Canonical direkt statt Nuggets+Panade lose nachzubauen.",
+      "optional_items": [
+        "Ketchup",
+        "Mayonnaise"
+      ]
+    },
+    "Chili con Carne": {
+      "base_items": [
+        "Kidneybohnen",
+        "Hackfleisch",
+        "Tomate",
+        "Zwiebel",
+        "Mais"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: HUELSENFRUECHTE (Bohnen) + PROTEIN (Hackfleisch) + KH (Mais). Dreifach-Verletzung. Mit Käse/Sauerrahm: zusätzlich MILCH. Mit Brot/Tortilla als Beilage: noch mehr KH.",
+      "optional_items": [
+        "Käse",
+        "Sauerrahm",
+        "Avocado",
+        "Paprika"
+      ]
+    },
+    "Chili sin Carne": {
+      "base_items": [
+        "Kidneybohnen",
+        "Tomate",
+        "Paprika",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Mais oder Süßkartoffel?",
+      "note": "Pur (ohne KH): CONDITIONAL — HUELSENFRUECHTE + NEUTRAL. Mit Mais oder Süßkartoffel: NOT_OK (HUELSENFRUECHTE + KH). Mit Käse: NOT_OK (HUELSENFRUECHTE + MILCH).",
+      "optional_items": [
+        "Mais",
+        "Süßkartoffel",
+        "Avocado",
+        "Käse"
+      ]
+    },
+    "Coleslaw": {
+      "base_items": [
+        "Weißkohl",
+        "Möhre",
+        "Mayonnaise"
+      ],
+      "needs_clarification": null,
+      "note": "CONDITIONAL: NEUTRAL (Weißkohl) + KH (Möhre) + FETT (Mayonnaise, high_fat). KH + NEUTRAL = OK. Mayonnaise = große Fett-Menge → nur noch mit NEUTRAL empfohlen. Auf Mayonnaise-Menge achten.",
+      "optional_items": [
+        "Essig",
+        "Senf",
+        "Honig",
+        "Schnittlauch"
+      ]
+    },
+    "Congee": {
+      "base_items": [
+        "Reis",
+        "Ingwer",
+        "Frühlingszwiebel"
+      ],
+      "needs_clarification": "Pur oder mit Einlagen (Ei/Fleisch/Tofu)?",
+      "note": "Pur: OK — KH (Reis) + NEUTRAL (Ingwer, Frühlingszwiebeln). Mit Ei oder Hähnchen: NOT_OK (KH+PROTEIN, R001). Mit Tofu: NOT_OK (KH+HUELSENFRUECHTE, R003). Chinesischer Reisbrei — pur als leichte Speise Trennkost-freundlich!",
+      "optional_items": [
+        "Ei",
+        "Hähnchen",
+        "Tofu",
+        "Sesam",
+        "Sojasoße"
+      ]
+    },
+    "Coq au Vin": {
+      "base_items": [
+        "Hähnchen",
+        "Pilze",
+        "Zwiebel",
+        "Speck"
+      ],
+      "needs_clarification": "Mit Möhre oder Kartoffeln als Einlage?",
+      "note": "Ohne Möhre/Kartoffel: OK — PROTEIN (Hähnchen, Speck) + NEUTRAL (Pilze, Zwiebeln). Mit Möhre: NOT_OK (PROTEIN + KH). Traditionell oft mit Möhre — dann NOT_OK. Pur mit Brot: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Möhre",
+        "Knoblauch",
+        "Rotwein",
+        "Kartoffel"
+      ]
+    },
+    "Couscous mit Gemüse": {
+      "base_items": [
+        "Couscous",
+        "Zucchini",
+        "Paprika",
+        "Tomate",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Kichererbsen oder Fleisch?",
+      "note": "Pur: OK/CONDITIONAL — KH (Couscous) + NEUTRAL (Gemüse). Mit Olivenöl (kleine Menge): CONDITIONAL. Mit Kichererbsen: NOT_OK (KH + HUELSENFRUECHTE). Mit Fleisch: NOT_OK (KH + PROTEIN). Mit Rosinen: TROCKENOBST + KH (R007-Geist).",
+      "optional_items": [
+        "Olivenöl",
+        "Koriander",
+        "Zitrone",
+        "Rosine"
+      ]
+    },
+    "Croque Monsieur": {
+      "base_items": [
+        "Brot",
+        "Käse",
+        "Schinken"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Toastbrot) + MILCH (Käse, Béchamel aus Sahne) + PROTEIN (Schinken). R001 (KH+PROTEIN) + R002 (KH+MILCH). Croque Madame (mit Spiegelei): weitere PROTEIN-Quelle. Überbackenes Sandwich — immer NOT_OK.",
+      "optional_items": [
+        "Butter",
+        "Senf",
+        "Sahne"
+      ]
     },
     "Crème Brûlée": {
-      "base_items": ["Sahne", "Ei", "Zucker", "Vanille"],
-      "optional_items": ["Zitrone"],
+      "base_items": [
+        "Sahne",
+        "Ei",
+        "Zucker",
+        "Vanille"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: MILCH (Sahne) + PROTEIN (Eigelb) + KH (Zucker). Dreifach-Verletzung: R001 (KH+PROTEIN), R002 (KH+MILCH), R006 (PROTEIN+MILCH)."
+      "note": "NOT_OK: MILCH (Sahne) + PROTEIN (Eigelb) + KH (Zucker). Dreifach-Verletzung: R001 (KH+PROTEIN), R002 (KH+MILCH), R006 (PROTEIN+MILCH).",
+      "optional_items": [
+        "Zitrone"
+      ]
     },
-    "Panna Cotta": {
-      "base_items": ["Sahne", "Zucker", "Vanille"],
-      "optional_items": ["Erdbeere", "Beerensauce", "Karamell"],
+    "Crêpes": {
+      "base_items": [
+        "Weizenmehl",
+        "Ei",
+        "Milch",
+        "Butter"
+      ],
+      "needs_clarification": "Süß (mit Obst/Sirup) oder salzig (mit Käse/Schinken)?",
+      "note": "NOT_OK: KH (Weizenmehl) + PROTEIN (Ei) + MILCH (Milch, Butter). Salzige Variante mit Schinken: noch mehr PROTEIN. Süße Variante mit Obst: zusätzlich OBST + MILCH.",
+      "optional_items": [
+        "Zitrone",
+        "Ahornsirup",
+        "Käse",
+        "Schinken"
+      ]
+    },
+    "Currywurst mit Pommes": {
+      "base_items": [
+        "Wurst",
+        "Kartoffel",
+        "Ketchup"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: MILCH (Sahne) + KH (Zucker). Mit Fruchtsauce: zusätzlich OBST + MILCH (R009). Ungesüßt (reine Sahne + Vanille): OK — MILCH + NEUTRAL. Praktisch aber immer gesüßt."
+      "note": "NOT_OK: PROTEIN (Wurst) + KH (Pommes). Ketchup enthält Zucker.",
+      "optional_items": [
+        "Currypulver"
+      ]
     },
-    "Apfelmus": {
-      "base_items": ["Apfel"],
-      "optional_items": ["Zimt", "Zitrone", "Zucker"],
+    "Dal Makhani": {
+      "base_items": [
+        "Linsen",
+        "Kidneybohnen",
+        "Butter",
+        "Sahne",
+        "Tomate"
+      ],
+      "needs_clarification": "Mit Naan oder Reis als Beilage?",
+      "note": "NOT_OK: HUELSENFRUECHTE (schwarze Linsen, Kidneybohnen) + MILCH (Butter, Sahne). Indischer Linseneintopf mit Sahne — HUELSENFRUECHTE + MILCH = NOT_OK (R005). Ohne Sahne/Butter: CONDITIONAL (HUELSENFRUECHTE + NEUTRAL).",
+      "optional_items": [
+        "Knoblauch",
+        "Ingwer",
+        "Garam Masala",
+        "Naan",
+        "Reis"
+      ]
+    },
+    "Dampfnudeln": {
+      "base_items": [
+        "Weizenmehl",
+        "Milch",
+        "Butter"
+      ],
+      "needs_clarification": "Mit Vanillesauce oder salziger Kruste?",
+      "note": "NOT_OK: KH (Hefeteig aus Weizenmehl) + MILCH (Milch im Teig, Butter). Mit Vanillesauce: mehr MILCH (bleibt NOT_OK). Mit Pflaumen: zusätzlich OBST + KH (R007). Süddeutsches Gericht.",
+      "optional_items": [
+        "Vanillesauce",
+        "Pflaumen",
+        "Salzkruste",
+        "Zucker"
+      ]
+    },
+    "Dan Dan Noodles": {
+      "base_items": [
+        "Pasta",
+        "Hackfleisch",
+        "Erdnüsse",
+        "Sesam"
+      ],
       "needs_clarification": null,
-      "note": "OK — reines OBST. Pur (ohne Zucker) das perfekte Trennkost-Dessert. Mit Zimt (NEUTRAL): weiterhin OK. Mit Zucker (KH): OBST + KH = NOT_OK (R007). Als Beilage zu Reibekuchen: nicht separat, sondern zusammen = OBST + KH (NOT_OK)."
+      "note": "NOT_OK: KH (Weizennudeln) + PROTEIN (Hackfleisch) + FETT (Erdnüsse, Sesam). Sichuan-Nudelgericht. Ohne Fleisch: CONDITIONAL (KH + NEUTRAL + FETT).",
+      "optional_items": [
+        "Sojasprossen",
+        "Frühlingszwiebel",
+        "Chili",
+        "Sojasoße"
+      ]
     },
-
-    "Omelette": {
-      "base_items": ["Ei"],
-      "optional_items": ["Pilze", "Spinat", "Paprika", "Käse", "Schinken", "Schnittlauch"],
-      "needs_clarification": "Mit Käse oder Schinken als Füllung?",
-      "note": "Pur (ohne Füllung): OK — reines PROTEIN. Mit Gemüse-Füllung (Pilze, Spinat, Paprika): OK — PROTEIN + NEUTRAL. Mit Käse: NOT_OK (PROTEIN + MILCH). Mit Schinken: PROTEIN + PROTEIN (gleiche Gruppe, OK). Mit Brot dazu: NOT_OK (KH + PROTEIN)."
+    "Dolma": {
+      "base_items": [
+        "Reis",
+        "Lamm",
+        "Zwiebel",
+        "Dill"
+      ],
+      "needs_clarification": "Mit Lammhack (NOT_OK) oder vegetarisch (OK)?",
+      "note": "Mit Fleisch: NOT_OK — KH (Reis) + PROTEIN (Lammhack). Weinblätter/Paprikahülle = NEUTRAL. Vegetarische Variante (nur Reis + Kräuter): CONDITIONAL — KH + NEUTRAL. Pinienkerne: FETT-Menge prüfen.",
+      "optional_items": [
+        "Pinienkerne",
+        "Tomate",
+        "Zitrone",
+        "Minze"
+      ]
+    },
+    "Döner Kebab": {
+      "base_items": [
+        "Fladenbrot",
+        "Hähnchen",
+        "Salat",
+        "Tomate",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Welches Fleisch? Mit Joghurtsauce (MILCH)?",
+      "note": "NOT_OK: KH (Fladenbrot) + PROTEIN (Fleisch), evtl. + MILCH (Joghurtsauce)",
+      "optional_items": [
+        "Joghurtsauce",
+        "Rotkohl"
+      ]
+    },
+    "Edamame": {
+      "base_items": [
+        "Sojabohnen"
+      ],
+      "needs_clarification": null,
+      "note": "CONDITIONAL/OK — pur: HUELSENFRUECHTE (Sojabohnen) + optional FETT (Sesamöl, kleine Menge). Kein verbotenes Paar! Eines der Trennkost-freundlichsten Snacks — eiweißreich, pur ohne problematische Kombinationen.",
+      "optional_items": [
+        "Meersalz",
+        "Sesamöl",
+        "Chili"
+      ]
+    },
+    "Eggs Benedict": {
+      "base_items": [
+        "Brot",
+        "Ei",
+        "Speck",
+        "Butter"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (English Muffin/Brötchen) + PROTEIN (Ei, Schinken) + FETT (Hollandaise aus Butter + Eigelb). Hauptverletzung: KH + PROTEIN. Eggs Florentine (mit Spinat statt Schinken): ebenfalls NOT_OK (KH + PROTEIN durch Ei).",
+      "optional_items": [
+        "Spinat",
+        "Zitrone"
+      ]
+    },
+    "Enchiladas": {
+      "base_items": [
+        "Tortilla",
+        "Hähnchen",
+        "Käse",
+        "Tomate"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Maistortilla) + PROTEIN (Hähnchen) + MILCH (Käse, Saure Sahne). R001 (KH+PROTEIN) + R002 (KH+MILCH). Mit Bohnen: HUELSENFRUECHTE+KH (R003). Mexikanisches Rollgericht — dreifach Trennkost-verletzend.",
+      "optional_items": [
+        "Bohnen",
+        "Saure Sahne",
+        "Avocado",
+        "Chili",
+        "Zwiebel",
+        "Koriander"
+      ]
+    },
+    "Erbsensuppe": {
+      "base_items": [
+        "Erbsen",
+        "Möhre",
+        "Sellerie",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Vegetarisch oder mit Speck/Wurst?",
+      "note": "Hier: getrocknete Erbsen = HUELSENFRUECHTE (nicht frische grüne Erbsen = NEUTRAL!). Vegetarisch: CONDITIONAL — HUELSENFRUECHTE + KH (Möhre) + NEUTRAL. Mit Speck/Wurst: NOT_OK (HUELSENFRUECHTE + PROTEIN).",
+      "optional_items": [
+        "Speck",
+        "Wurst",
+        "Petersilie"
+      ]
+    },
+    "Falafel": {
+      "base_items": [
+        "Kichererbsen",
+        "Zwiebel",
+        "Koriander",
+        "Kreuzkümmel"
+      ],
+      "needs_clarification": "Pur als Beilage, in Pita/Brot oder mit Tahini-Sauce?",
+      "note": "Pur (ohne Brot): CONDITIONAL — HUELSENFRUECHTE (Kichererbsen) + NEUTRAL (Kräuter/Gewürze). In Pita/Brot: NOT_OK (HUELSENFRUECHTE + KH). Mit Hummus: OK (HUELSENFRUECHTE + HUELSENFRUECHTE). Mit kleiner Menge Tahini: CONDITIONAL auf Fett-Menge.",
+      "optional_items": [
+        "Petersilie",
+        "Sesam",
+        "Knoblauch"
+      ]
+    },
+    "Falscher Hase": {
+      "base_items": [
+        "Hackfleisch",
+        "Ei",
+        "Zwiebel",
+        "Paniermehl"
+      ],
+      "needs_clarification": null,
+      "note": "CONDITIONAL bis NOT_OK: PROTEIN (Hackfleisch, Ei) + KH (Paniermehl als Binder, kleine Menge). Bei kleiner Menge Semmelbrösel kaum relevant. Ohne Paniermehl (gebunden mit Ei allein): OK — reines PROTEIN + NEUTRAL. Mit Kartoffelseite: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Speck",
+        "Senf",
+        "Petersilie",
+        "Kartoffel"
+      ]
+    },
+    "Fattoush": {
+      "base_items": [
+        "Brot",
+        "Tomate",
+        "Gurke",
+        "Kopfsalat",
+        "Petersilie"
+      ],
+      "needs_clarification": null,
+      "note": "OK/CONDITIONAL: KH (geröstetes Pita/Fladenbrot) + NEUTRAL (Gemüse, Kräuter) + kleine Menge FETT (Olivenöl). KH + NEUTRAL = OK. Levantinischer Brotsalat — Trennkost-freundlich.",
+      "optional_items": [
+        "Rettich",
+        "Minze",
+        "Olivenöl",
+        "Zitrone",
+        "Sumach"
+      ]
+    },
+    "Feta Pasta": {
+      "base_items": [
+        "Pasta",
+        "Käse",
+        "Tomate",
+        "Olivenöl",
+        "Knoblauch"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Pasta) + MILCH (Feta). Gebackene Feta-Pasta (TikTok-Trend). Kein Fleisch, aber KH + MILCH = NOT_OK (R002). Feta allein mit Tomate + Olivenöl ohne Pasta: OK.",
+      "optional_items": [
+        "Basilikum",
+        "Chili",
+        "Spinat"
+      ]
+    },
+    "Fischstäbchen mit Pommes": {
+      "base_items": [
+        "Fischstäbchen",
+        "Pommes"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: intrinsisch konfliktuelle Fischstäbchen plus Pommes. Nutzt das Prepared-Protein-Canonical direkt statt Fisch+Panade lose nachzubauen. Mit Mayonnaise: zusätzlich high_fat FETT.",
+      "optional_items": [
+        "Zitronensaft",
+        "Ketchup",
+        "Mayonnaise"
+      ]
+    },
+    "Fish and Chips": {
+      "base_items": [
+        "Alaska-Seelachs",
+        "Weizenmehl",
+        "Kartoffel"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: PROTEIN (Fisch) + KH (Bierteig aus Weizenmehl + Chips/Pommes aus Kartoffel). Britischer Klassiker — ähnlich wie Fischstäbchen mit Pommes, aber mit Bierteig.",
+      "optional_items": [
+        "Zitrone",
+        "Erbsen",
+        "Mayonnaise",
+        "Ketchup"
+      ]
+    },
+    "Flammkuchen": {
+      "base_items": [
+        "Weizenmehl",
+        "Sahne",
+        "Speck",
+        "Zwiebel"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Weizenmehl-Teig) + MILCH (Schmand/Sahne) + PROTEIN (Speck). Auch bekannt als Tarte flambée. Vegetarisch (ohne Speck): NOT_OK wegen KH + MILCH.",
+      "optional_items": [
+        "Schnittlauch",
+        "Rucola",
+        "Käse"
+      ]
+    },
+    "Frankfurter Grüne Soße": {
+      "base_items": [
+        "Joghurt",
+        "Ei",
+        "Petersilie",
+        "Schnittlauch"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: MILCH (Joghurt, Saure Sahne) + PROTEIN (hartgekochtes Ei). R006 (PROTEIN+MILCH). Kräuter = NEUTRAL. Traditionell zu Tafelspitz + Kartoffeln — weitere NOT_OK-Kombinationen. Die Soße selbst ist bereits NOT_OK.",
+      "optional_items": [
+        "Saure Sahne",
+        "Borretsch",
+        "Sauerampfer",
+        "Olivenöl",
+        "Senf"
+      ]
+    },
+    "French Toast": {
+      "base_items": [
+        "Brot",
+        "Ei",
+        "Milch"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Brot) + PROTEIN (Ei) + MILCH. Auch bekannt als Arme Ritter. Mit Früchten als Topping: zusätzlich OBST + MILCH (R009).",
+      "optional_items": [
+        "Butter",
+        "Zimt",
+        "Ahornsirup",
+        "Puderzucker"
+      ]
+    },
+    "Frucht-Smoothie": {
+      "base_items": [
+        "Banane",
+        "Erdbeere"
+      ],
+      "needs_clarification": "Nur Früchte oder mit Joghurt/Milch/Protein-Pulver?",
+      "note": "Pur (nur Obst + Wasser/Eis): OK — reines OBST. Mit Joghurt/Milch: NOT_OK (OBST + MILCH). Mit Bananenmilch/Hafermilch: OBST + MILCH/KH = NOT_OK. Grüner Smoothie (Blattgrün): OK.",
+      "optional_items": [
+        "Mango",
+        "Ananas",
+        "Blaubeere",
+        "Wasser",
+        "Eis"
+      ]
+    },
+    "Frühlingsrollen frisch": {
+      "base_items": [
+        "Reis",
+        "Garnele",
+        "Kopfsalat",
+        "Reisnudeln"
+      ],
+      "needs_clarification": "Vegetarisch oder mit Garnelen/Fleisch?",
+      "note": "Standard: NOT_OK — KH (Reispapier + Reisnudeln) + PROTEIN (Garnelen). Vegetarisch (nur Gemüse, keine Nudeln): OK — KH (Reispapier) + NEUTRAL. Mit Erdnusssoße: FETT-Menge prüfen.",
+      "optional_items": [
+        "Minze",
+        "Koriander",
+        "Möhre",
+        "Gurke",
+        "Erdnusssoße"
+      ]
+    },
+    "Gazpacho": {
+      "base_items": [
+        "Tomate",
+        "Gurke",
+        "Paprika",
+        "Zwiebel",
+        "Knoblauch"
+      ],
+      "needs_clarification": null,
+      "note": "OK — ausschließlich NEUTRAL (stärkearmes Gemüse + Kräuter). Klassisch Trennkost-freundlich. Auch mit etwas Brot als Einlage: OK (KH + NEUTRAL ist erlaubt). Mit Olivenöl: CONDITIONAL auf Menge.",
+      "optional_items": [
+        "Olivenöl",
+        "Essig",
+        "Brot"
+      ]
+    },
+    "Gebratener Reis": {
+      "base_items": [
+        "Reis",
+        "Ei",
+        "Frühlingszwiebel"
+      ],
+      "needs_clarification": "Vegetarisch oder mit Fleisch/Meeresfrüchten?",
+      "note": "NOT_OK: KH (Reis) + PROTEIN (Ei). Mit Hähnchen/Garnelen: zusätzlich PROTEIN. Auch bekannt als Fried Rice.",
+      "optional_items": [
+        "Hähnchen",
+        "Garnele",
+        "Möhre",
+        "Erbsen",
+        "Sojasoße"
+      ]
+    },
+    "Gefüllte Paprika": {
+      "base_items": [
+        "Paprika",
+        "Hackfleisch",
+        "Reis",
+        "Zwiebel",
+        "Tomate"
+      ],
+      "needs_clarification": "Mit Reis in der Füllung oder ohne?",
+      "note": "Mit Reis: NOT_OK — PROTEIN (Hackfleisch) + KH (Reis in Füllung). Paprika = NEUTRAL. Ohne Reis (nur Hackfleisch + Gemüse): OK — PROTEIN + NEUTRAL. Mit Käse/Sahne-Sauce: zusätzlich MILCH.",
+      "optional_items": [
+        "Käse",
+        "Sahne",
+        "Knoblauch"
+      ]
+    },
+    "Gemischter Blattsalat": {
+      "base_items": [
+        "Kopfsalat",
+        "Tomate",
+        "Gurke",
+        "Paprika"
+      ],
+      "needs_clarification": null,
+      "note": "Pur: OK — reines NEUTRAL. Mit Hähnchen/Thunfisch: OK (PROTEIN + NEUTRAL). Mit Käse: OK (MILCH + NEUTRAL). Mit Olivenöl: CONDITIONAL. Mit Croutons + Hähnchen: OK (KH + NEUTRAL + PROTEIN... Moment: KH + PROTEIN = NOT_OK!). Croutons + Käse: KH + MILCH = NOT_OK. Ohne Croutons sehr flexibel.",
+      "optional_items": [
+        "Olivenöl",
+        "Essig",
+        "Hähnchen",
+        "Thunfisch",
+        "Käse",
+        "Croutons"
+      ]
+    },
+    "Gemüseauflauf": {
+      "base_items": [
+        "Zucchini",
+        "Paprika",
+        "Tomate",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Kartoffeln und/oder Käse-Sahne-Sauce?",
+      "note": "Variiert: Nur NEUTRAL: OK (Zucchini, Paprika, Tomate). Mit Käse/Sahne: CONDITIONAL (MILCH). Mit Kartoffeln + Käse: NOT_OK (KH+MILCH, R002). Einer der wenigen Aufläufe, der Trennkost-freundlich sein kann — ohne Milchprodukte und KH.",
+      "optional_items": [
+        "Kartoffel",
+        "Käse",
+        "Sahne",
+        "Brokkoli",
+        "Blumenkohl"
+      ]
+    },
+    "Gemüsecurry": {
+      "base_items": [
+        "Aubergine",
+        "Zucchini",
+        "Tomate",
+        "Paprika",
+        "Kokosmilch",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Rein gemüsebasiert, mit Kichererbsen oder mit Kartoffeln?",
+      "note": "Pur (nur Gemüse + Kokosmilch): CONDITIONAL — NEUTRAL + FETT (Kokosmilch). Mit Kichererbsen: CONDITIONAL (HUELSENFRUECHTE + NEUTRAL). Mit Kartoffeln: KH + NEUTRAL = OK. Mit Reis: KH + NEUTRAL = OK. Ohne Fleisch = eines der Trennkost-freundlichsten Gerichte!",
+      "optional_items": [
+        "Kichererbsen",
+        "Kartoffel",
+        "Reis",
+        "Garam Masala",
+        "Ingwer"
+      ]
+    },
+    "Gnocchi al Pomodoro": {
+      "base_items": [
+        "Kartoffel",
+        "Tomate",
+        "Knoblauch",
+        "Basilikum",
+        "Olivenöl"
+      ],
+      "needs_clarification": "Mit oder ohne Parmesan?",
+      "note": "Ohne Parmesan: OK — KH (Gnocchi aus Kartoffel) + NEUTRAL (Tomatensauce, Knoblauch, Basilikum). Positives Trennkost-Beispiel! Mit Parmesan: NOT_OK (KH + MILCH).",
+      "optional_items": [
+        "Parmesan",
+        "Zwiebel"
+      ]
+    },
+    "Granola Bowl": {
+      "base_items": [
+        "Müsli",
+        "Joghurt",
+        "Erdbeere"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Granola/Müsli) + MILCH (Joghurt) + OBST (Beeren). Dreifach-Verletzung. Granola mit Pflanzenmilch: KH + KH/FETT = besser. Reine Obst-Bowl ohne Granola: OK (nur OBST).",
+      "optional_items": [
+        "Banane",
+        "Blaubeere",
+        "Honig",
+        "Chiasamen"
+      ]
+    },
+    "Griechischer Salat": {
+      "base_items": [
+        "Tomate",
+        "Gurke",
+        "Paprika",
+        "Oliven",
+        "Käse",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Brot/Pita als Beilage?",
+      "note": "Ohne Brot: OK — MILCH (Feta) + NEUTRAL (Gemüse, Oliven). Mit Pita/Brot: NOT_OK (KH + MILCH). Olivenöl = kleine Menge FETT: CONDITIONAL auf Menge.",
+      "optional_items": [
+        "Olivenöl",
+        "Oregano",
+        "Zitrone"
+      ]
+    },
+    "Grießbrei": {
+      "base_items": [
+        "Grieß",
+        "Milch"
+      ],
+      "needs_clarification": "Mit Milch oder mit Wasser gekocht?",
+      "note": "Mit Milch: NOT_OK — KH (Grieß) + MILCH. Mit Wasser: OK — reines KH. Ähnlich wie Porridge. Süße Toppings (Zucker, Honig) = weitere KH, aber keine neue Verletzung.",
+      "optional_items": [
+        "Zucker",
+        "Zimt",
+        "Butter",
+        "Vanille"
+      ]
+    },
+    "Grüner Smoothie": {
+      "base_items": [
+        "Banane",
+        "Spinat"
+      ],
+      "needs_clarification": null,
+      "note": "OK: OBST + BLATTGRUEN (Smoothie-Ausnahme)",
+      "optional_items": [
+        "Apfel",
+        "Ingwer",
+        "Wasser"
+      ]
+    },
+    "Gulasch": {
+      "base_items": [
+        "Rindfleisch",
+        "Paprika",
+        "Zwiebel",
+        "Tomatensauce"
+      ],
+      "needs_clarification": "Mit welcher Beilage? Kartoffeln/Nudeln = NOT_OK. Gulasch pur = OK.",
+      "note": "Gulasch pur (ohne KH-Beilage): OK — PROTEIN (Rindfleisch) + NEUTRAL (Paprika, Zwiebel, Tomatensauce). Mit Kartoffeln oder Nudeln: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Paprikapulver",
+        "Lorbeer",
+        "Kartoffel",
+        "Pasta"
+      ]
+    },
+    "Gyoza": {
+      "base_items": [
+        "Weizenmehl",
+        "Schwein",
+        "Weißkohl",
+        "Ingwer",
+        "Knoblauch"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Weizenteig) + PROTEIN (Schweinehack). Auch bekannt als Dim Sum, Dumplings oder Jiaozi. Gedämpft, gebraten oder gekocht — immer KH + PROTEIN.",
+      "optional_items": [
+        "Sojasoße",
+        "Reisessig",
+        "Sesamöl"
+      ]
+    },
+    "Gyros mit Tzatziki": {
+      "base_items": [
+        "Hähnchen",
+        "Joghurt",
+        "Gurke",
+        "Knoblauch"
+      ],
+      "needs_clarification": "Mit oder ohne Pita?",
+      "note": "Gyros + Tzatziki allein: NOT_OK — PROTEIN (Hähnchen) + MILCH (Joghurt im Tzatziki). Mit Pita: zusätzlich KH. Gyros pur ohne Tzatziki + Gemüsebeilage: OK (PROTEIN + NEUTRAL).",
+      "optional_items": [
+        "Olivenöl",
+        "Tomate",
+        "Zwiebel"
+      ]
+    },
+    "Himmel und Erde": {
+      "base_items": [
+        "Kartoffel",
+        "Apfel",
+        "Wurst",
+        "Zwiebel"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Kartoffelpüree) + OBST (Apfel) + PROTEIN (Blutwurst/Bratwurst). Dreifach-Verletzung: R001 (KH+PROTEIN), R007 (KH+OBST), R008 (PROTEIN+OBST). Typisch rheinisches Gericht — Trennkost-inkompatibel.",
+      "optional_items": [
+        "Speck",
+        "Butter"
+      ]
+    },
+    "Hotdog": {
+      "base_items": [
+        "Brot",
+        "Wurst"
+      ],
+      "needs_clarification": "Klassisch, vegetarisch oder vegan? Explizite modifier-aware Varianten bleiben stärker als dieser generische Restaurant-Fallback.",
+      "note": "Generischer Hotdog-Fallback: Brot + Wurst. Vegetarische/vegane Hotdogs bleiben bewusst über die bestehenden Wurst-Varianten modelliert.",
+      "optional_items": [
+        "Senf",
+        "Ketchup"
+      ]
+    },
+    "Hotdog mit Pommes": {
+      "base_items": [
+        "Brot",
+        "Wurst",
+        "Pommes"
+      ],
+      "needs_clarification": "Klassisch, vegetarisch oder vegan? Explizite modifier-aware Varianten bleiben stärker als dieser generische Restaurant-Fallback.",
+      "note": "Generischer Restaurant-Fallback: Hotdog plus Pommes. Modifier-aware Varianten wie vegetarischer oder veganer Hotdog mit Pommes bleiben vorsichtig über die bestehenden Wurst-Canonicals modelliert.",
+      "optional_items": [
+        "Senf",
+        "Ketchup",
+        "Mayonnaise"
+      ]
+    },
+    "Hummus mit Gemüsesticks": {
+      "base_items": [
+        "Kichererbsen",
+        "Sesam",
+        "Olivenöl",
+        "Gurke",
+        "Paprika",
+        "Möhre"
+      ],
+      "needs_clarification": null,
+      "note": "Möhre = KH (stärkehaltig)! Prüfen: HUELSENFRUECHTE + KH (Möhre). Ohne Möhre: CONDITIONAL (HUELSENFRUECHTE + FETT Menge). Besser: Hummus nur mit stärkearmen Gemüsesticks (Gurke, Paprika, Sellerie)",
+      "optional_items": [
+        "Knoblauch",
+        "Zitrone"
+      ]
+    },
+    "Hühnersalat": {
+      "base_items": [
+        "Hähnchen",
+        "Sellerie",
+        "Mayonnaise",
+        "Kopfsalat"
+      ],
+      "needs_clarification": "Mit Weintrauben (OBST)?",
+      "note": "Ohne Weintrauben: CONDITIONAL — PROTEIN (Hähnchen) + NEUTRAL (Sellerie, Salat) + FETT (Mayonnaise, high_fat). Kein verbotenes Paar. Mit Weintrauben: NOT_OK (OBST + PROTEIN, R008). Als Sandwich: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Weintraube",
+        "Walnüsse",
+        "Senf",
+        "Zitrone"
+      ]
+    },
+    "Hühnersuppe": {
+      "base_items": [
+        "Hähnchen",
+        "Möhre",
+        "Sellerie",
+        "Zwiebel",
+        "Petersilie"
+      ],
+      "needs_clarification": "Mit Nudeln oder Einlagen?",
+      "note": "Mit Möhre: NOT_OK — PROTEIN (Hähnchen) + KH (Möhre = stärkehaltiges Gemüse). Ohne Möhre (nur Hähnchen + stärkearmes Gemüse): OK. Mit Nudeln: NOT_OK (KH + PROTEIN). Klassische Hühnerbrühe ohne Einlagen und ohne Möhre: OK.",
+      "optional_items": [
+        "Nudeln",
+        "Grießklößchen",
+        "Suppennudeln"
+      ]
+    },
+    "Imam Bayildi": {
+      "base_items": [
+        "Aubergine",
+        "Tomate",
+        "Zwiebel",
+        "Knoblauch",
+        "Olivenöl"
+      ],
+      "needs_clarification": null,
+      "note": "OK/CONDITIONAL — ausschließlich NEUTRAL + FETT (Olivenöl). Türkisches geschmortes Auberginengericht. Fettmenge beachten: großzügig Olivenöl → CONDITIONAL. Positives Trennkost-Beispiel!",
+      "optional_items": [
+        "Petersilie",
+        "Zitrone",
+        "Paprika"
+      ]
+    },
+    "Japchae": {
+      "base_items": [
+        "Reisnudeln",
+        "Rindfleisch",
+        "Spinat",
+        "Möhre",
+        "Paprika"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Glasnudeln aus Süßkartoffelstärke) + PROTEIN (Rindfleisch) + KH (Möhre). Koreanisches Glasnudel-Gericht. Vegetarisch ohne Fleisch: KH + NEUTRAL = CONDITIONAL.",
+      "optional_items": [
+        "Ei",
+        "Sojasoße",
+        "Sesamöl",
+        "Sesam",
+        "Frühlingszwiebel"
+      ]
+    },
+    "Joghurt mit Früchten": {
+      "base_items": [
+        "Joghurt",
+        "Erdbeere"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: MILCH (Joghurt) + OBST (Früchte). Obst muss allein gegessen werden, nicht mit Milchprodukten.",
+      "optional_items": [
+        "Honig",
+        "Blaubeere",
+        "Banane",
+        "Chiasamen"
+      ]
+    },
+    "Joghurt mit Müsli": {
+      "base_items": [
+        "Joghurt",
+        "Müsli"
+      ],
+      "needs_clarification": "Mit oder ohne Früchte als Topping?",
+      "note": "NOT_OK: MILCH (Joghurt) + KH (Müsli). Mit Früchten: zusätzlich OBST + MILCH (R009).",
+      "optional_items": [
+        "Honig",
+        "Erdbeere",
+        "Blaubeere"
+      ]
+    },
+    "Kaiserschmarrn": {
+      "base_items": [
+        "Weizenmehl",
+        "Ei",
+        "Milch",
+        "Butter",
+        "Rosinen"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Weizenmehl) + PROTEIN (Ei) + MILCH (Milch, Butter) + TROCKENOBST (Rosinen). Österreichisches Dessert — Vierfach-Verletzung. Mit Pflaumenkompott: zusätzlich OBST.",
+      "optional_items": [
+        "Puderzucker",
+        "Pflaume",
+        "Zwetschgenkompott"
+      ]
+    },
+    "Kartoffelsalat": {
+      "base_items": [
+        "Kartoffel",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Mayonnaise (FETT) oder Essig-Dressing? Mit Speck?",
+      "note": "Ohne Fleisch: CONDITIONAL — KH (Kartoffel) + FETT (Mayonnaise, high_fat). Mayonnaise = größere Fettmenge → nur NEUTRAL-Beilage empfohlen. Mit Speck: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Mayonnaise",
+        "Senf",
+        "Essig",
+        "Gurke",
+        "Schnittlauch",
+        "Speck"
+      ]
+    },
+    "Kartoffelsuppe": {
+      "base_items": [
+        "Kartoffel",
+        "Möhre",
+        "Sellerie",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Sahne und/oder Speck?",
+      "note": "Pur (ohne Milch/Protein): OK — KH (Kartoffel, Möhre) + NEUTRAL (Sellerie, Zwiebel). Mit Sahne: NOT_OK (KH + MILCH). Mit Speck: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Sahne",
+        "Speck",
+        "Petersilie",
+        "Schnittlauch"
+      ]
+    },
+    "Kibbeh": {
+      "base_items": [
+        "Bulgur",
+        "Lamm",
+        "Zwiebel",
+        "Pinienkerne"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Bulgur) + PROTEIN (Lammhack). Arabisch-levantinisches Gericht (gebraten, gebacken oder roh). Mit Pinienkerne: zusätzlich FETT.",
+      "optional_items": [
+        "Knoblauch",
+        "Kreuzkümmel",
+        "Zimt",
+        "Minze"
+      ]
+    },
+    "Kimchi Fried Rice": {
+      "base_items": [
+        "Reis",
+        "Weißkohl"
+      ],
+      "needs_clarification": "Mit oder ohne Ei/Fleisch?",
+      "note": "Ohne Ei/Fleisch: OK — KH (Reis) + NEUTRAL (Kimchi = fermentierter Weißkohl). Mit Ei: NOT_OK (KH + PROTEIN). Mit Hähnchen: NOT_OK (KH + PROTEIN). Koreanisches Restessengericht.",
+      "optional_items": [
+        "Ei",
+        "Hähnchen",
+        "Frühlingszwiebel",
+        "Sesamöl",
+        "Sojasoße"
+      ]
+    },
+    "Knäckebrot mit Avocado": {
+      "base_items": [
+        "Knäckebrot",
+        "Avocado"
+      ],
+      "needs_clarification": null,
+      "note": "CONDITIONAL: KH (Knäckebrot aus Roggen/Weizen) + FETT (Avocado). R017 — Avocado in größerer Menge → CONDITIONAL. Kein KH+PROTEIN Verstoß! Beliebter gesunder Snack — Trennkost-akzeptabel, Avocado-Menge beachten.",
+      "optional_items": [
+        "Zitrone",
+        "Chili",
+        "Tomate",
+        "Sesam",
+        "Frühlingszwiebel"
+      ]
     },
     "Kohlrouladen": {
-      "base_items": ["Weißkohl", "Rindfleisch", "Zwiebel", "Senf"],
-      "optional_items": ["Speck", "Reis", "Tomatensauce"],
+      "base_items": [
+        "Weißkohl",
+        "Rindfleisch",
+        "Zwiebel",
+        "Senf"
+      ],
       "needs_clarification": "Reis in der Füllung oder ohne?",
-      "note": "Ohne Reis: OK — PROTEIN (Rindfleisch) + NEUTRAL (Weißkohl, Zwiebeln). Mit Reis in der Füllung: NOT_OK (KH + PROTEIN). Mit Speck zusätzlich: mehr PROTEIN (gleiche Gruppe, OK). Mit KH-Beilagen (Kartoffeln): NOT_OK."
+      "note": "Ohne Reis: OK — PROTEIN (Rindfleisch) + NEUTRAL (Weißkohl, Zwiebeln). Mit Reis in der Füllung: NOT_OK (KH + PROTEIN). Mit Speck zusätzlich: mehr PROTEIN (gleiche Gruppe, OK). Mit KH-Beilagen (Kartoffeln): NOT_OK.",
+      "optional_items": [
+        "Speck",
+        "Reis",
+        "Tomatensauce"
+      ]
     },
-    "Rösti": {
-      "base_items": ["Kartoffel", "Zwiebel", "Olivenöl"],
-      "optional_items": ["Ei", "Speck", "Käse", "Schnittlauch"],
-      "needs_clarification": "Pur oder mit Ei/Speck/Käse?",
-      "note": "Pur: CONDITIONAL — KH (Kartoffel) + NEUTRAL (Zwiebeln) + FETT (Olivenöl, kleine Menge). Mit Ei obendrauf: NOT_OK (KH + PROTEIN). Mit Speck: NOT_OK (KH + PROTEIN). Mit Käse: NOT_OK (KH + MILCH)."
+    "Korean Fried Chicken": {
+      "base_items": [
+        "Hähnchen",
+        "Weizenmehl",
+        "Stärke"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Weizenmehl + Stärke in der Panade) + PROTEIN (Hähnchen). R001 (KH+PROTEIN). Koreanisches knuspriges Hähnchen — wie alle panierten Fleischgerichte Trennkost-verletzend.",
+      "optional_items": [
+        "Gochujang",
+        "Sojasoße",
+        "Sesamöl",
+        "Knoblauch",
+        "Ingwer",
+        "Sesam"
+      ]
     },
-    "Pasta Arrabiata": {
-      "base_items": ["Pasta", "Tomate", "Knoblauch", "Chili", "Olivenöl"],
-      "optional_items": ["Petersilie", "Parmesan"],
-      "needs_clarification": "Mit oder ohne Parmesan?",
-      "note": "Ohne Parmesan: OK/CONDITIONAL — KH (Pasta) + NEUTRAL (Tomate, Knoblauch, Chili) + kleine Menge FETT (Olivenöl). Positives Trennkost-Beispiel! Mit Parmesan: NOT_OK (KH + MILCH)."
+    "Kung Pao Chicken": {
+      "base_items": [
+        "Hähnchen",
+        "Erdnüsse",
+        "Chili",
+        "Frühlingszwiebel",
+        "Knoblauch"
+      ],
+      "needs_clarification": "Mit oder ohne Reis?",
+      "note": "Ohne Reis: CONDITIONAL — PROTEIN (Hähnchen) + FETT (Erdnüsse) + NEUTRAL (Gemüse, Gewürze). Kein verbotenes Paar. Mit Reis: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Sojasoße",
+        "Reisessig",
+        "Sesamöl",
+        "Reis"
+      ]
     },
-    "Linsensalat": {
-      "base_items": ["Linsen", "Tomate", "Gurke", "Sellerie", "Zwiebel"],
-      "optional_items": ["Olivenöl", "Essig", "Petersilie", "Möhre"],
-      "needs_clarification": "Mit Möhre?",
-      "note": "Ohne Möhre: CONDITIONAL — HUELSENFRUECHTE (Linsen) + NEUTRAL (Gemüse, Kräuter). Mit Möhre: NOT_OK (HUELSENFRUECHTE + KH, da Möhre = stärkehaltiges Gemüse). Olivenöl (1-2 TL): CONDITIONAL auf Menge."
+    "Käsebrot": {
+      "base_items": [
+        "Brot",
+        "Käse"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Brot) + MILCH (Käse)",
+      "optional_items": [
+        "Butter"
+      ]
+    },
+    "Käsefondue": {
+      "base_items": [
+        "Käse",
+        "Brot",
+        "Knoblauch"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: MILCH (Käse) + KH (Brot als Dipper). Mit Kartoffeln als Alternative: ebenfalls KH + MILCH = NOT_OK. Käsefondue als reines MILCH-Gericht (ohne Brot/KH-Dipper) wäre möglich, aber unüblich.",
+      "optional_items": [
+        "Weißwein",
+        "Kirschwasser",
+        "Kartoffel"
+      ]
+    },
+    "Käsekuchen": {
+      "base_items": [
+        "Weizenmehl",
+        "Quark",
+        "Ei",
+        "Butter"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Mürbeteig aus Weizenmehl) + MILCH (Quark) + PROTEIN (Ei). Dreifach-Verletzung. Mit Früchten als Belag: zusätzlich OBST.",
+      "optional_items": [
+        "Sahne",
+        "Zitrone",
+        "Vanille",
+        "Zucker"
+      ]
     },
     "Käseplatte": {
       "base_items": [],
-      "optional_items": ["Käse", "Walnüsse", "Weintraube", "Feige", "Honig", "Brot", "Cracker"],
       "needs_clarification": "Nur Käse + Nüsse oder mit Obst (Trauben, Feige) und Brot?",
-      "note": "Käse + Nüsse (ohne Obst/Brot): OK — MILCH + FETT. Mit Weintrauben/Feigen: NOT_OK (MILCH + OBST, R009). Mit Brot/Cracker: NOT_OK (KH + MILCH, R002). Minimale Käseplatte (Käse + Nüsse + Gemüsesticks): OK."
+      "note": "Käse + Nüsse (ohne Obst/Brot): OK — MILCH + FETT. Mit Weintrauben/Feigen: NOT_OK (MILCH + OBST, R009). Mit Brot/Cracker: NOT_OK (KH + MILCH, R002). Minimale Käseplatte (Käse + Nüsse + Gemüsesticks): OK.",
+      "optional_items": [
+        "Käse",
+        "Walnüsse",
+        "Weintraube",
+        "Feige",
+        "Honig",
+        "Brot",
+        "Cracker"
+      ]
     },
-    "Niçoise Salat": {
-      "base_items": ["Thunfisch", "Ei", "Tomate", "Grüne Bohnen", "Oliven", "Kopfsalat"],
-      "optional_items": ["Olivenöl", "Essig", "Kartoffel", "Anchovis"],
-      "needs_clarification": "Klassisch (ohne Kartoffeln) oder mit Kartoffeln?",
-      "note": "Ohne Kartoffeln: OK — PROTEIN (Thunfisch, Ei, Anchovis) + NEUTRAL (Gemüse, Salat). Klassische französische Variante ist Trennkost-freundlich! Mit Kartoffeln: NOT_OK (KH + PROTEIN)."
-    },
-    "Bratkartoffeln mit Ei": {
-      "base_items": ["Kartoffel", "Ei", "Zwiebel", "Olivenöl"],
-      "optional_items": ["Speck", "Paprika", "Schnittlauch"],
+    "Käsespätzle": {
+      "base_items": [
+        "Weizenmehl",
+        "Ei",
+        "Käse",
+        "Zwiebel"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Kartoffel) + PROTEIN (Ei). Typisches deutsches Restessen. Mit Speck: zusätzlich PROTEIN. Bratkartoffeln pur (ohne Ei, ohne Speck): CONDITIONAL — KH + NEUTRAL + FETT."
+      "note": "NOT_OK: KH (Weizenmehl im Spätzle-Teig) + PROTEIN (Ei im Teig) + MILCH (Käse). Klassisches Schwäbisches Gericht — leider dreifache Verletzung.",
+      "optional_items": [
+        "Butter",
+        "Schnittlauch"
+      ]
     },
-    "Polenta": {
-      "base_items": ["Mais"],
-      "optional_items": ["Butter", "Käse", "Pilze", "Tomatensauce", "Hähnchen"],
-      "needs_clarification": "Pur, mit Käse oder als Beilage zu Fleisch/Ragù?",
-      "note": "Pur (nur Mais + Wasser): OK — reines KH. Mit Butter (1-2 TL): CONDITIONAL. Mit Käse (Parmesan): NOT_OK (KH + MILCH). Als Beilage zu Fleischragù: NOT_OK (KH + PROTEIN). Mit Pilzen: OK (KH + NEUTRAL)."
+    "Kürbissuppe": {
+      "base_items": [
+        "Kürbis",
+        "Zwiebel",
+        "Ingwer"
+      ],
+      "needs_clarification": "Mit Sahne (MILCH → NOT_OK) oder Kokosmilch (FETT → CONDITIONAL)?",
+      "note": "Pur (ohne Milchprodukte): OK — KH (Kürbis) + NEUTRAL (Zwiebel, Ingwer). Mit Sahne: NOT_OK (KH + MILCH). Mit Kokosmilch (FETT, größere Menge): CONDITIONAL (KH + FETT, kein explizites Verbot, aber Fett-Menge prüfen).",
+      "optional_items": [
+        "Sahne",
+        "Kokosmilch",
+        "Olivenöl"
+      ]
     },
-
-    "Schweinebraten": {
-      "base_items": ["Schwein", "Zwiebel", "Knoblauch", "Sellerie"],
-      "optional_items": ["Möhre", "Kartoffel", "Kartoffelknödel", "Rotkohl"],
-      "needs_clarification": "Mit Kartoffelknödeln/-beilagen oder pur mit Gemüse?",
-      "note": "Pur (ohne KH-Beilagen): OK — PROTEIN (Schwein) + NEUTRAL (Zwiebel, Knoblauch, Sellerie). Mit Kartoffelknödeln oder Bratkartoffeln: NOT_OK (KH + PROTEIN). Mit Möhre im Braten: beachten, dass Möhre = KH (stärkehaltig)."
+    "Labskaus": {
+      "base_items": [
+        "Rindfleisch",
+        "Kartoffel",
+        "Hering",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Spiegelei obendrauf?",
+      "note": "NOT_OK: KH (Kartoffelbrei) + PROTEIN (gepökeltes Rindfleisch, Hering). R001 (KH+PROTEIN). Mit Ei: weiteres PROTEIN. Norddeutsches Seemannsgericht — Kartoffel + Fleisch + Fisch für Trennkost nicht geeignet.",
+      "optional_items": [
+        "Ei",
+        "Rote Bete",
+        "Gewürzgurke"
+      ]
     },
-    "Himmel und Erde": {
-      "base_items": ["Kartoffel", "Apfel", "Wurst", "Zwiebel"],
-      "optional_items": ["Speck", "Butter"],
+    "Larb": {
+      "base_items": [
+        "Hähnchen",
+        "Petersilie",
+        "Minze",
+        "Limette",
+        "Chili"
+      ],
+      "needs_clarification": "Mit geröstetem Reispulver (Khao Kua)?",
+      "note": "NOT_OK: PROTEIN (Hähnchengehacktes) + OBST (Limette). R008 (OBST+PROTEIN). Mit Reispulver: zusätzlich KH+PROTEIN (R001). Ohne Limette: CONDITIONAL (PROTEIN+NEUTRAL). Laotisch-Thai Fleischsalat — Limette macht ihn problematisch.",
+      "optional_items": [
+        "Fischsauce",
+        "Röstzwiebeln",
+        "Reis",
+        "Koriander"
+      ]
+    },
+    "Lasagne": {
+      "base_items": [
+        "Pasta",
+        "Hackfleisch",
+        "Tomatensauce",
+        "Käse",
+        "Sahne"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Kartoffelpüree) + OBST (Apfel) + PROTEIN (Blutwurst/Bratwurst). Dreifach-Verletzung: R001 (KH+PROTEIN), R007 (KH+OBST), R008 (PROTEIN+OBST). Typisch rheinisches Gericht — Trennkost-inkompatibel."
+      "note": "NOT_OK: KH (Pasta) + PROTEIN (Hackfleisch) + MILCH (Käse, Sahne)",
+      "optional_items": [
+        "Zwiebel",
+        "Möhre"
+      ]
     },
-    "Falscher Hase": {
-      "base_items": ["Hackfleisch", "Ei", "Zwiebel", "Paniermehl"],
-      "optional_items": ["Speck", "Senf", "Petersilie", "Kartoffel"],
+    "Leberknödelsuppe": {
+      "base_items": [
+        "Leber",
+        "Brötchen",
+        "Ei",
+        "Zwiebel"
+      ],
       "needs_clarification": null,
-      "note": "CONDITIONAL bis NOT_OK: PROTEIN (Hackfleisch, Ei) + KH (Paniermehl als Binder, kleine Menge). Bei kleiner Menge Semmelbrösel kaum relevant. Ohne Paniermehl (gebunden mit Ei allein): OK — reines PROTEIN + NEUTRAL. Mit Kartoffelseite: NOT_OK (KH + PROTEIN)."
+      "note": "NOT_OK: KH (altbackene Brötchen im Knödel) + PROTEIN (Leber, Ei). R001 (KH+PROTEIN). Bayerische/österreichische Suppe — der Knödel vereint KH + PROTEIN in einem.",
+      "optional_items": [
+        "Majoran",
+        "Petersilie",
+        "Butter"
+      ]
     },
-    "Bagel mit Lachs": {
-      "base_items": ["Brot", "Lachs", "Käse"],
-      "optional_items": ["Kapern", "Zwiebel", "Gurke", "Dill", "Zitrone"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Bagel) + PROTEIN (Lachs) + MILCH (Frischkäse/Cream Cheese). Dreifach-Verletzung. Auch ohne Käse: KH + PROTEIN = NOT_OK."
+    "Linsensalat": {
+      "base_items": [
+        "Linsen",
+        "Tomate",
+        "Gurke",
+        "Sellerie",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Möhre?",
+      "note": "Ohne Möhre: CONDITIONAL — HUELSENFRUECHTE (Linsen) + NEUTRAL (Gemüse, Kräuter). Mit Möhre: NOT_OK (HUELSENFRUECHTE + KH, da Möhre = stärkehaltiges Gemüse). Olivenöl (1-2 TL): CONDITIONAL auf Menge.",
+      "optional_items": [
+        "Olivenöl",
+        "Essig",
+        "Petersilie",
+        "Möhre"
+      ]
     },
-
-    "Bruschetta": {
-      "base_items": ["Brot", "Tomate", "Knoblauch", "Olivenöl", "Basilikum"],
-      "optional_items": ["Essig", "Salz", "Pfeffer"],
-      "needs_clarification": null,
-      "note": "OK/CONDITIONAL: KH (Brot) + NEUTRAL (Tomate, Knoblauch, Basilikum) + FETT (Olivenöl). KH + NEUTRAL = OK (R016). Olivenöl (1-2 TL): CONDITIONAL. Positives Trennkost-Beispiel!"
-    },
-    "Pesto Pasta": {
-      "base_items": ["Pasta", "Basilikum", "Pinienkerne", "Olivenöl", "Knoblauch"],
-      "optional_items": ["Parmesan", "Walnüsse"],
-      "needs_clarification": "Mit oder ohne Parmesan im Pesto?",
-      "note": "Ohne Parmesan: CONDITIONAL — KH (Pasta) + NEUTRAL (Basilikum, Knoblauch) + FETT (Pinienkerne, Olivenöl). Kein verbotenes Paar! Mit Parmesan: NOT_OK (KH + MILCH)."
-    },
-    "Gnocchi al Pomodoro": {
-      "base_items": ["Kartoffel", "Tomate", "Knoblauch", "Basilikum", "Olivenöl"],
-      "optional_items": ["Parmesan", "Zwiebel"],
-      "needs_clarification": "Mit oder ohne Parmesan?",
-      "note": "Ohne Parmesan: OK — KH (Gnocchi aus Kartoffel) + NEUTRAL (Tomatensauce, Knoblauch, Basilikum). Positives Trennkost-Beispiel! Mit Parmesan: NOT_OK (KH + MILCH)."
-    },
-    "Calzone": {
-      "base_items": ["Weizenmehl", "Käse", "Tomatensauce"],
-      "optional_items": ["Schinken", "Salami", "Pilze", "Olivenöl"],
-      "needs_clarification": "Nur Käse oder auch Schinken/Salami?",
-      "note": "NOT_OK: KH (Teig) + MILCH (Käse). Mit Schinken/Salami: zusätzlich PROTEIN (KH + MILCH + PROTEIN). Wie Pizza, nur gefaltet — gleiche Trennkost-Problematik."
-    },
-
-    "Ossobuco": {
-      "base_items": ["Kalb", "Tomate", "Zwiebel", "Sellerie", "Knoblauch"],
-      "optional_items": ["Möhre", "Weißwein", "Petersilie", "Zitrone", "Risotto"],
-      "needs_clarification": "Mit Risotto Milanese (NOT_OK) oder mit Gremolata pur (OK)?",
-      "note": "Pur mit Gremolata (Petersilie, Zitrone, Knoblauch): OK — PROTEIN (Kalbshaxe) + NEUTRAL. Mit Möhre im Schmorfond: beachten (Möhre = KH). Traditionell mit Risotto Milanese: NOT_OK (KH + MILCH)."
-    },
-    "Kung Pao Chicken": {
-      "base_items": ["Hähnchen", "Erdnüsse", "Chili", "Frühlingszwiebel", "Knoblauch"],
-      "optional_items": ["Sojasoße", "Reisessig", "Sesamöl", "Reis"],
-      "needs_clarification": "Mit oder ohne Reis?",
-      "note": "Ohne Reis: CONDITIONAL — PROTEIN (Hähnchen) + FETT (Erdnüsse) + NEUTRAL (Gemüse, Gewürze). Kein verbotenes Paar. Mit Reis: NOT_OK (KH + PROTEIN)."
+    "Linsensuppe": {
+      "base_items": [
+        "Linsen",
+        "Möhre",
+        "Zwiebel",
+        "Sellerie"
+      ],
+      "needs_clarification": "Mit Kartoffeln oder Brot dazu?",
+      "note": "Ohne KH-Beilagen: CONDITIONAL (HUELSENFRUECHTE + Möhre als stärkehaltiges Gemüse). Kurs: Hülsenfrüchte nur mit Gemüse/Salat + kleine Menge Fett.",
+      "optional_items": [
+        "Kartoffel",
+        "Olivenöl"
+      ]
     },
     "Mango Sticky Rice": {
-      "base_items": ["Reis", "Mango", "Kokosmilch"],
-      "optional_items": ["Sesam", "Zucker"],
+      "base_items": [
+        "Reis",
+        "Mango",
+        "Kokosmilch"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Klebreis) + OBST (Mango) + FETT (Kokosmilch). R007 (KH+OBST) + R014 (OBST+FETT). Thailändisches Dessert — Trennkost-inkompatibel."
+      "note": "NOT_OK: KH (Klebreis) + OBST (Mango) + FETT (Kokosmilch). R007 (KH+OBST) + R014 (OBST+FETT). Thailändisches Dessert — Trennkost-inkompatibel.",
+      "optional_items": [
+        "Sesam",
+        "Zucker"
+      ]
     },
-    "Kimchi Fried Rice": {
-      "base_items": ["Reis", "Weißkohl"],
-      "optional_items": ["Ei", "Hähnchen", "Frühlingszwiebel", "Sesamöl", "Sojasoße"],
-      "needs_clarification": "Mit oder ohne Ei/Fleisch?",
-      "note": "Ohne Ei/Fleisch: OK — KH (Reis) + NEUTRAL (Kimchi = fermentierter Weißkohl). Mit Ei: NOT_OK (KH + PROTEIN). Mit Hähnchen: NOT_OK (KH + PROTEIN). Koreanisches Restessengericht."
-    },
-
-    "Fattoush": {
-      "base_items": ["Brot", "Tomate", "Gurke", "Kopfsalat", "Petersilie"],
-      "optional_items": ["Rettich", "Minze", "Olivenöl", "Zitrone", "Sumach"],
+    "Mapo Tofu": {
+      "base_items": [
+        "Tofu",
+        "Hackfleisch",
+        "Frühlingszwiebel",
+        "Knoblauch",
+        "Chili"
+      ],
       "needs_clarification": null,
-      "note": "OK/CONDITIONAL: KH (geröstetes Pita/Fladenbrot) + NEUTRAL (Gemüse, Kräuter) + kleine Menge FETT (Olivenöl). KH + NEUTRAL = OK. Levantinischer Brotsalat — Trennkost-freundlich."
+      "note": "NOT_OK: HUELSENFRUECHTE (Tofu) + PROTEIN (Hackfleisch). Sichuan-Klassiker. Vegetarische/vegane Variante (ohne Hackfleisch): CONDITIONAL — HUELSENFRUECHTE + NEUTRAL. Mit Reis: NOT_OK (HUELSENFRUECHTE + KH).",
+      "optional_items": [
+        "Sojasoße",
+        "Sesamöl",
+        "Szechuanpfeffer"
+      ]
     },
-    "Kibbeh": {
-      "base_items": ["Bulgur", "Lamm", "Zwiebel", "Pinienkerne"],
-      "optional_items": ["Knoblauch", "Kreuzkümmel", "Zimt", "Minze"],
+    "Maultaschen": {
+      "base_items": [
+        "Weizenmehl",
+        "Hackfleisch",
+        "Spinat",
+        "Zwiebel"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Bulgur) + PROTEIN (Lammhack). Arabisch-levantinisches Gericht (gebraten, gebacken oder roh). Mit Pinienkerne: zusätzlich FETT."
+      "note": "NOT_OK: KH (Weizenmehl-Teig) + PROTEIN (Hackfleisch, Ei im Teig). Spinat = NEUTRAL macht es nicht besser. Mit Parmesan: zusätzlich MILCH.",
+      "optional_items": [
+        "Ei",
+        "Butter",
+        "Parmesan"
+      ]
+    },
+    "Milchreis": {
+      "base_items": [
+        "Reis",
+        "Milch",
+        "Zucker",
+        "Zimt"
+      ],
+      "needs_clarification": "Mit Frucht-Topping?",
+      "note": "NOT_OK: KH (Reis, Zucker) + MILCH. Mit Erdbeer-Topping: zusätzlich OBST + MILCH (R009). Mit Apfelmus: OBST + MILCH + KH = mehrfach NOT_OK. Kindheitserinnerung — leider nicht Trennkost-konform.",
+      "optional_items": [
+        "Butter",
+        "Vanille",
+        "Erdbeere",
+        "Apfelmus"
+      ]
+    },
+    "Minestrone": {
+      "base_items": [
+        "Pasta",
+        "Weiße Bohnen",
+        "Tomate",
+        "Zucchini",
+        "Möhre",
+        "Sellerie"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Pasta, Möhre) + HUELSENFRUECHTE (Weiße Bohnen). Hülsenfrüchte dürfen nicht mit anderen KH kombiniert werden. Mit Parmesan: zusätzlich MILCH.",
+      "optional_items": [
+        "Parmesan",
+        "Olivenöl",
+        "Basilikum"
+      ]
+    },
+    "Miso Suppe": {
+      "base_items": [
+        "Miso",
+        "Tofu",
+        "Frühlingszwiebel"
+      ],
+      "needs_clarification": null,
+      "note": "CONDITIONAL: HUELSENFRUECHTE (Miso + Tofu = fermentierte/verarbeitete Soja) + NEUTRAL (Frühlingszwiebeln, Algen). Kein verbotenes Paar — HUELSENFRUECHTE dürfen mit NEUTRAL kombiniert werden. Kurs warnt generell vor Soja. Ohne KH oder Protein: Trennkost-konform.",
+      "optional_items": [
+        "Nori",
+        "Pilze",
+        "Ingwer"
+      ]
+    },
+    "Moussaka": {
+      "base_items": [
+        "Aubergine",
+        "Hackfleisch",
+        "Weizenmehl",
+        "Sahne",
+        "Käse"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: PROTEIN (Hackfleisch) + MILCH (Béchamel aus Sahne + Käse) + KH (Mehl in Béchamel). Dreifach-Verletzung. Aubergine = NEUTRAL, ändert nichts. Mit Kartoffelschichten: noch mehr KH.",
+      "optional_items": [
+        "Kartoffel",
+        "Tomate",
+        "Zwiebel",
+        "Knoblauch"
+      ]
+    },
+    "Mousse au Chocolat": {
+      "base_items": [
+        "Sahne",
+        "Ei",
+        "Kakao"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: MILCH (Sahne) + PROTEIN (Ei) + UNKNOWN (Kakao, noch nicht kategorisiert). R006 (PROTEIN + MILCH). Kakao könnte zusätzlich KH-nah sein. Eines der problematischsten Desserts aus Trennkost-Sicht.",
+      "optional_items": [
+        "Zucker",
+        "Butter",
+        "Vanille"
+      ]
     },
     "Mujaddara": {
-      "base_items": ["Linsen", "Reis", "Zwiebel", "Olivenöl"],
-      "optional_items": ["Joghurt", "Kurkuma", "Koriander"],
+      "base_items": [
+        "Linsen",
+        "Reis",
+        "Zwiebel",
+        "Olivenöl"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: HUELSENFRUECHTE (Linsen) + KH (Reis). Arabisches Comfort-Food — leider HUELSENFRUECHTE + KH = NOT_OK (R003). Mit Joghurt: zusätzlich MILCH. Ohne Reis (nur Linsen + karamellisierte Zwiebeln): CONDITIONAL."
+      "note": "NOT_OK: HUELSENFRUECHTE (Linsen) + KH (Reis). Arabisches Comfort-Food — leider HUELSENFRUECHTE + KH = NOT_OK (R003). Mit Joghurt: zusätzlich MILCH. Ohne Reis (nur Linsen + karamellisierte Zwiebeln): CONDITIONAL.",
+      "optional_items": [
+        "Joghurt",
+        "Kurkuma",
+        "Koriander"
+      ]
     },
-    "Pasta e Fagioli": {
-      "base_items": ["Pasta", "Weiße Bohnen", "Tomate", "Knoblauch", "Sellerie"],
-      "optional_items": ["Olivenöl", "Rosmarin", "Parmesan", "Speck"],
+    "Müsli mit Milch": {
+      "base_items": [
+        "Müsli",
+        "Milch"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Pasta) + HUELSENFRUECHTE (Weiße Bohnen). Klassische italienische Suppe — HUELSENFRUECHTE dürfen nicht mit KH kombiniert werden (R003). Mit Parmesan: zusätzlich MILCH."
+      "note": "NOT_OK: KH (Müsli) + MILCH. Mit Banane zusätzlich OBST.",
+      "optional_items": [
+        "Banane",
+        "Honig"
+      ]
     },
-
-    "Shakshuka mit Feta": {
-      "base_items": ["Tomate", "Ei", "Paprika", "Käse", "Olivenöl", "Zwiebel"],
-      "optional_items": ["Spinat", "Chili", "Koriander"],
+    "Nachos": {
+      "base_items": [
+        "Mais",
+        "Käse"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: PROTEIN (Ei) + MILCH (Feta). Standard-Shakshuka wäre OK, aber Feta macht es zum NOT_OK-Gericht (R006: PROTEIN + MILCH). Mit Brot zum Dippen: zusätzlich KH + PROTEIN."
+      "note": "NOT_OK: KH (Mais-Tortilla-Chips) + MILCH (Käse). R002 (KH+MILCH). Mit Hackfleisch: KH+PROTEIN (R001). Mit Bohnen: HUELSENFRUECHTE+KH (R003). Avocado = FETT (CONDITIONAL). Party-Snack — immer NOT_OK durch Käse+Chips.",
+      "optional_items": [
+        "Hackfleisch",
+        "Bohnen",
+        "Avocado",
+        "Saure Sahne",
+        "Jalapeño",
+        "Tomate"
+      ]
     },
-    "Tofu-Gemüse-Wok": {
-      "base_items": ["Tofu", "Brokkoli", "Paprika", "Frühlingszwiebel", "Sojasoße"],
-      "optional_items": ["Sesamöl", "Ingwer", "Knoblauch", "Reis", "Reisnudeln"],
-      "needs_clarification": "Mit Reis oder Nudeln als Beilage?",
-      "note": "Ohne Getreide-Beilage: CONDITIONAL — HUELSENFRUECHTE (Tofu) + NEUTRAL (Gemüse). Mit Reis oder Reisnudeln: NOT_OK (HUELSENFRUECHTE + KH). Sesamöl (kleine Menge): CONDITIONAL auf Fett-Menge."
-    },
-    "Veggie Burger": {
-      "base_items": ["Brötchen", "Vegetarisches Patty"],
-      "optional_items": ["Kopfsalat", "Tomate", "Gurke", "Senf", "Ketchup"],
-      "needs_clarification": "Welche Patty-Basis genau? Modifier-aware vegetarische Varianten bleiben ohne klare Produktbasis bewusst vorsichtig.",
-      "note": "Modifier-aware Fallback: vegetarischer Burger bleibt absichtlich unscharf, statt automatisch auf Kichererbsen/Bohnen festgelegt zu werden."
-    },
-    "Gemüsecurry": {
-      "base_items": ["Aubergine", "Zucchini", "Tomate", "Paprika", "Kokosmilch", "Zwiebel"],
-      "optional_items": ["Kichererbsen", "Kartoffel", "Reis", "Garam Masala", "Ingwer"],
-      "needs_clarification": "Rein gemüsebasiert, mit Kichererbsen oder mit Kartoffeln?",
-      "note": "Pur (nur Gemüse + Kokosmilch): CONDITIONAL — NEUTRAL + FETT (Kokosmilch). Mit Kichererbsen: CONDITIONAL (HUELSENFRUECHTE + NEUTRAL). Mit Kartoffeln: KH + NEUTRAL = OK. Mit Reis: KH + NEUTRAL = OK. Ohne Fleisch = eines der Trennkost-freundlichsten Gerichte!"
-    },
-
-    "Hühnersuppe": {
-      "base_items": ["Hähnchen", "Möhre", "Sellerie", "Zwiebel", "Petersilie"],
-      "optional_items": ["Nudeln", "Grießklößchen", "Suppennudeln"],
-      "needs_clarification": "Mit Nudeln oder Einlagen?",
-      "note": "Mit Möhre: NOT_OK — PROTEIN (Hähnchen) + KH (Möhre = stärkehaltiges Gemüse). Ohne Möhre (nur Hähnchen + stärkearmes Gemüse): OK. Mit Nudeln: NOT_OK (KH + PROTEIN). Klassische Hühnerbrühe ohne Einlagen und ohne Möhre: OK."
-    },
-    "Thunfischsalat": {
-      "base_items": ["Thunfisch", "Tomate", "Gurke", "Zwiebel", "Oliven"],
-      "optional_items": ["Olivenöl", "Zitrone", "Kapern", "Petersilie", "Kopfsalat"],
+    "Nasi Goreng": {
+      "base_items": [
+        "Reis",
+        "Ei",
+        "Hähnchen"
+      ],
       "needs_clarification": null,
-      "note": "OK — PROTEIN (Thunfisch) + NEUTRAL (Gemüse, Salat). Mit kleiner Menge Olivenöl: CONDITIONAL. Kein verbotenes Paar. Positives Trennkost-Beispiel — auch als Sandwich NOT_OK (KH + PROTEIN)."
+      "note": "NOT_OK: KH (Reis) + PROTEIN (Ei, Hähnchen). Indonesisches Gebratenes-Reis-Gericht. Mit Garnelen zusätzlich PROTEIN.",
+      "optional_items": [
+        "Frühlingszwiebel",
+        "Knoblauch",
+        "Sojasoße",
+        "Chili",
+        "Garnele"
+      ]
     },
-    "Hühnersalat": {
-      "base_items": ["Hähnchen", "Sellerie", "Mayonnaise", "Kopfsalat"],
-      "optional_items": ["Weintraube", "Walnüsse", "Senf", "Zitrone"],
-      "needs_clarification": "Mit Weintrauben (OBST)?",
-      "note": "Ohne Weintrauben: CONDITIONAL — PROTEIN (Hähnchen) + NEUTRAL (Sellerie, Salat) + FETT (Mayonnaise, high_fat). Kein verbotenes Paar. Mit Weintrauben: NOT_OK (OBST + PROTEIN, R008). Als Sandwich: NOT_OK (KH + PROTEIN)."
-    },
-    "Gemischter Blattsalat": {
-      "base_items": ["Kopfsalat", "Tomate", "Gurke", "Paprika"],
-      "optional_items": ["Olivenöl", "Essig", "Hähnchen", "Thunfisch", "Käse", "Croutons"],
-      "needs_clarification": null,
-      "note": "Pur: OK — reines NEUTRAL. Mit Hähnchen/Thunfisch: OK (PROTEIN + NEUTRAL). Mit Käse: OK (MILCH + NEUTRAL). Mit Olivenöl: CONDITIONAL. Mit Croutons + Hähnchen: OK (KH + NEUTRAL + PROTEIN... Moment: KH + PROTEIN = NOT_OK!). Croutons + Käse: KH + MILCH = NOT_OK. Ohne Croutons sehr flexibel."
-    },
-    "Zucchini-Nudeln": {
-      "base_items": ["Zucchini", "Olivenöl", "Knoblauch", "Tomate"],
-      "optional_items": ["Basilikum", "Pinienkerne", "Parmesan", "Hähnchen"],
-      "needs_clarification": "Mit Parmesan oder Hähnchen?",
-      "note": "Pur (als Pasta-Ersatz): CONDITIONAL — NEUTRAL (Zucchini = Gemüse, nicht KH!) + NEUTRAL + FETT (Olivenöl). Ausgezeichnetes Trennkost-Gericht! Mit Parmesan: OK (MILCH + NEUTRAL). Mit Hähnchen: OK (PROTEIN + NEUTRAL). Mit echten Nudeln gemischt: KH + NEUTRAL = OK."
-    },
-    "Teriyaki Lachs": {
-      "base_items": ["Lachs", "Sojasoße", "Ingwer", "Knoblauch"],
-      "optional_items": ["Sesam", "Frühlingszwiebel", "Sesamöl", "Reis", "Brokkoli"],
-      "needs_clarification": "Mit Reis oder nur mit Gemüse?",
-      "note": "Ohne Reis: OK/CONDITIONAL — PROTEIN (Lachs) + NEUTRAL (Sojasoße, Ingwer, Knoblauch) + kleine Menge FETT (Sesam). Mit Brokkoli: OK. Mit Reis: NOT_OK (KH + PROTEIN)."
+    "Niçoise Salat": {
+      "base_items": [
+        "Thunfisch",
+        "Ei",
+        "Tomate",
+        "Grüne Bohnen",
+        "Oliven",
+        "Kopfsalat"
+      ],
+      "needs_clarification": "Klassisch (ohne Kartoffeln) oder mit Kartoffeln?",
+      "note": "Ohne Kartoffeln: OK — PROTEIN (Thunfisch, Ei, Anchovis) + NEUTRAL (Gemüse, Salat). Klassische französische Variante ist Trennkost-freundlich! Mit Kartoffeln: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Olivenöl",
+        "Essig",
+        "Kartoffel",
+        "Anchovis"
+      ]
     },
     "Nudelauflauf": {
-      "base_items": ["Pasta", "Sahne", "Käse", "Ei"],
-      "optional_items": ["Schinken", "Speck", "Pilze", "Tomaten"],
+      "base_items": [
+        "Pasta",
+        "Sahne",
+        "Käse",
+        "Ei"
+      ],
       "needs_clarification": "Mit Schinken/Speck?",
-      "note": "NOT_OK: KH (Pasta) + MILCH (Sahne, Käse) + PROTEIN (Ei). Dreifach-Verletzung. Mit Schinken/Speck: noch mehr PROTEIN."
+      "note": "NOT_OK: KH (Pasta) + MILCH (Sahne, Käse) + PROTEIN (Ei). Dreifach-Verletzung. Mit Schinken/Speck: noch mehr PROTEIN.",
+      "optional_items": [
+        "Schinken",
+        "Speck",
+        "Pilze",
+        "Tomaten"
+      ]
     },
-    "Rote Grütze": {
-      "base_items": ["Erdbeere", "Himbeere", "Kirsche"],
-      "optional_items": ["Blaubeere", "Johannisbeere", "Speisestärke", "Zucker", "Sahne"],
-      "needs_clarification": "Mit Zucker/Stärke oder pur? Mit Sahne gereicht?",
-      "note": "Pur (nur Beeren ohne Zucker/Stärke): OK — reines OBST. Mit Speisestärke und Zucker (KH): NOT_OK (OBST + KH, R007). Mit Sahne oder Vanillesauce: NOT_OK (OBST + MILCH, R009). Pur ohne Zusätze = perfektes Trennkost-Dessert."
+    "Nuggets mit Pommes": {
+      "base_items": [
+        "Chicken Nuggets",
+        "Pommes"
+      ],
+      "needs_clarification": "Chicken Nuggets oder andere Nuggets-Variante?",
+      "note": "Restaurant-Default: ohne weitere Präzisierung wird dies vorsichtig als Chicken Nuggets mit Pommes behandelt.",
+      "optional_items": [
+        "Ketchup",
+        "Mayonnaise"
+      ]
+    },
+    "Obatzda": {
+      "base_items": [
+        "Camembert",
+        "Butter",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Brezel oder Brot gereicht?",
+      "note": "Pur: OK — MILCH (Camembert) + FETT (Butter) + NEUTRAL (Zwiebeln). Kein verbotenes Paar! Mit Brezel oder Brot: NOT_OK (KH + MILCH). Bayerischer Brotaufstrich — pur Trennkost-freundlich.",
+      "optional_items": [
+        "Radieschen",
+        "Schnittlauch",
+        "Paprikapulver",
+        "Bier",
+        "Brezel"
+      ]
     },
     "Obstkuchen": {
-      "base_items": ["Weizenmehl", "Butter", "Ei", "Apfel"],
-      "optional_items": ["Pflaume", "Kirsche", "Beeren", "Sahne", "Zucker"],
+      "base_items": [
+        "Weizenmehl",
+        "Butter",
+        "Ei",
+        "Apfel"
+      ],
       "needs_clarification": "Welche Obstsorte?",
-      "note": "NOT_OK: KH (Mürbeteig/Biskuit aus Weizenmehl) + OBST (Apfel, Pflaume etc.) + PROTEIN (Ei im Teig). Gilt für alle Varianten: Pflaumenkuchen, Apfelkuchen, Kirschkuchen, Beerenkuchen. Mit Sahne-Topping: zusätzlich MILCH."
+      "note": "NOT_OK: KH (Mürbeteig/Biskuit aus Weizenmehl) + OBST (Apfel, Pflaume etc.) + PROTEIN (Ei im Teig). Gilt für alle Varianten: Pflaumenkuchen, Apfelkuchen, Kirschkuchen, Beerenkuchen. Mit Sahne-Topping: zusätzlich MILCH.",
+      "optional_items": [
+        "Pflaume",
+        "Kirsche",
+        "Beeren",
+        "Sahne",
+        "Zucker"
+      ]
+    },
+    "Obstsalat": {
+      "base_items": [],
+      "needs_clarification": "Welche Obstsorten? Purer Obstsalat oder mit Joghurt/Sahne?",
+      "note": "Pur = OK. Mit Joghurt/Sahne = NOT_OK (OBST + MILCH)",
+      "optional_items": []
+    },
+    "Okonomiyaki": {
+      "base_items": [
+        "Weizenmehl",
+        "Ei",
+        "Weißkohl",
+        "Speck"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Weizenmehl-Teig) + PROTEIN (Ei, Speck). Japanischer Herzhafter Pfannkuchen. Ohne Fleisch/Eier (rein NEUTRAL-Füllung): KH + NEUTRAL = OK — unüblich aber möglich.",
+      "optional_items": [
+        "Garnele",
+        "Tintenfisch",
+        "Frühlingszwiebel",
+        "Sojasoße",
+        "Mayonnaise"
+      ]
+    },
+    "Omelette": {
+      "base_items": [
+        "Ei"
+      ],
+      "needs_clarification": "Mit Käse oder Schinken als Füllung?",
+      "note": "Pur (ohne Füllung): OK — reines PROTEIN. Mit Gemüse-Füllung (Pilze, Spinat, Paprika): OK — PROTEIN + NEUTRAL. Mit Käse: NOT_OK (PROTEIN + MILCH). Mit Schinken: PROTEIN + PROTEIN (gleiche Gruppe, OK). Mit Brot dazu: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Pilze",
+        "Spinat",
+        "Paprika",
+        "Käse",
+        "Schinken",
+        "Schnittlauch"
+      ]
+    },
+    "Ossobuco": {
+      "base_items": [
+        "Kalb",
+        "Tomate",
+        "Zwiebel",
+        "Sellerie",
+        "Knoblauch"
+      ],
+      "needs_clarification": "Mit Risotto Milanese (NOT_OK) oder mit Gremolata pur (OK)?",
+      "note": "Pur mit Gremolata (Petersilie, Zitrone, Knoblauch): OK — PROTEIN (Kalbshaxe) + NEUTRAL. Mit Möhre im Schmorfond: beachten (Möhre = KH). Traditionell mit Risotto Milanese: NOT_OK (KH + MILCH).",
+      "optional_items": [
+        "Möhre",
+        "Weißwein",
+        "Petersilie",
+        "Zitrone",
+        "Risotto"
+      ]
+    },
+    "Overnight Oats": {
+      "base_items": [
+        "Hafer"
+      ],
+      "needs_clarification": "Mit Milch/Joghurt (NOT_OK) oder mit Wasser/Pflanzenmilch?",
+      "note": "Kurs empfiehlt: Hafer + Wasser + Ahornsirup + max 1-2 TL Nussmus = OK",
+      "optional_items": [
+        "Ahornsirup",
+        "Zimt",
+        "Nussmus"
+      ]
+    },
+    "Pad Thai": {
+      "base_items": [
+        "Reisnudeln",
+        "Ei",
+        "Tofu"
+      ],
+      "needs_clarification": "Vegetarisch (mit Ei/Tofu) oder vegan (ohne Ei)?",
+      "note": "Standard: NOT_OK wegen KH (Reisnudeln) + PROTEIN (Ei/Tofu). Vegan ohne Ei/Tofu = OK (nur KH + Gemüse + Erdnüsse/Fett)",
+      "optional_items": [
+        "Erdnüsse",
+        "Sojasprossen",
+        "Frühlingszwiebel",
+        "Limette",
+        "Fischsauce",
+        "Tamarinde"
+      ]
+    },
+    "Paella": {
+      "base_items": [
+        "Reis",
+        "Hähnchen",
+        "Garnele"
+      ],
+      "needs_clarification": "Fleisch-Paella, Seafood-Paella oder vegetarisch?",
+      "note": "Standard: NOT_OK — KH (Reis) + PROTEIN (Hähnchen, Garnelen). Vegetarische Paella ohne PROTEIN: KH + NEUTRAL = OK.",
+      "optional_items": [
+        "Paprika",
+        "Tomate",
+        "Safran",
+        "Olivenöl",
+        "Zitrone"
+      ]
+    },
+    "Pancakes": {
+      "base_items": [
+        "Weizenmehl",
+        "Ei",
+        "Milch",
+        "Butter"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Weizenmehl) + PROTEIN (Ei) + MILCH (Milch, Butter). Dreifach-Verletzung. Mit Beeren als Topping zusätzlich OBST + MILCH (R009).",
+      "optional_items": [
+        "Ahornsirup",
+        "Erdbeere",
+        "Blaubeere",
+        "Honig"
+      ]
+    },
+    "Panna Cotta": {
+      "base_items": [
+        "Sahne",
+        "Zucker",
+        "Vanille"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: MILCH (Sahne) + KH (Zucker). Mit Fruchtsauce: zusätzlich OBST + MILCH (R009). Ungesüßt (reine Sahne + Vanille): OK — MILCH + NEUTRAL. Praktisch aber immer gesüßt.",
+      "optional_items": [
+        "Erdbeere",
+        "Beerensauce",
+        "Karamell"
+      ]
+    },
+    "Panzanella": {
+      "base_items": [
+        "Brot",
+        "Tomate",
+        "Gurke",
+        "Basilikum",
+        "Olivenöl"
+      ],
+      "needs_clarification": null,
+      "note": "OK/CONDITIONAL: KH (altbackenes Brot) + NEUTRAL (Tomate, Gurke, Basilikum) + FETT (Olivenöl). Italienischer Brotsalat — KH + NEUTRAL = OK. Positives Trennkost-Beispiel!",
+      "optional_items": [
+        "Zwiebel",
+        "Kapern",
+        "Essig",
+        "Paprika"
+      ]
+    },
+    "Pasta Arrabiata": {
+      "base_items": [
+        "Pasta",
+        "Tomate",
+        "Knoblauch",
+        "Chili",
+        "Olivenöl"
+      ],
+      "needs_clarification": "Mit oder ohne Parmesan?",
+      "note": "Ohne Parmesan: OK/CONDITIONAL — KH (Pasta) + NEUTRAL (Tomate, Knoblauch, Chili) + kleine Menge FETT (Olivenöl). Positives Trennkost-Beispiel! Mit Parmesan: NOT_OK (KH + MILCH).",
+      "optional_items": [
+        "Petersilie",
+        "Parmesan"
+      ]
+    },
+    "Pasta Puttanesca": {
+      "base_items": [
+        "Pasta",
+        "Tomate",
+        "Kapern",
+        "Oliven",
+        "Knoblauch"
+      ],
+      "needs_clarification": "Mit Sardellen (Anchovis) oder vegetarisch?",
+      "note": "Vegetarisch: OK/CONDITIONAL — KH (Pasta) + NEUTRAL (Tomate, Kapern, Oliven, Knoblauch) + FETT (Olivenöl). Mit Sardellen: NOT_OK (KH+PROTEIN, R001). Neapolitanische Pasta — vegetarisch Trennkost-verträglich!",
+      "optional_items": [
+        "Sardellen",
+        "Chili",
+        "Petersilie",
+        "Olivenöl"
+      ]
+    },
+    "Pasta e Fagioli": {
+      "base_items": [
+        "Pasta",
+        "Weiße Bohnen",
+        "Tomate",
+        "Knoblauch",
+        "Sellerie"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Pasta) + HUELSENFRUECHTE (Weiße Bohnen). Klassische italienische Suppe — HUELSENFRUECHTE dürfen nicht mit KH kombiniert werden (R003). Mit Parmesan: zusätzlich MILCH.",
+      "optional_items": [
+        "Olivenöl",
+        "Rosmarin",
+        "Parmesan",
+        "Speck"
+      ]
+    },
+    "Pavlova": {
+      "base_items": [
+        "Ei",
+        "Zucker",
+        "Sahne"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: PROTEIN (Eiweiß im Baiserboden) + MILCH (Schlagsahne) + OBST (Früchte-Topping). R006 (PROTEIN+MILCH) + R008 (OBST+PROTEIN) + R009 (OBST+MILCH). Australisches Baiser-Dessert — dreifache Trennkost-Verletzung.",
+      "optional_items": [
+        "Erdbeere",
+        "Kiwi",
+        "Passionsfrucht",
+        "Himbeere",
+        "Banane"
+      ]
+    },
+    "Pesto Pasta": {
+      "base_items": [
+        "Pasta",
+        "Basilikum",
+        "Pinienkerne",
+        "Olivenöl",
+        "Knoblauch"
+      ],
+      "needs_clarification": "Mit oder ohne Parmesan im Pesto?",
+      "note": "Ohne Parmesan: CONDITIONAL — KH (Pasta) + NEUTRAL (Basilikum, Knoblauch) + FETT (Pinienkerne, Olivenöl). Kein verbotenes Paar! Mit Parmesan: NOT_OK (KH + MILCH).",
+      "optional_items": [
+        "Parmesan",
+        "Walnüsse"
+      ]
+    },
+    "Pho": {
+      "base_items": [
+        "Reisnudeln",
+        "Rindfleisch"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Reisnudeln) + PROTEIN (Rindfleisch). Vietnamesische Rindfleischsuppe. Frische Kräuter/Sprossen = NEUTRAL, ändern nichts am Verdikt.",
+      "optional_items": [
+        "Sojasprossen",
+        "Frühlingszwiebel",
+        "Basilikum",
+        "Limette",
+        "Chili"
+      ]
+    },
+    "Pide": {
+      "base_items": [
+        "Weizenmehl"
+      ],
+      "needs_clarification": "Welcher Belag? Käse, Hackfleisch, Spinat-Käse oder Ei?",
+      "note": "Türkisches Fladenbrot = KH. Kashar-Pide (Käse): NOT_OK (KH + MILCH). Kiymali Pide (Hackfleisch): NOT_OK (KH + PROTEIN). Ispanakli Pide (Spinat): OK (KH + NEUTRAL). Mit Ei: NOT_OK (KH + PROTEIN). Wie Pizza je nach Belag.",
+      "optional_items": [
+        "Käse",
+        "Hackfleisch",
+        "Spinat",
+        "Ei",
+        "Zwiebel"
+      ]
+    },
+    "Pizza": {
+      "base_items": [
+        "Weizenteig",
+        "Tomatensauce",
+        "Käse"
+      ],
+      "needs_clarification": "Welcher Belag? (z.B. Salami, Gemüse, Schinken)",
+      "note": "Basis allein schon NOT_OK: KH (Teig) + MILCH (Käse)",
+      "optional_items": [
+        "Olivenöl"
+      ]
+    },
+    "Pizza Margherita": {
+      "base_items": [
+        "Weizenteig",
+        "Tomatensauce",
+        "Mozzarella",
+        "Basilikum",
+        "Olivenöl"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Teig) + MILCH (Mozzarella)",
+      "optional_items": []
+    },
+    "Poke Bowl": {
+      "base_items": [
+        "Reis",
+        "Lachs"
+      ],
+      "needs_clarification": "Welcher Protein? Mit Edamame?",
+      "note": "Standard: NOT_OK — KH (Reis) + PROTEIN (Lachs). Mit Edamame: zusätzlich HUELSENFRUECHTE + KH. Mit Mango: zusätzlich OBST + KH. Vegane Variante ohne Fisch: KH + NEUTRAL/HUELSENFRUECHTE prüfen.",
+      "optional_items": [
+        "Avocado",
+        "Edamame",
+        "Gurke",
+        "Sesam",
+        "Sojasoße",
+        "Mango"
+      ]
+    },
+    "Polenta": {
+      "base_items": [
+        "Mais"
+      ],
+      "needs_clarification": "Pur, mit Käse oder als Beilage zu Fleisch/Ragù?",
+      "note": "Pur (nur Mais + Wasser): OK — reines KH. Mit Butter (1-2 TL): CONDITIONAL. Mit Käse (Parmesan): NOT_OK (KH + MILCH). Als Beilage zu Fleischragù: NOT_OK (KH + PROTEIN). Mit Pilzen: OK (KH + NEUTRAL).",
+      "optional_items": [
+        "Butter",
+        "Käse",
+        "Pilze",
+        "Tomatensauce",
+        "Hähnchen"
+      ]
+    },
+    "Porridge": {
+      "base_items": [
+        "Hafer"
+      ],
+      "needs_clarification": "Mit Milch oder mit Wasser gekocht?",
+      "note": "Mit Wasser = OK (KH). Mit Milch = NOT_OK (KH + MILCH)",
+      "optional_items": [
+        "Ahornsirup",
+        "Zimt"
+      ]
+    },
+    "Pulled Pork": {
+      "base_items": [
+        "Schwein"
+      ],
+      "needs_clarification": "Im Burger-Bun oder pur?",
+      "note": "Pur (ohne Brötchen): OK — reines PROTEIN. Im Brötchen: NOT_OK (KH + PROTEIN). Mit Coleslaw als Beilage: CONDITIONAL (PROTEIN + FETT/NEUTRAL). BBQ-Sauce enthält oft Zucker (KH) → kleine Menge OK, große Menge beachten.",
+      "optional_items": [
+        "Brot",
+        "Weißkohl",
+        "BBQ-Sauce",
+        "Zwiebel"
+      ]
+    },
+    "Quark mit Früchten": {
+      "base_items": [
+        "Quark",
+        "Erdbeere"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: MILCH (Quark) + OBST (Früchte). Obst muss allein und auf nüchternen Magen gegessen werden, nicht mit Milchprodukten.",
+      "optional_items": [
+        "Honig",
+        "Blaubeere",
+        "Himbeere",
+        "Nussmus"
+      ]
+    },
+    "Quesadilla": {
+      "base_items": [
+        "Tortilla",
+        "Käse"
+      ],
+      "needs_clarification": "Mit oder ohne Fleisch?",
+      "note": "Ohne Fleisch: NOT_OK — KH (Tortilla) + MILCH (Käse). Mit Hähnchen: zusätzlich PROTEIN (KH + MILCH + PROTEIN).",
+      "optional_items": [
+        "Hähnchen",
+        "Paprika",
+        "Zwiebel",
+        "Sahne"
+      ]
+    },
+    "Quiche Lorraine": {
+      "base_items": [
+        "Weizenmehl",
+        "Ei",
+        "Sahne",
+        "Speck",
+        "Käse"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Mürbeteig aus Weizenmehl) + PROTEIN (Ei, Speck) + MILCH (Sahne, Käse). Dreifache Kombinations-Verletzung.",
+      "optional_items": [
+        "Butter",
+        "Zwiebel",
+        "Schnittlauch"
+      ]
+    },
+    "Quinoa Salat": {
+      "base_items": [
+        "Quinoa",
+        "Paprika",
+        "Gurke",
+        "Tomate",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Kichererbsen?",
+      "note": "Ohne Kichererbsen: OK/CONDITIONAL — KH (Quinoa) + NEUTRAL (Gemüse). Mit Olivenöl: CONDITIONAL. Mit Kichererbsen: NOT_OK (KH + HUELSENFRUECHTE). Positives Trennkost-Beispiel für gesunde Mahlzeiten.",
+      "optional_items": [
+        "Olivenöl",
+        "Zitrone",
+        "Petersilie",
+        "Koriander",
+        "Kichererbsen"
+      ]
+    },
+    "Raclette": {
+      "base_items": [
+        "Käse",
+        "Kartoffel"
+      ],
+      "needs_clarification": "Mit Fleisch-Beilagen?",
+      "note": "NOT_OK: MILCH (Raclette-Käse) + KH (Kartoffeln). Mit Schinken/Speck: zusätzlich PROTEIN + MILCH = NOT_OK (R006). Nur Käse + NEUTRAL Gemüse (Paprika, Pilze) = OK (MILCH + NEUTRAL).",
+      "optional_items": [
+        "Schinken",
+        "Speck",
+        "Paprika",
+        "Pilze",
+        "Essiggurke"
+      ]
+    },
+    "Ramen": {
+      "base_items": [
+        "Pasta",
+        "Ei",
+        "Speck"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Weizennudeln) + PROTEIN (Ei, Schweinebauch/Chashu). Mit Mais: zusätzlich KH. Mit Sojasprossen/Nori: NEUTRAL, ändert nichts am Verdikt.",
+      "optional_items": [
+        "Sojasprossen",
+        "Frühlingszwiebel",
+        "Nori",
+        "Mais",
+        "Sojasoße"
+      ]
+    },
+    "Ratatouille": {
+      "base_items": [
+        "Aubergine",
+        "Zucchini",
+        "Paprika",
+        "Tomate",
+        "Zwiebel",
+        "Knoblauch"
+      ],
+      "needs_clarification": null,
+      "note": "OK — ausschließlich NEUTRAL (stärkearmes Gemüse + Kräuter). Klassisches Trennkost-freundliches Gericht. Mit kleiner Menge Olivenöl (1-2 TL): OK.",
+      "optional_items": [
+        "Olivenöl",
+        "Thymian",
+        "Basilikum"
+      ]
+    },
+    "Reibekuchen": {
+      "base_items": [
+        "Kartoffel",
+        "Ei",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Apfelmus oder Schmand/Speck gereicht?",
+      "note": "NOT_OK: KH (Kartoffel) + PROTEIN (Ei). Auch bekannt als Kartoffelpuffer oder Latkes. Mit Apfelmus: zusätzlich OBST + KH (R007). Mit Schmand: zusätzlich MILCH + KH (R002). Mit Speck: mehr PROTEIN.",
+      "optional_items": [
+        "Weizenmehl",
+        "Apfelmus",
+        "Sahne",
+        "Speck"
+      ]
+    },
+    "Ribollita": {
+      "base_items": [
+        "Bohnen",
+        "Brot",
+        "Tomate",
+        "Wirsing",
+        "Möhre"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: HUELSENFRUECHTE (Cannellini-Bohnen) + KH (altbackenes Brot + Möhre). R003 (HUELSENFRUECHTE+KH). Toskanischer Eintopf. Ohne Brot und Möhre: CONDITIONAL (HUELSENFRUECHTE+NEUTRAL). Olivenöl in kleiner Menge OK.",
+      "optional_items": [
+        "Sellerie",
+        "Zwiebel",
+        "Knoblauch",
+        "Olivenöl",
+        "Rosmarin"
+      ]
+    },
+    "Rinderroulade": {
+      "base_items": [
+        "Rindfleisch",
+        "Senf",
+        "Speck",
+        "Gurke",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Pur oder mit Kartoffelklößen/Knödeln als Beilage?",
+      "note": "Pur (ohne KH-Beilage): OK — PROTEIN (Rindfleisch, Speck) + NEUTRAL (Senf, Gurke, Zwiebeln). Mit Möhre im Fond: NOT_OK (PROTEIN+KH). Mit Kartoffelklößen: NOT_OK (KH+PROTEIN, R001). Traditionell mit Klößen — dann NOT_OK.",
+      "optional_items": [
+        "Möhre",
+        "Sellerie",
+        "Rotwein",
+        "Kartoffel"
+      ]
+    },
+    "Risotto": {
+      "base_items": [
+        "Reis",
+        "Parmesan",
+        "Butter",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Meeresfrüchten oder Fleisch?",
+      "note": "Standard: NOT_OK — KH (Reis) + MILCH (Parmesan, Butter). Mit Garnelen oder Hähnchen: zusätzlich PROTEIN. Auch vegetarisches Risotto bleibt NOT_OK (KH + MILCH).",
+      "optional_items": [
+        "Pilze",
+        "Spargel",
+        "Garnele",
+        "Hähnchen"
+      ]
+    },
+    "Rote Grütze": {
+      "base_items": [
+        "Erdbeere",
+        "Himbeere",
+        "Kirsche"
+      ],
+      "needs_clarification": "Mit Zucker/Stärke oder pur? Mit Sahne gereicht?",
+      "note": "Pur (nur Beeren ohne Zucker/Stärke): OK — reines OBST. Mit Speisestärke und Zucker (KH): NOT_OK (OBST + KH, R007). Mit Sahne oder Vanillesauce: NOT_OK (OBST + MILCH, R009). Pur ohne Zusätze = perfektes Trennkost-Dessert.",
+      "optional_items": [
+        "Blaubeere",
+        "Johannisbeere",
+        "Speisestärke",
+        "Zucker",
+        "Sahne"
+      ]
+    },
+    "Rotes Linsen-Dal": {
+      "base_items": [
+        "Linsen",
+        "Zwiebel",
+        "Tomate",
+        "Knoblauch",
+        "Ingwer"
+      ],
+      "needs_clarification": "Mit Reis oder Brot als Beilage?",
+      "note": "Pur (ohne Beilage): CONDITIONAL — HUELSENFRUECHTE (Linsen) + NEUTRAL (Gemüse, Gewürze). Mit Reis: NOT_OK (HUELSENFRUECHTE + KH). Mit Brot: NOT_OK (HUELSENFRUECHTE + KH). Mit viel Kokosmilch: FETT-Menge prüfen.",
+      "optional_items": [
+        "Kokosmilch",
+        "Kreuzkümmel",
+        "Kurkuma",
+        "Koriander"
+      ]
+    },
+    "Rösti": {
+      "base_items": [
+        "Kartoffel",
+        "Zwiebel",
+        "Olivenöl"
+      ],
+      "needs_clarification": "Pur oder mit Ei/Speck/Käse?",
+      "note": "Pur: CONDITIONAL — KH (Kartoffel) + NEUTRAL (Zwiebeln) + FETT (Olivenöl, kleine Menge). Mit Ei obendrauf: NOT_OK (KH + PROTEIN). Mit Speck: NOT_OK (KH + PROTEIN). Mit Käse: NOT_OK (KH + MILCH).",
+      "optional_items": [
+        "Ei",
+        "Speck",
+        "Käse",
+        "Schnittlauch"
+      ]
+    },
+    "Rührei": {
+      "base_items": [
+        "Eier"
+      ],
+      "needs_clarification": null,
+      "note": "OK — reines PROTEIN. Mit Butter (kleine Menge FETT): CONDITIONAL aber praktisch OK. Mit Brot/Toast: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Butter",
+        "Salz",
+        "Schnittlauch"
+      ]
+    },
+    "Rührei mit Toast": {
+      "base_items": [
+        "Ei",
+        "Brot"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: PROTEIN (Ei) + KH (Brot)",
+      "optional_items": [
+        "Butter"
+      ]
+    },
+    "Saag Paneer": {
+      "base_items": [
+        "Käse",
+        "Spinat",
+        "Zwiebel",
+        "Knoblauch",
+        "Ingwer"
+      ],
+      "needs_clarification": "Mit Naan oder Reis als Beilage?",
+      "note": "Pur (ohne Brot/Reis): OK — MILCH (Paneer) + NEUTRAL (Spinat, Gemüse, Gewürze). Mit Sahne: mehr MILCH, bleibt OK. Mit Naan oder Reis: NOT_OK (KH + MILCH).",
+      "optional_items": [
+        "Sahne",
+        "Naan",
+        "Reis",
+        "Garam Masala"
+      ]
+    },
+    "Sachertorte": {
+      "base_items": [
+        "Weizenmehl",
+        "Butter",
+        "Ei",
+        "Kakao",
+        "Aprikose"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Weizenmehl, Zucker) + PROTEIN (Ei) + FETT (Butter) + OBST (Marillenmarmelade/Aprikosenmarmelade) + UNKNOWN (Kakao). R001 (KH+PROTEIN) + R007 (OBST+KH). Wiener Kulturdessert — mehrfache Trennkost-Verletzung.",
+      "optional_items": [
+        "Zucker",
+        "Sahne",
+        "Schokolade"
+      ]
+    },
+    "Saltimbocca": {
+      "base_items": [
+        "Rindfleisch",
+        "Schinken",
+        "Salbei",
+        "Butter"
+      ],
+      "needs_clarification": null,
+      "note": "CONDITIONAL — PROTEIN (Kalbfleisch/Rindfleisch, Parmaschinken) + NEUTRAL (Salbei) + FETT (Butter, kleine Menge). Kein verbotenes Paar! Zwei PROTEIN-Quellen sind erlaubt (R006 betrifft nur PROTEIN+MILCH). Butter → CONDITIONAL (Menge).",
+      "optional_items": [
+        "Weißwein",
+        "Olivenöl",
+        "Zitrone"
+      ]
+    },
+    "Sashimi": {
+      "base_items": [
+        "Lachs"
+      ],
+      "needs_clarification": null,
+      "note": "OK — reines PROTEIN (roher Fisch ohne Reis). Im Gegensatz zu Sushi (mit Reis = KH + PROTEIN = NOT_OK) ist Sashimi Trennkost-konform. Sojasoße (kleine Menge als Würze) = NEUTRAL.",
+      "optional_items": [
+        "Thunfisch",
+        "Sojasoße",
+        "Ingwer",
+        "Wasabi"
+      ]
+    },
+    "Satay": {
+      "base_items": [
+        "Hähnchen",
+        "Erdnüsse"
+      ],
+      "needs_clarification": "Mit Reis als Beilage?",
+      "note": "CONDITIONAL: PROTEIN (Hähnchen) + FETT (Erdnusssoße). Größere Erdnussmengen → CONDITIONAL. Mit Reis: NOT_OK (KH+PROTEIN, R001). Kokosmilch = FETT. Pur ohne Beilage Trennkost-akzeptabel — Erdnussmenge beachten.",
+      "optional_items": [
+        "Kokosmilch",
+        "Limette",
+        "Chili",
+        "Ingwer",
+        "Knoblauch",
+        "Sojasoße"
+      ]
+    },
+    "Sauerbraten": {
+      "base_items": [
+        "Rindfleisch",
+        "Kartoffel",
+        "Rotkohl"
+      ],
+      "needs_clarification": null,
+      "note": "Traditionell mit Kartoffelklößen: NOT_OK — PROTEIN (Rindfleisch) + KH (Kartoffel). Rotkohl = NEUTRAL, ändert nichts. Sauerbraten pur (ohne Klöße, nur mit Rotkohl): OK (PROTEIN + NEUTRAL).",
+      "optional_items": [
+        "Rosinen",
+        "Essig",
+        "Lorbeer",
+        "Zwiebel"
+      ]
+    },
+    "Schinkenbrot": {
+      "base_items": [
+        "Brot",
+        "Schinken"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Brot) + PROTEIN (Schinken)",
+      "optional_items": [
+        "Butter"
+      ]
+    },
+    "Schnitzel mit Pommes": {
+      "base_items": [
+        "Paniertes Schnitzel",
+        "Pommes"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: intrinsisch konfliktuales paniertes Schnitzel plus Pommes. Nutzt die neueren Prepared-/Potato-Canonicals direkt.",
+      "optional_items": [
+        "Zitronensaft",
+        "Kopfsalat"
+      ]
+    },
+    "Schwarzwälder Kirschtorte": {
+      "base_items": [
+        "Weizenmehl",
+        "Ei",
+        "Sahne",
+        "Kirsche"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Biskuit-Teig) + PROTEIN (Ei) + MILCH (Sahne) + OBST (Kirschen). Vierfache Verletzung. Sahne + Kirschen allein = MILCH + OBST = NOT_OK (R009).",
+      "optional_items": [
+        "Butter",
+        "Zucker",
+        "Kakao",
+        "Kirschwasser"
+      ]
+    },
+    "Schweinebraten": {
+      "base_items": [
+        "Schwein",
+        "Zwiebel",
+        "Knoblauch",
+        "Sellerie"
+      ],
+      "needs_clarification": "Mit Kartoffelknödeln/-beilagen oder pur mit Gemüse?",
+      "note": "Pur (ohne KH-Beilagen): OK — PROTEIN (Schwein) + NEUTRAL (Zwiebel, Knoblauch, Sellerie). Mit Kartoffelknödeln oder Bratkartoffeln: NOT_OK (KH + PROTEIN). Mit Möhre im Braten: beachten, dass Möhre = KH (stärkehaltig).",
+      "optional_items": [
+        "Möhre",
+        "Kartoffel",
+        "Kartoffelknödel",
+        "Rotkohl"
+      ]
+    },
+    "Shakshuka": {
+      "base_items": [
+        "Tomaten",
+        "Eier",
+        "Paprika",
+        "Zwiebeln",
+        "Olivenöl"
+      ],
+      "needs_clarification": null,
+      "note": "Standard: OK — PROTEIN (Eier) + NEUTRAL (Tomaten, Paprika, Zwiebeln) + kleine Menge FETT (Olivenöl, 1-2 EL OK). ACHTUNG: Mit Feta = NOT_OK (PROTEIN + MILCH). Mit Kichererbsen = CONDITIONAL (HUELSENFRUECHTE + PROTEIN). Mit Brot zum Dippen = NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Spinat",
+        "Harissa",
+        "Koriander"
+      ]
+    },
+    "Shakshuka mit Feta": {
+      "base_items": [
+        "Tomate",
+        "Ei",
+        "Paprika",
+        "Käse",
+        "Olivenöl",
+        "Zwiebel"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: PROTEIN (Ei) + MILCH (Feta). Standard-Shakshuka wäre OK, aber Feta macht es zum NOT_OK-Gericht (R006: PROTEIN + MILCH). Mit Brot zum Dippen: zusätzlich KH + PROTEIN.",
+      "optional_items": [
+        "Spinat",
+        "Chili",
+        "Koriander"
+      ]
+    },
+    "Shepherd's Pie": {
+      "base_items": [
+        "Lamm",
+        "Kartoffel",
+        "Möhre",
+        "Zwiebel"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: PROTEIN (Lammhack) + KH (Kartoffelpüree-Decke + Möhre). Britischer Auflauf. Mit Rindfleisch statt Lamm = Cottage Pie — gleiche Verletzung.",
+      "optional_items": [
+        "Sellerie",
+        "Butter",
+        "Worcestershiresauce"
+      ]
+    },
+    "Som Tum": {
+      "base_items": [
+        "Papaya",
+        "Tomate",
+        "Erdnüsse",
+        "Limette"
+      ],
+      "needs_clarification": "Mit Garnelen oder vegetarisch? Grüne (unreife) Papaya?",
+      "note": "Komplex: NEUTRAL (grüne Papaya = NEUTRAL als unreifes Gemüse, Tomate) + FETT (Erdnüsse) + OBST (Limette). OBST+FETT = NOT_OK (R014). Mit Garnelen: OBST+PROTEIN = NOT_OK (R008). Ohne Limette vegetarisch: CONDITIONAL (NEUTRAL+FETT). Thailändischer Papayasalat.",
+      "optional_items": [
+        "Garnelen",
+        "Schlangenbohnen",
+        "Chili",
+        "Fischsauce",
+        "Knoblauch"
+      ]
+    },
+    "Spaghetti Aglio e Olio": {
+      "base_items": [
+        "Pasta",
+        "Knoblauch",
+        "Olivenöl",
+        "Chili"
+      ],
+      "needs_clarification": null,
+      "note": "OK wenn Fett-Menge klein (1-2 TL Olivenöl): KH + NEUTRAL + kleine Menge FETT",
+      "optional_items": [
+        "Petersilie"
+      ]
+    },
+    "Spaghetti Bolognese": {
+      "base_items": [
+        "Pasta",
+        "Hackfleisch",
+        "Tomatensauce",
+        "Zwiebel"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Pasta) + PROTEIN (Hackfleisch)",
+      "optional_items": [
+        "Parmesan",
+        "Olivenöl",
+        "Möhre",
+        "Sellerie"
+      ]
+    },
+    "Spaghetti Carbonara": {
+      "base_items": [
+        "Pasta",
+        "Ei",
+        "Speck",
+        "Parmesan"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Pasta) + PROTEIN (Ei, Speck) + MILCH (Parmesan, evtl. Sahne)",
+      "optional_items": [
+        "Sahne"
+      ]
+    },
+    "Spanakopita": {
+      "base_items": [
+        "Weizenmehl",
+        "Käse",
+        "Spinat",
+        "Ei"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Filo-Teig aus Weizenmehl) + MILCH (Feta) + PROTEIN (Ei). Griechische Spinat-Käse-Pastete. Spinat = NEUTRAL, macht es nicht besser.",
+      "optional_items": [
+        "Butter",
+        "Zwiebel",
+        "Dill"
+      ]
     },
     "Speiseeis": {
       "base_items": [],
-      "optional_items": ["Sahne", "Milch", "Erdbeere", "Mango", "Banane", "Zucker"],
       "needs_clarification": "Sahne-/Milcheis, Fruchtsorbet oder veganes Eis?",
-      "note": "Fruchtsorbet pur (nur Obst + Wasser, ohne Zucker): OK — OBST. Mit Zucker: NOT_OK (OBST + KH). Sahneeis: MILCH + KH (Zucker) = NOT_OK. Fruchteis am Stiel (Zucker enthalten): CONDITIONAL/NOT_OK. Je nach Sorte und Zutaten sehr unterschiedlich."
+      "note": "Fruchtsorbet pur (nur Obst + Wasser, ohne Zucker): OK — OBST. Mit Zucker: NOT_OK (OBST + KH). Sahneeis: MILCH + KH (Zucker) = NOT_OK. Fruchteis am Stiel (Zucker enthalten): CONDITIONAL/NOT_OK. Je nach Sorte und Zutaten sehr unterschiedlich.",
+      "optional_items": [
+        "Sahne",
+        "Milch",
+        "Erdbeere",
+        "Mango",
+        "Banane",
+        "Zucker"
+      ]
     },
-
-    "Toast Hawaii": {
-      "base_items": ["Brot", "Speck", "Ananas", "Käse"],
-      "optional_items": ["Butter"],
+    "Spiegelei": {
+      "base_items": [
+        "Eier",
+        "Olivenöl"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Toast) + PROTEIN (Schinken/Speck) + OBST (Ananas) + MILCH (Käse). Vierfach-Verletzung — R001 (KH+PROTEIN), R002 (KH+MILCH), R007 (KH+OBST), R009 (MILCH+OBST). Eines der Trennkost-unfreundlichsten Gerichte überhaupt."
-    },
-    "Weißwurst mit Brezel": {
-      "base_items": ["Wurst", "Brot"],
-      "optional_items": ["Senf"],
-      "needs_clarification": null,
-      "note": "NOT_OK: PROTEIN (Weißwurst) + KH (Brezel aus Weizenmehl). Bayerisches Frühstück — Trennkost-inkompatibel. Weißwurst pur (ohne Brezel): OK — reines PROTEIN. Süßer Senf (kleine Menge, Würze): vernachlässigbar."
-    },
-    "Obatzda": {
-      "base_items": ["Camembert", "Butter", "Zwiebel"],
-      "optional_items": ["Radieschen", "Schnittlauch", "Paprikapulver", "Bier", "Brezel"],
-      "needs_clarification": "Mit Brezel oder Brot gereicht?",
-      "note": "Pur: OK — MILCH (Camembert) + FETT (Butter) + NEUTRAL (Zwiebeln). Kein verbotenes Paar! Mit Brezel oder Brot: NOT_OK (KH + MILCH). Bayerischer Brotaufstrich — pur Trennkost-freundlich."
-    },
-    "Banana Bread": {
-      "base_items": ["Weizenmehl", "Banane", "Ei", "Butter"],
-      "optional_items": ["Walnüsse", "Schokolade", "Honig", "Zimt"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizenmehl) + OBST (Banane) + PROTEIN (Ei) + FETT (Butter). R001 (KH+PROTEIN) + R007 (KH+OBST). Auch vegane Variante ohne Ei: KH + OBST = NOT_OK bleibt."
-    },
-
-    "Brathähnchen": {
-      "base_items": ["Hähnchen", "Knoblauch", "Rosmarin", "Olivenöl"],
-      "optional_items": ["Kartoffel", "Thymian", "Zitrone", "Zwiebel"],
-      "needs_clarification": "Mit Kartoffeln als Beilage oder pur?",
-      "note": "Pur: OK — PROTEIN (Hähnchen) + NEUTRAL (Knoblauch, Rosmarin). Mit Kartoffeln: NOT_OK (KH + PROTEIN). Mit Olivenöl (kleine Menge): CONDITIONAL. Klassisches Sonntagsgericht — pur Trennkost-freundlich!"
-    },
-    "Pulled Pork": {
-      "base_items": ["Schwein"],
-      "optional_items": ["Brot", "Weißkohl", "BBQ-Sauce", "Zwiebel"],
-      "needs_clarification": "Im Burger-Bun oder pur?",
-      "note": "Pur (ohne Brötchen): OK — reines PROTEIN. Im Brötchen: NOT_OK (KH + PROTEIN). Mit Coleslaw als Beilage: CONDITIONAL (PROTEIN + FETT/NEUTRAL). BBQ-Sauce enthält oft Zucker (KH) → kleine Menge OK, große Menge beachten."
-    },
-    "Fish and Chips": {
-      "base_items": ["Alaska-Seelachs", "Weizenmehl", "Kartoffel"],
-      "optional_items": ["Zitrone", "Erbsen", "Mayonnaise", "Ketchup"],
-      "needs_clarification": null,
-      "note": "NOT_OK: PROTEIN (Fisch) + KH (Bierteig aus Weizenmehl + Chips/Pommes aus Kartoffel). Britischer Klassiker — ähnlich wie Fischstäbchen mit Pommes, aber mit Bierteig."
-    },
-    "Shepherd's Pie": {
-      "base_items": ["Lamm", "Kartoffel", "Möhre", "Zwiebel"],
-      "optional_items": ["Sellerie", "Butter", "Worcestershiresauce"],
-      "needs_clarification": null,
-      "note": "NOT_OK: PROTEIN (Lammhack) + KH (Kartoffelpüree-Decke + Möhre). Britischer Auflauf. Mit Rindfleisch statt Lamm = Cottage Pie — gleiche Verletzung."
-    },
-
-    "Bibimbap": {
-      "base_items": ["Reis", "Ei", "Rindfleisch", "Spinat", "Möhre"],
-      "optional_items": ["Zucchini", "Pilze", "Sojasprossen", "Gochujang", "Sesamöl"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Reis) + PROTEIN (Ei, Rindfleisch) + KH (Möhre). Koreanisches Reisgericht. Vegetarisch ohne Ei/Fleisch: KH + NEUTRAL = OK — dann Trennkost-freundlich!"
-    },
-    "Mapo Tofu": {
-      "base_items": ["Tofu", "Hackfleisch", "Frühlingszwiebel", "Knoblauch", "Chili"],
-      "optional_items": ["Sojasoße", "Sesamöl", "Szechuanpfeffer"],
-      "needs_clarification": null,
-      "note": "NOT_OK: HUELSENFRUECHTE (Tofu) + PROTEIN (Hackfleisch). Sichuan-Klassiker. Vegetarische/vegane Variante (ohne Hackfleisch): CONDITIONAL — HUELSENFRUECHTE + NEUTRAL. Mit Reis: NOT_OK (HUELSENFRUECHTE + KH)."
-    },
-    "Japchae": {
-      "base_items": ["Reisnudeln", "Rindfleisch", "Spinat", "Möhre", "Paprika"],
-      "optional_items": ["Ei", "Sojasoße", "Sesamöl", "Sesam", "Frühlingszwiebel"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Glasnudeln aus Süßkartoffelstärke) + PROTEIN (Rindfleisch) + KH (Möhre). Koreanisches Glasnudel-Gericht. Vegetarisch ohne Fleisch: KH + NEUTRAL = CONDITIONAL."
-    },
-    "Okonomiyaki": {
-      "base_items": ["Weizenmehl", "Ei", "Weißkohl", "Speck"],
-      "optional_items": ["Garnele", "Tintenfisch", "Frühlingszwiebel", "Sojasoße", "Mayonnaise"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizenmehl-Teig) + PROTEIN (Ei, Speck). Japanischer Herzhafter Pfannkuchen. Ohne Fleisch/Eier (rein NEUTRAL-Füllung): KH + NEUTRAL = OK — unüblich aber möglich."
-    },
-    "Dan Dan Noodles": {
-      "base_items": ["Pasta", "Hackfleisch", "Erdnüsse", "Sesam"],
-      "optional_items": ["Sojasprossen", "Frühlingszwiebel", "Chili", "Sojasoße"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizennudeln) + PROTEIN (Hackfleisch) + FETT (Erdnüsse, Sesam). Sichuan-Nudelgericht. Ohne Fleisch: CONDITIONAL (KH + NEUTRAL + FETT)."
-    },
-
-    "Imam Bayildi": {
-      "base_items": ["Aubergine", "Tomate", "Zwiebel", "Knoblauch", "Olivenöl"],
-      "optional_items": ["Petersilie", "Zitrone", "Paprika"],
-      "needs_clarification": null,
-      "note": "OK/CONDITIONAL — ausschließlich NEUTRAL + FETT (Olivenöl). Türkisches geschmortes Auberginengericht. Fettmenge beachten: großzügig Olivenöl → CONDITIONAL. Positives Trennkost-Beispiel!"
-    },
-    "Dolma": {
-      "base_items": ["Reis", "Lamm", "Zwiebel", "Dill"],
-      "optional_items": ["Pinienkerne", "Tomate", "Zitrone", "Minze"],
-      "needs_clarification": "Mit Lammhack (NOT_OK) oder vegetarisch (OK)?",
-      "note": "Mit Fleisch: NOT_OK — KH (Reis) + PROTEIN (Lammhack). Weinblätter/Paprikahülle = NEUTRAL. Vegetarische Variante (nur Reis + Kräuter): CONDITIONAL — KH + NEUTRAL. Pinienkerne: FETT-Menge prüfen."
-    },
-    "Feta Pasta": {
-      "base_items": ["Pasta", "Käse", "Tomate", "Olivenöl", "Knoblauch"],
-      "optional_items": ["Basilikum", "Chili", "Spinat"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Pasta) + MILCH (Feta). Gebackene Feta-Pasta (TikTok-Trend). Kein Fleisch, aber KH + MILCH = NOT_OK (R002). Feta allein mit Tomate + Olivenöl ohne Pasta: OK."
-    },
-    "Pide": {
-      "base_items": ["Weizenmehl"],
-      "optional_items": ["Käse", "Hackfleisch", "Spinat", "Ei", "Zwiebel"],
-      "needs_clarification": "Welcher Belag? Käse, Hackfleisch, Spinat-Käse oder Ei?",
-      "note": "Türkisches Fladenbrot = KH. Kashar-Pide (Käse): NOT_OK (KH + MILCH). Kiymali Pide (Hackfleisch): NOT_OK (KH + PROTEIN). Ispanakli Pide (Spinat): OK (KH + NEUTRAL). Mit Ei: NOT_OK (KH + PROTEIN). Wie Pizza je nach Belag."
-    },
-
-    "Quinoa Salat": {
-      "base_items": ["Quinoa", "Paprika", "Gurke", "Tomate", "Zwiebel"],
-      "optional_items": ["Olivenöl", "Zitrone", "Petersilie", "Koriander", "Kichererbsen"],
-      "needs_clarification": "Mit Kichererbsen?",
-      "note": "Ohne Kichererbsen: OK/CONDITIONAL — KH (Quinoa) + NEUTRAL (Gemüse). Mit Olivenöl: CONDITIONAL. Mit Kichererbsen: NOT_OK (KH + HUELSENFRUECHTE). Positives Trennkost-Beispiel für gesunde Mahlzeiten."
-    },
-    "Panzanella": {
-      "base_items": ["Brot", "Tomate", "Gurke", "Basilikum", "Olivenöl"],
-      "optional_items": ["Zwiebel", "Kapern", "Essig", "Paprika"],
-      "needs_clarification": null,
-      "note": "OK/CONDITIONAL: KH (altbackenes Brot) + NEUTRAL (Tomate, Gurke, Basilikum) + FETT (Olivenöl). Italienischer Brotsalat — KH + NEUTRAL = OK. Positives Trennkost-Beispiel!"
+      "note": "OK — PROTEIN + kleine Menge FETT. Mit Brot/Toast: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Salz",
+        "Pfeffer"
+      ]
     },
     "Spinat-Ricotta-Pasta": {
-      "base_items": ["Pasta", "Käse", "Spinat"],
-      "optional_items": ["Olivenöl", "Knoblauch", "Pinienkerne", "Muskatnuss"],
+      "base_items": [
+        "Pasta",
+        "Käse",
+        "Spinat"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Pasta) + MILCH (Ricotta = Frischkäse). Spinat = NEUTRAL, ändert nichts. Klassische vegetarische Pasta — leider KH + MILCH = NOT_OK (R002)."
-    },
-    "Aloo Gobi": {
-      "base_items": ["Kartoffel", "Blumenkohl", "Tomate", "Zwiebel", "Knoblauch"],
-      "optional_items": ["Ingwer", "Kurkuma", "Kreuzkümmel", "Koriander", "Olivenöl"],
-      "needs_clarification": "Mit Reis oder Naan als Beilage?",
-      "note": "Pur: OK — KH (Kartoffel) + NEUTRAL (Blumenkohl, Tomate, Zwiebel). Indisches Kartoffel-Blumenkohl-Curry — ohne Milch oder Fleisch Trennkost-freundlich! Mit Naan: KH + KH = OK. Mit Reis: KH + KH = OK. Mit Sahne/Joghurt: NOT_OK (KH + MILCH)."
-    },
-    "Dal Makhani": {
-      "base_items": ["Linsen", "Kidneybohnen", "Butter", "Sahne", "Tomate"],
-      "optional_items": ["Knoblauch", "Ingwer", "Garam Masala", "Naan", "Reis"],
-      "needs_clarification": "Mit Naan oder Reis als Beilage?",
-      "note": "NOT_OK: HUELSENFRUECHTE (schwarze Linsen, Kidneybohnen) + MILCH (Butter, Sahne). Indischer Linseneintopf mit Sahne — HUELSENFRUECHTE + MILCH = NOT_OK (R005). Ohne Sahne/Butter: CONDITIONAL (HUELSENFRUECHTE + NEUTRAL)."
-    },
-
-    "Coq au Vin": {
-      "base_items": ["Hähnchen", "Pilze", "Zwiebel", "Speck"],
-      "optional_items": ["Möhre", "Knoblauch", "Rotwein", "Kartoffel"],
-      "needs_clarification": "Mit Möhre oder Kartoffeln als Einlage?",
-      "note": "Ohne Möhre/Kartoffel: OK — PROTEIN (Hähnchen, Speck) + NEUTRAL (Pilze, Zwiebeln). Mit Möhre: NOT_OK (PROTEIN + KH). Traditionell oft mit Möhre — dann NOT_OK. Pur mit Brot: NOT_OK (KH + PROTEIN)."
-    },
-    "Boeuf Bourguignon": {
-      "base_items": ["Rindfleisch", "Pilze", "Zwiebel", "Speck"],
-      "optional_items": ["Möhre", "Knoblauch", "Rotwein", "Kartoffel"],
-      "needs_clarification": "Mit Möhre oder Kartoffeln?",
-      "note": "Ohne Möhre/Kartoffel: OK — PROTEIN (Rindfleisch, Speck) + NEUTRAL (Pilze, Zwiebeln). Mit Möhre: NOT_OK (PROTEIN + KH). Französischer Schmorfleisch-Klassiker — pur ohne KH Trennkost-freundlich."
-    },
-    "Tafelspitz": {
-      "base_items": ["Rindfleisch", "Möhre", "Sellerie", "Zwiebel"],
-      "optional_items": ["Meerrettich", "Schnittlauchsauce", "Kartoffel", "Brot"],
-      "needs_clarification": "Mit Kartoffeln oder nur mit Sauce?",
-      "note": "Mit Möhre im Fond: NOT_OK — PROTEIN (Rindfleisch) + KH (Möhre). Ohne Möhre: OK. Mit Kartoffeln als Beilage: NOT_OK (KH + PROTEIN). Mit Meerrettich (NEUTRAL): OK. Wiener Klassiker — kaum ohne Möhre traditionell."
-    },
-    "Gefüllte Paprika": {
-      "base_items": ["Paprika", "Hackfleisch", "Reis", "Zwiebel", "Tomate"],
-      "optional_items": ["Käse", "Sahne", "Knoblauch"],
-      "needs_clarification": "Mit Reis in der Füllung oder ohne?",
-      "note": "Mit Reis: NOT_OK — PROTEIN (Hackfleisch) + KH (Reis in Füllung). Paprika = NEUTRAL. Ohne Reis (nur Hackfleisch + Gemüse): OK — PROTEIN + NEUTRAL. Mit Käse/Sahne-Sauce: zusätzlich MILCH."
-    },
-
-    "Mousse au Chocolat": {
-      "base_items": ["Sahne", "Ei", "Kakao"],
-      "optional_items": ["Zucker", "Butter", "Vanille"],
-      "needs_clarification": null,
-      "note": "NOT_OK: MILCH (Sahne) + PROTEIN (Ei) + UNKNOWN (Kakao, noch nicht kategorisiert). R006 (PROTEIN + MILCH). Kakao könnte zusätzlich KH-nah sein. Eines der problematischsten Desserts aus Trennkost-Sicht."
-    },
-    "Milchreis": {
-      "base_items": ["Reis", "Milch", "Zucker", "Zimt"],
-      "optional_items": ["Butter", "Vanille", "Erdbeere", "Apfelmus"],
-      "needs_clarification": "Mit Frucht-Topping?",
-      "note": "NOT_OK: KH (Reis, Zucker) + MILCH. Mit Erdbeer-Topping: zusätzlich OBST + MILCH (R009). Mit Apfelmus: OBST + MILCH + KH = mehrfach NOT_OK. Kindheitserinnerung — leider nicht Trennkost-konform."
-    },
-    "Kaiserschmarrn": {
-      "base_items": ["Weizenmehl", "Ei", "Milch", "Butter", "Rosinen"],
-      "optional_items": ["Puderzucker", "Pflaume", "Zwetschgenkompott"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizenmehl) + PROTEIN (Ei) + MILCH (Milch, Butter) + TROCKENOBST (Rosinen). Österreichisches Dessert — Vierfach-Verletzung. Mit Pflaumenkompott: zusätzlich OBST."
-    },
-    "Dampfnudeln": {
-      "base_items": ["Weizenmehl", "Milch", "Butter"],
-      "optional_items": ["Vanillesauce", "Pflaumen", "Salzkruste", "Zucker"],
-      "needs_clarification": "Mit Vanillesauce oder salziger Kruste?",
-      "note": "NOT_OK: KH (Hefeteig aus Weizenmehl) + MILCH (Milch im Teig, Butter). Mit Vanillesauce: mehr MILCH (bleibt NOT_OK). Mit Pflaumen: zusätzlich OBST + KH (R007). Süddeutsches Gericht."
-    },
-
-    "Croque Monsieur": {
-      "base_items": ["Brot", "Käse", "Schinken"],
-      "optional_items": ["Butter", "Senf", "Sahne"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Toastbrot) + MILCH (Käse, Béchamel aus Sahne) + PROTEIN (Schinken). R001 (KH+PROTEIN) + R002 (KH+MILCH). Croque Madame (mit Spiegelei): weitere PROTEIN-Quelle. Überbackenes Sandwich — immer NOT_OK."
+      "note": "NOT_OK: KH (Pasta) + MILCH (Ricotta = Frischkäse). Spinat = NEUTRAL, ändert nichts. Klassische vegetarische Pasta — leider KH + MILCH = NOT_OK (R002).",
+      "optional_items": [
+        "Olivenöl",
+        "Knoblauch",
+        "Pinienkerne",
+        "Muskatnuss"
+      ]
     },
     "Strammer Max": {
-      "base_items": ["Brot", "Schinken", "Ei"],
-      "optional_items": ["Butter", "Senf", "Gurke", "Zwiebel"],
+      "base_items": [
+        "Brot",
+        "Schinken",
+        "Ei"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Brot) + PROTEIN (Schinken, Ei). R001 (KH+PROTEIN). Klassisches deutsches Belegtbrot — Brot + Rohschinken + Spiegelei = doppeltes PROTEIN + KH."
+      "note": "NOT_OK: KH (Brot) + PROTEIN (Schinken, Ei). R001 (KH+PROTEIN). Klassisches deutsches Belegtbrot — Brot + Rohschinken + Spiegelei = doppeltes PROTEIN + KH.",
+      "optional_items": [
+        "Butter",
+        "Senf",
+        "Gurke",
+        "Zwiebel"
+      ]
     },
-    "Rinderroulade": {
-      "base_items": ["Rindfleisch", "Senf", "Speck", "Gurke", "Zwiebel"],
-      "optional_items": ["Möhre", "Sellerie", "Rotwein", "Kartoffel"],
-      "needs_clarification": "Pur oder mit Kartoffelklößen/Knödeln als Beilage?",
-      "note": "Pur (ohne KH-Beilage): OK — PROTEIN (Rindfleisch, Speck) + NEUTRAL (Senf, Gurke, Zwiebeln). Mit Möhre im Fond: NOT_OK (PROTEIN+KH). Mit Kartoffelklößen: NOT_OK (KH+PROTEIN, R001). Traditionell mit Klößen — dann NOT_OK."
+    "Sushi": {
+      "base_items": [
+        "Reis"
+      ],
+      "needs_clarification": "Welche Sorte? Nigiri/Maki mit Fisch (PROTEIN) oder vegetarisch (z.B. Avocado, Gurke)?",
+      "note": "Fisch-Sushi = NOT_OK: KH (Reis) + PROTEIN (Fisch). Avocado-Maki = KH + FETT (CONDITIONAL auf Menge)",
+      "optional_items": [
+        "Sojasoße",
+        "Wasabi",
+        "Ingwer"
+      ]
     },
-    "Zwiebelkuchen": {
-      "base_items": ["Weizenmehl", "Zwiebel", "Speck", "Ei", "Sahne"],
-      "optional_items": ["Butter", "Kümmel", "Sauerrahm"],
+    "Tabbouleh": {
+      "base_items": [
+        "Bulgur",
+        "Petersilie",
+        "Tomate",
+        "Gurke",
+        "Minze"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Mürbeteig aus Weizenmehl) + PROTEIN (Speck, Ei) + MILCH (Sahne). R001 (KH+PROTEIN) + R002 (KH+MILCH). Herbstlicher Klassiker ähnlich wie Quiche — mehrfach Trennkost-verletzend."
+      "note": "CONDITIONAL: KH (Bulgur) + NEUTRAL (Petersilie, Tomate, Gurke, Minze) + kleine Menge FETT (Olivenöl). KH + NEUTRAL = OK. Olivenöl (1-2 TL): OK. Zitronensaft (paar Tropfen) gilt als NEUTRAL. Insgesamt Trennkost-freundlich.",
+      "optional_items": [
+        "Olivenöl",
+        "Zitrone"
+      ]
     },
-    "Labskaus": {
-      "base_items": ["Rindfleisch", "Kartoffel", "Hering", "Zwiebel"],
-      "optional_items": ["Ei", "Rote Bete", "Gewürzgurke"],
-      "needs_clarification": "Mit Spiegelei obendrauf?",
-      "note": "NOT_OK: KH (Kartoffelbrei) + PROTEIN (gepökeltes Rindfleisch, Hering). R001 (KH+PROTEIN). Mit Ei: weiteres PROTEIN. Norddeutsches Seemannsgericht — Kartoffel + Fleisch + Fisch für Trennkost nicht geeignet."
+    "Tacos": {
+      "base_items": [
+        "Mais"
+      ],
+      "needs_clarification": "Welche Füllung? Fleisch (PROTEIN), Bohnen (HUELSENFRUECHTE) oder nur Gemüse?",
+      "note": "Mais-Tacoschale = KH. Mit Fleisch: NOT_OK (KH + PROTEIN). Mit Bohnen: NOT_OK (KH + HUELSENFRUECHTE). Mit Käse/Sauerrahm: NOT_OK (KH + MILCH). Rein vegane Gemüse-Füllung: OK (KH + NEUTRAL).",
+      "optional_items": [
+        "Kopfsalat",
+        "Tomate",
+        "Avocado",
+        "Sahne"
+      ]
     },
-    "Frankfurter Grüne Soße": {
-      "base_items": ["Joghurt", "Ei", "Petersilie", "Schnittlauch"],
-      "optional_items": ["Saure Sahne", "Borretsch", "Sauerampfer", "Olivenöl", "Senf"],
-      "needs_clarification": null,
-      "note": "NOT_OK: MILCH (Joghurt, Saure Sahne) + PROTEIN (hartgekochtes Ei). R006 (PROTEIN+MILCH). Kräuter = NEUTRAL. Traditionell zu Tafelspitz + Kartoffeln — weitere NOT_OK-Kombinationen. Die Soße selbst ist bereits NOT_OK."
-    },
-    "Leberknödelsuppe": {
-      "base_items": ["Leber", "Brötchen", "Ei", "Zwiebel"],
-      "optional_items": ["Majoran", "Petersilie", "Butter"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (altbackene Brötchen im Knödel) + PROTEIN (Leber, Ei). R001 (KH+PROTEIN). Bayerische/österreichische Suppe — der Knödel vereint KH + PROTEIN in einem."
-    },
-
-    "Tzatziki": {
-      "base_items": ["Joghurt", "Gurke", "Knoblauch", "Olivenöl"],
-      "optional_items": ["Dill", "Minze", "Zitrone"],
-      "needs_clarification": null,
-      "note": "OK/CONDITIONAL — MILCH (Joghurt) + NEUTRAL (Gurke, Knoblauch) + FETT (Olivenöl, kleine Menge). Kein verbotenes Paar! MILCH + NEUTRAL = erlaubt. Olivenöl in kleiner Menge: CONDITIONAL. Pur als Dip Trennkost-freundlich!"
-    },
-    "Saltimbocca": {
-      "base_items": ["Rindfleisch", "Schinken", "Salbei", "Butter"],
-      "optional_items": ["Weißwein", "Olivenöl", "Zitrone"],
-      "needs_clarification": null,
-      "note": "CONDITIONAL — PROTEIN (Kalbfleisch/Rindfleisch, Parmaschinken) + NEUTRAL (Salbei) + FETT (Butter, kleine Menge). Kein verbotenes Paar! Zwei PROTEIN-Quellen sind erlaubt (R006 betrifft nur PROTEIN+MILCH). Butter → CONDITIONAL (Menge)."
-    },
-    "Ribollita": {
-      "base_items": ["Bohnen", "Brot", "Tomate", "Wirsing", "Möhre"],
-      "optional_items": ["Sellerie", "Zwiebel", "Knoblauch", "Olivenöl", "Rosmarin"],
-      "needs_clarification": null,
-      "note": "NOT_OK: HUELSENFRUECHTE (Cannellini-Bohnen) + KH (altbackenes Brot + Möhre). R003 (HUELSENFRUECHTE+KH). Toskanischer Eintopf. Ohne Brot und Möhre: CONDITIONAL (HUELSENFRUECHTE+NEUTRAL). Olivenöl in kleiner Menge OK."
-    },
-    "Arancini": {
-      "base_items": ["Reis", "Mozzarella", "Hackfleisch", "Weizenmehl"],
-      "optional_items": ["Erbsen", "Tomate", "Safran", "Ei"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Reis, Weizenpanade) + MILCH (Mozzarella) + PROTEIN (Hackfleisch). R001 (KH+PROTEIN) + R002 (KH+MILCH). Sizilianische gefüllte Reisbällchen — dreifache Trennkost-Verletzung."
-    },
-    "Vitello Tonnato": {
-      "base_items": ["Rindfleisch", "Thunfisch", "Kapern", "Mayonnaise"],
-      "optional_items": ["Sardellen", "Zitrone", "Olivenöl", "Ei"],
-      "needs_clarification": null,
-      "note": "CONDITIONAL: PROTEIN (Kalbfleisch) + PROTEIN (Thunfisch) + FETT (Mayonnaise). Kein explizit verbotenes Paar — zwei PROTEIN-Quellen sind erlaubt (R006 betrifft nur PROTEIN+MILCH). Mayonnaise als HIGH_FAT → CONDITIONAL. Piemontesisches Antipasto."
-    },
-    "Pasta Puttanesca": {
-      "base_items": ["Pasta", "Tomate", "Kapern", "Oliven", "Knoblauch"],
-      "optional_items": ["Sardellen", "Chili", "Petersilie", "Olivenöl"],
-      "needs_clarification": "Mit Sardellen (Anchovis) oder vegetarisch?",
-      "note": "Vegetarisch: OK/CONDITIONAL — KH (Pasta) + NEUTRAL (Tomate, Kapern, Oliven, Knoblauch) + FETT (Olivenöl). Mit Sardellen: NOT_OK (KH+PROTEIN, R001). Neapolitanische Pasta — vegetarisch Trennkost-verträglich!"
-    },
-
-    "Banh Mi": {
-      "base_items": ["Brot", "Hähnchen"],
-      "optional_items": ["Möhre", "Gurke", "Koriander", "Chili", "Mayonnaise"],
-      "needs_clarification": "Mit Tofu oder Fleisch als Füllung?",
-      "note": "NOT_OK: KH (Baguette) + PROTEIN (Hähnchen/Schwein) bzw. HUELSENFRUECHTE (Tofu-Variante, R003). R001 (KH+PROTEIN). Mit Möhre: weiteres KH. Vietnamesisches Sandwich — durch Brot + Füllung immer NOT_OK."
-    },
-    "Satay": {
-      "base_items": ["Hähnchen", "Erdnüsse"],
-      "optional_items": ["Kokosmilch", "Limette", "Chili", "Ingwer", "Knoblauch", "Sojasoße"],
-      "needs_clarification": "Mit Reis als Beilage?",
-      "note": "CONDITIONAL: PROTEIN (Hähnchen) + FETT (Erdnusssoße). Größere Erdnussmengen → CONDITIONAL. Mit Reis: NOT_OK (KH+PROTEIN, R001). Kokosmilch = FETT. Pur ohne Beilage Trennkost-akzeptabel — Erdnussmenge beachten."
+    "Tafelspitz": {
+      "base_items": [
+        "Rindfleisch",
+        "Möhre",
+        "Sellerie",
+        "Zwiebel"
+      ],
+      "needs_clarification": "Mit Kartoffeln oder nur mit Sauce?",
+      "note": "Mit Möhre im Fond: NOT_OK — PROTEIN (Rindfleisch) + KH (Möhre). Ohne Möhre: OK. Mit Kartoffeln als Beilage: NOT_OK (KH + PROTEIN). Mit Meerrettich (NEUTRAL): OK. Wiener Klassiker — kaum ohne Möhre traditionell.",
+      "optional_items": [
+        "Meerrettich",
+        "Schnittlauchsauce",
+        "Kartoffel",
+        "Brot"
+      ]
     },
     "Tempura": {
-      "base_items": ["Weizenmehl"],
-      "optional_items": ["Garnelen", "Aubergine", "Paprika", "Zucchini", "Süßkartoffel"],
+      "base_items": [
+        "Weizenmehl"
+      ],
       "needs_clarification": "Nur Gemüse-Tempura oder mit Meeresfrüchten/Fisch?",
-      "note": "Variiert: Nur Gemüse: CONDITIONAL — KH (Weizenteig) + NEUTRAL (Gemüse). Mit Garnelen: NOT_OK (KH+PROTEIN, R001). Süßkartoffel: KH+KH = OK. Japanisches Backteig-Gericht — Gemüse-Variante Trennkost-verträglich!"
+      "note": "Variiert: Nur Gemüse: CONDITIONAL — KH (Weizenteig) + NEUTRAL (Gemüse). Mit Garnelen: NOT_OK (KH+PROTEIN, R001). Süßkartoffel: KH+KH = OK. Japanisches Backteig-Gericht — Gemüse-Variante Trennkost-verträglich!",
+      "optional_items": [
+        "Garnelen",
+        "Aubergine",
+        "Paprika",
+        "Zucchini",
+        "Süßkartoffel"
+      ]
     },
-    "Congee": {
-      "base_items": ["Reis", "Ingwer", "Frühlingszwiebel"],
-      "optional_items": ["Ei", "Hähnchen", "Tofu", "Sesam", "Sojasoße"],
-      "needs_clarification": "Pur oder mit Einlagen (Ei/Fleisch/Tofu)?",
-      "note": "Pur: OK — KH (Reis) + NEUTRAL (Ingwer, Frühlingszwiebeln). Mit Ei oder Hähnchen: NOT_OK (KH+PROTEIN, R001). Mit Tofu: NOT_OK (KH+HUELSENFRUECHTE, R003). Chinesischer Reisbrei — pur als leichte Speise Trennkost-freundlich!"
+    "Teriyaki Lachs": {
+      "base_items": [
+        "Lachs",
+        "Sojasoße",
+        "Ingwer",
+        "Knoblauch"
+      ],
+      "needs_clarification": "Mit Reis oder nur mit Gemüse?",
+      "note": "Ohne Reis: OK/CONDITIONAL — PROTEIN (Lachs) + NEUTRAL (Sojasoße, Ingwer, Knoblauch) + kleine Menge FETT (Sesam). Mit Brokkoli: OK. Mit Reis: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Sesam",
+        "Frühlingszwiebel",
+        "Sesamöl",
+        "Reis",
+        "Brokkoli"
+      ]
     },
-    "Korean Fried Chicken": {
-      "base_items": ["Hähnchen", "Weizenmehl", "Stärke"],
-      "optional_items": ["Gochujang", "Sojasoße", "Sesamöl", "Knoblauch", "Ingwer", "Sesam"],
+    "Thai Green Curry": {
+      "base_items": [
+        "Hähnchen",
+        "Kokosmilch",
+        "Paprika",
+        "Zucchini",
+        "Basilikum"
+      ],
+      "needs_clarification": "Mit Reis als Beilage?",
+      "note": "Pur (ohne Reis): CONDITIONAL — PROTEIN (Hähnchen) + FETT (Kokosmilch, größere Menge) + NEUTRAL (Gemüse). Kein explizites Verbot für PROTEIN + FETT. Mit Reis: NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Reis",
+        "Aubergine",
+        "Bambussprosse",
+        "Chili",
+        "Ingwer"
+      ]
+    },
+    "Thunfischsalat": {
+      "base_items": [
+        "Thunfisch",
+        "Tomate",
+        "Gurke",
+        "Zwiebel",
+        "Oliven"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizenmehl + Stärke in der Panade) + PROTEIN (Hähnchen). R001 (KH+PROTEIN). Koreanisches knuspriges Hähnchen — wie alle panierten Fleischgerichte Trennkost-verletzend."
+      "note": "OK — PROTEIN (Thunfisch) + NEUTRAL (Gemüse, Salat). Mit kleiner Menge Olivenöl: CONDITIONAL. Kein verbotenes Paar. Positives Trennkost-Beispiel — auch als Sandwich NOT_OK (KH + PROTEIN).",
+      "optional_items": [
+        "Olivenöl",
+        "Zitrone",
+        "Kapern",
+        "Petersilie",
+        "Kopfsalat"
+      ]
     },
-    "Edamame": {
-      "base_items": ["Sojabohnen"],
-      "optional_items": ["Meersalz", "Sesamöl", "Chili"],
+    "Tiramisu": {
+      "base_items": [
+        "Weizenmehl",
+        "Ei",
+        "Käse",
+        "Kaffee"
+      ],
       "needs_clarification": null,
-      "note": "CONDITIONAL/OK — pur: HUELSENFRUECHTE (Sojabohnen) + optional FETT (Sesamöl, kleine Menge). Kein verbotenes Paar! Eines der Trennkost-freundlichsten Snacks — eiweißreich, pur ohne problematische Kombinationen."
+      "note": "NOT_OK: KH (Löffelbiskuit aus Weizenmehl) + PROTEIN (Ei) + MILCH (Mascarpone). Dreifach-Verletzung. Käse steht hier für Mascarpone (MILCH). Klassisches Dessert — leider Trennkost-inkompatibel.",
+      "optional_items": [
+        "Zucker",
+        "Kakao",
+        "Amaretto"
+      ]
     },
-    "Som Tum": {
-      "base_items": ["Papaya", "Tomate", "Erdnüsse", "Limette"],
-      "optional_items": ["Garnelen", "Schlangenbohnen", "Chili", "Fischsauce", "Knoblauch"],
-      "needs_clarification": "Mit Garnelen oder vegetarisch? Grüne (unreife) Papaya?",
-      "note": "Komplex: NEUTRAL (grüne Papaya = NEUTRAL als unreifes Gemüse, Tomate) + FETT (Erdnüsse) + OBST (Limette). OBST+FETT = NOT_OK (R014). Mit Garnelen: OBST+PROTEIN = NOT_OK (R008). Ohne Limette vegetarisch: CONDITIONAL (NEUTRAL+FETT). Thailändischer Papayasalat."
-    },
-    "Larb": {
-      "base_items": ["Hähnchen", "Petersilie", "Minze", "Limette", "Chili"],
-      "optional_items": ["Fischsauce", "Röstzwiebeln", "Reis", "Koriander"],
-      "needs_clarification": "Mit geröstetem Reispulver (Khao Kua)?",
-      "note": "NOT_OK: PROTEIN (Hähnchengehacktes) + OBST (Limette). R008 (OBST+PROTEIN). Mit Reispulver: zusätzlich KH+PROTEIN (R001). Ohne Limette: CONDITIONAL (PROTEIN+NEUTRAL). Laotisch-Thai Fleischsalat — Limette macht ihn problematisch."
-    },
-
-    "Enchiladas": {
-      "base_items": ["Tortilla", "Hähnchen", "Käse", "Tomate"],
-      "optional_items": ["Bohnen", "Saure Sahne", "Avocado", "Chili", "Zwiebel", "Koriander"],
+    "Toast Hawaii": {
+      "base_items": [
+        "Brot",
+        "Speck",
+        "Ananas",
+        "Käse"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Maistortilla) + PROTEIN (Hähnchen) + MILCH (Käse, Saure Sahne). R001 (KH+PROTEIN) + R002 (KH+MILCH). Mit Bohnen: HUELSENFRUECHTE+KH (R003). Mexikanisches Rollgericht — dreifach Trennkost-verletzend."
+      "note": "NOT_OK: KH (Toast) + PROTEIN (Schinken/Speck) + OBST (Ananas) + MILCH (Käse). Vierfach-Verletzung — R001 (KH+PROTEIN), R002 (KH+MILCH), R007 (KH+OBST), R009 (MILCH+OBST). Eines der Trennkost-unfreundlichsten Gerichte überhaupt.",
+      "optional_items": [
+        "Butter"
+      ]
     },
-    "Nachos": {
-      "base_items": ["Mais", "Käse"],
-      "optional_items": ["Hackfleisch", "Bohnen", "Avocado", "Saure Sahne", "Jalapeño", "Tomate"],
+    "Tofu-Gemüse-Wok": {
+      "base_items": [
+        "Tofu",
+        "Brokkoli",
+        "Paprika",
+        "Frühlingszwiebel",
+        "Sojasoße"
+      ],
+      "needs_clarification": "Mit Reis oder Nudeln als Beilage?",
+      "note": "Ohne Getreide-Beilage: CONDITIONAL — HUELSENFRUECHTE (Tofu) + NEUTRAL (Gemüse). Mit Reis oder Reisnudeln: NOT_OK (HUELSENFRUECHTE + KH). Sesamöl (kleine Menge): CONDITIONAL auf Fett-Menge.",
+      "optional_items": [
+        "Sesamöl",
+        "Ingwer",
+        "Knoblauch",
+        "Reis",
+        "Reisnudeln"
+      ]
+    },
+    "Tom Yum": {
+      "base_items": [
+        "Garnele",
+        "Pilze",
+        "Tomate",
+        "Zitronengras"
+      ],
+      "needs_clarification": "Tom Yum Nam Sai (klar, ohne Kokosmilch) oder Tom Kha (mit Kokosmilch)?",
+      "note": "Klar (ohne Kokosmilch): OK — PROTEIN (Garnelen) + NEUTRAL (Pilze, Gemüse, Kräuter). Mit Kokosmilch: CONDITIONAL — PROTEIN + NEUTRAL + FETT (kein explizites Verbot, Menge prüfen).",
+      "optional_items": [
+        "Kokosmilch",
+        "Chili",
+        "Limette",
+        "Ingwer"
+      ]
+    },
+    "Tomatensuppe": {
+      "base_items": [
+        "Tomate",
+        "Zwiebel",
+        "Knoblauch"
+      ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Mais-Tortilla-Chips) + MILCH (Käse). R002 (KH+MILCH). Mit Hackfleisch: KH+PROTEIN (R001). Mit Bohnen: HUELSENFRUECHTE+KH (R003). Avocado = FETT (CONDITIONAL). Party-Snack — immer NOT_OK durch Käse+Chips."
+      "note": "OK — ausschließlich NEUTRAL (Tomate, Zwiebeln, Knoblauch). Mit Sahne: ebenfalls OK (NEUTRAL + MILCH, kein Kombinationsverbot). Mit Olivenöl (1-2 TL): CONDITIONAL auf Menge.",
+      "optional_items": [
+        "Sahne",
+        "Olivenöl",
+        "Basilikum"
+      ]
     },
-
+    "Tortilla Española": {
+      "base_items": [
+        "Kartoffel",
+        "Ei",
+        "Olivenöl",
+        "Zwiebel"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Kartoffel) + PROTEIN (Ei). Spanisches Kartoffel-Omelett. Mit Chorizo: zusätzlich PROTEIN. Mit kleiner Menge Olivenöl in der Pfanne: CONDITIONAL auf Menge.",
+      "optional_items": [
+        "Paprika",
+        "Chorizo"
+      ]
+    },
+    "Tzatziki": {
+      "base_items": [
+        "Joghurt",
+        "Gurke",
+        "Knoblauch",
+        "Olivenöl"
+      ],
+      "needs_clarification": null,
+      "note": "OK/CONDITIONAL — MILCH (Joghurt) + NEUTRAL (Gurke, Knoblauch) + FETT (Olivenöl, kleine Menge). Kein verbotenes Paar! MILCH + NEUTRAL = erlaubt. Olivenöl in kleiner Menge: CONDITIONAL. Pur als Dip Trennkost-freundlich!",
+      "optional_items": [
+        "Dill",
+        "Minze",
+        "Zitrone"
+      ]
+    },
+    "Veggie Burger": {
+      "base_items": [
+        "Brötchen",
+        "Vegetarisches Patty"
+      ],
+      "needs_clarification": "Welche Patty-Basis genau? Modifier-aware vegetarische Varianten bleiben ohne klare Produktbasis bewusst vorsichtig.",
+      "note": "Modifier-aware Fallback: vegetarischer Burger bleibt absichtlich unscharf, statt automatisch auf Kichererbsen/Bohnen festgelegt zu werden.",
+      "optional_items": [
+        "Kopfsalat",
+        "Tomate",
+        "Gurke",
+        "Senf",
+        "Ketchup"
+      ]
+    },
+    "Vitello Tonnato": {
+      "base_items": [
+        "Rindfleisch",
+        "Thunfisch",
+        "Kapern",
+        "Mayonnaise"
+      ],
+      "needs_clarification": null,
+      "note": "CONDITIONAL: PROTEIN (Kalbfleisch) + PROTEIN (Thunfisch) + FETT (Mayonnaise). Kein explizit verbotenes Paar — zwei PROTEIN-Quellen sind erlaubt (R006 betrifft nur PROTEIN+MILCH). Mayonnaise als HIGH_FAT → CONDITIONAL. Piemontesisches Antipasto.",
+      "optional_items": [
+        "Sardellen",
+        "Zitrone",
+        "Olivenöl",
+        "Ei"
+      ]
+    },
+    "Waffeln": {
+      "base_items": [
+        "Weizenmehl",
+        "Ei",
+        "Milch",
+        "Butter"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Weizenmehl) + PROTEIN (Ei) + MILCH (Milch, Butter). Mit Sahne als Topping: mehr MILCH. Mit Erdbeeren: zusätzlich OBST.",
+      "optional_items": [
+        "Puderzucker",
+        "Sahne",
+        "Erdbeere",
+        "Ahornsirup"
+      ]
+    },
+    "Waldorf Salat": {
+      "base_items": [
+        "Sellerie",
+        "Apfel",
+        "Walnüsse",
+        "Mayonnaise"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: OBST (Apfel) + FETT (Walnüsse, Mayonnaise). Obst darf nicht mit Fett kombiniert werden (R014). Außerdem OBST + NEUTRAL (Sellerie) = NOT_OK, da nur Blattgrün als Ausnahme gilt (R013). Mit Joghurt: zusätzlich OBST + MILCH.",
+      "optional_items": [
+        "Joghurt",
+        "Zitrone",
+        "Petersilie"
+      ]
+    },
+    "Weißwurst mit Brezel": {
+      "base_items": [
+        "Wurst",
+        "Brot"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: PROTEIN (Weißwurst) + KH (Brezel aus Weizenmehl). Bayerisches Frühstück — Trennkost-inkompatibel. Weißwurst pur (ohne Brezel): OK — reines PROTEIN. Süßer Senf (kleine Menge, Würze): vernachlässigbar.",
+      "optional_items": [
+        "Senf"
+      ]
+    },
+    "Wiener Schnitzel": {
+      "base_items": [
+        "Paniertes Schnitzel"
+      ],
+      "needs_clarification": "Mit gekochten Kartoffeln als Beilage oder ohne KH-Beilage?",
+      "note": "Schon das panierte Schnitzel selbst bleibt intrinsisch konfliktuell. Gekochte Kartoffeln sind eine häufige, aber nicht erzwungene KH-Beilage.",
+      "optional_items": [
+        "Kartoffel gekocht",
+        "Zitronensaft",
+        "Preiselbeeren"
+      ]
+    },
+    "Wrap": {
+      "base_items": [
+        "Tortilla"
+      ],
+      "needs_clarification": "Welche Füllung? Fleisch, Falafel, Gemüse?",
+      "note": "Tortilla = KH. Je nach Füllung: Fleisch = NOT_OK (KH+PROTEIN), Falafel = NOT_OK (KH+HUELSENFRUECHTE), rein Gemüse = OK",
+      "optional_items": [
+        "Salat",
+        "Tomate"
+      ]
+    },
+    "Wurstbrot": {
+      "base_items": [
+        "Brot",
+        "Wurst"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Brot) + PROTEIN (Wurst). Standard-Wurst = FLEISCH/PROTEIN.",
+      "optional_items": [
+        "Butter"
+      ]
+    },
+    "Zucchini-Nudeln": {
+      "base_items": [
+        "Zucchini",
+        "Olivenöl",
+        "Knoblauch",
+        "Tomate"
+      ],
+      "needs_clarification": "Mit Parmesan oder Hähnchen?",
+      "note": "Pur (als Pasta-Ersatz): CONDITIONAL — NEUTRAL (Zucchini = Gemüse, nicht KH!) + NEUTRAL + FETT (Olivenöl). Ausgezeichnetes Trennkost-Gericht! Mit Parmesan: OK (MILCH + NEUTRAL). Mit Hähnchen: OK (PROTEIN + NEUTRAL). Mit echten Nudeln gemischt: KH + NEUTRAL = OK.",
+      "optional_items": [
+        "Basilikum",
+        "Pinienkerne",
+        "Parmesan",
+        "Hähnchen"
+      ]
+    },
+    "Zwiebelkuchen": {
+      "base_items": [
+        "Weizenmehl",
+        "Zwiebel",
+        "Speck",
+        "Ei",
+        "Sahne"
+      ],
+      "needs_clarification": null,
+      "note": "NOT_OK: KH (Mürbeteig aus Weizenmehl) + PROTEIN (Speck, Ei) + MILCH (Sahne). R001 (KH+PROTEIN) + R002 (KH+MILCH). Herbstlicher Klassiker ähnlich wie Quiche — mehrfach Trennkost-verletzend.",
+      "optional_items": [
+        "Butter",
+        "Kümmel",
+        "Sauerrahm"
+      ]
+    },
     "Zwiebelsuppe": {
-      "base_items": ["Zwiebel", "Käse", "Brot"],
-      "optional_items": ["Butter", "Weißwein", "Thymian", "Rinderbrühe"],
+      "base_items": [
+        "Zwiebel",
+        "Käse",
+        "Brot"
+      ],
       "needs_clarification": "Mit überbackenem Käse und Croutons?",
-      "note": "NOT_OK: KH (Croutons/Toast) + MILCH (überbackener Gruyère/Käse). R002 (KH+MILCH). Zwiebeln = NEUTRAL. Pur als Zwiebel-Brühe ohne Käse/Brot: OK. Klassische französische überbackene Zwiebelsuppe — NOT_OK."
-    },
-    "Borschtsch": {
-      "base_items": ["Rote Bete", "Weißkohl", "Tomate", "Zwiebel"],
-      "optional_items": ["Rindfleisch", "Kartoffel", "Saure Sahne", "Möhre", "Dill"],
-      "needs_clarification": "Mit Rindfleisch, Kartoffeln und/oder Saure Sahne?",
-      "note": "Variiert: Vegetarisch ohne Kartoffel: OK — NEUTRAL (Rote Bete, Weißkohl, Tomate). Mit Kartoffeln: CONDITIONAL (KH). Mit Rindfleisch + Kartoffeln: NOT_OK (KH+PROTEIN, R001). Mit Saure Sahne: MILCH. Ukrainischer Klassiker — vegetarisch purste Variante Trennkost-freundlich."
-    },
-
-    "Sachertorte": {
-      "base_items": ["Weizenmehl", "Butter", "Ei", "Kakao", "Aprikose"],
-      "optional_items": ["Zucker", "Sahne", "Schokolade"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Weizenmehl, Zucker) + PROTEIN (Ei) + FETT (Butter) + OBST (Marillenmarmelade/Aprikosenmarmelade) + UNKNOWN (Kakao). R001 (KH+PROTEIN) + R007 (OBST+KH). Wiener Kulturdessert — mehrfache Trennkost-Verletzung."
-    },
-    "Pavlova": {
-      "base_items": ["Ei", "Zucker", "Sahne"],
-      "optional_items": ["Erdbeere", "Kiwi", "Passionsfrucht", "Himbeere", "Banane"],
-      "needs_clarification": null,
-      "note": "NOT_OK: PROTEIN (Eiweiß im Baiserboden) + MILCH (Schlagsahne) + OBST (Früchte-Topping). R006 (PROTEIN+MILCH) + R008 (OBST+PROTEIN) + R009 (OBST+MILCH). Australisches Baiser-Dessert — dreifache Trennkost-Verletzung."
-    },
-    "Bienenstich": {
-      "base_items": ["Weizenmehl", "Milch", "Butter", "Mandeln", "Sahne"],
-      "optional_items": ["Ei", "Hefe", "Zucker", "Vanille"],
-      "needs_clarification": null,
-      "note": "NOT_OK: KH (Hefeteig aus Weizenmehl) + MILCH (Milch im Teig, Vanillesahne-Füllung). R002 (KH+MILCH). Mit Ei im Teig: zusätzlich KH+PROTEIN (R001). Mandeln = FETT. Klassisches deutsches Blechkuchen-Dessert."
-    },
-
-    "Gemüseauflauf": {
-      "base_items": ["Zucchini", "Paprika", "Tomate", "Zwiebel"],
-      "optional_items": ["Kartoffel", "Käse", "Sahne", "Brokkoli", "Blumenkohl"],
-      "needs_clarification": "Mit Kartoffeln und/oder Käse-Sahne-Sauce?",
-      "note": "Variiert: Nur NEUTRAL: OK (Zucchini, Paprika, Tomate). Mit Käse/Sahne: CONDITIONAL (MILCH). Mit Kartoffeln + Käse: NOT_OK (KH+MILCH, R002). Einer der wenigen Aufläufe, der Trennkost-freundlich sein kann — ohne Milchprodukte und KH."
-    },
-    "Knäckebrot mit Avocado": {
-      "base_items": ["Knäckebrot", "Avocado"],
-      "optional_items": ["Zitrone", "Chili", "Tomate", "Sesam", "Frühlingszwiebel"],
-      "needs_clarification": null,
-      "note": "CONDITIONAL: KH (Knäckebrot aus Roggen/Weizen) + FETT (Avocado). R017 — Avocado in größerer Menge → CONDITIONAL. Kein KH+PROTEIN Verstoß! Beliebter gesunder Snack — Trennkost-akzeptabel, Avocado-Menge beachten."
+      "note": "NOT_OK: KH (Croutons/Toast) + MILCH (überbackener Gruyère/Käse). R002 (KH+MILCH). Zwiebeln = NEUTRAL. Pur als Zwiebel-Brühe ohne Käse/Brot: OK. Klassische französische überbackene Zwiebelsuppe — NOT_OK.",
+      "optional_items": [
+        "Butter",
+        "Weißwein",
+        "Thymian",
+        "Rinderbrühe"
+      ]
     }
   }
 }

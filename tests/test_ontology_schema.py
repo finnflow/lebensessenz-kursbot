@@ -1,10 +1,11 @@
 """
 Tests for additive ontology schema loading.
 """
+import csv
 from pathlib import Path
 
 from trennkost.models import CombinationGroup, FoodGroup
-from trennkost.ontology import Ontology
+from trennkost.ontology import ONTOLOGY_CSV, Ontology
 
 
 def _write_json(path: Path, content: str):
@@ -228,6 +229,24 @@ def test_canonical_ontology_has_no_validation_issues():
     ontology = Ontology()
     assert ontology.validation_issues == []
     ontology.assert_valid()
+
+
+def test_canonical_ontology_csv_is_row_clean_and_comment_free():
+    with open(ONTOLOGY_CSV, "r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.reader(f)
+        header = next(reader)
+        assert len(header) == 21
+
+        for line_number, row in enumerate(reader, start=2):
+            assert row, f"Ontology row {line_number} is unexpectedly empty"
+            assert len(row) == len(header), (
+                f"Ontology row {line_number} has {len(row)} columns "
+                f"(expected {len(header)})"
+            )
+            assert row[0].strip(), f"Ontology row {line_number} has empty canonical value"
+            assert not row[0].strip().startswith("#"), (
+                f"Ontology row {line_number} contains a comment-style row in CSV body"
+            )
 
 
 def test_loader_handles_legacy_and_malformed_rows(tmp_path):
