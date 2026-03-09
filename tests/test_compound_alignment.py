@@ -9,6 +9,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from trennkost.models import ModifierTag
+from trennkost.ontology import Ontology
 from trennkost.normalizer import normalize_dish
 
 
@@ -46,6 +47,21 @@ def test_hotdog_family_preserves_variant_resolution(dish_name, expected_variant,
     assert variant.recognized_modifiers == [expected_tag]
 
 
+def test_hotdog_compounds_exist_as_generic_restaurant_fallbacks():
+    ontology = Ontology()
+
+    hotdog = ontology.get_compound("Hotdog")
+    hotdog_with_fries = ontology.get_compound("Hotdog mit Pommes")
+
+    assert hotdog is not None
+    assert hotdog["base_items"] == ["Brot", "Wurst"]
+    assert hotdog["optional_items"] == ["Senf", "Ketchup"]
+
+    assert hotdog_with_fries is not None
+    assert hotdog_with_fries["base_items"] == ["Brot", "Wurst", "Pommes"]
+    assert hotdog_with_fries["optional_items"] == ["Senf", "Ketchup", "Mayonnaise"]
+
+
 def test_schnitzel_mit_pommes_uses_prepared_and_potato_canonicals():
     analysis = normalize_dish("Schnitzel mit Pommes")
 
@@ -80,3 +96,15 @@ def test_fischstaebchen_mit_pommes_uses_intrinsic_prepared_canonical():
     assert {"Alaska-Seelachs", "Paniermehl"}.issubset(set(canonicals))
     assert "Kartoffel" not in canonicals
     assert any(item.canonical == "Zitronensaft" for item in analysis.assumed_items)
+
+
+@pytest.mark.parametrize("dish_name", ["Chicken Nuggets mit Pommes", "Nuggets mit Pommes"])
+def test_nuggets_with_fries_use_intrinsic_nuggets_and_pommes(dish_name):
+    analysis = normalize_dish(dish_name)
+
+    canonicals = [item.canonical for item in analysis.items]
+
+    assert canonicals[0] == "Chicken Nuggets"
+    assert "Pommes" in canonicals
+    assert {"Hähnchen", "Paniermehl"}.issubset(set(canonicals))
+    assert "Kartoffel" not in canonicals

@@ -38,6 +38,18 @@
       "needs_clarification": "Welche Patty-/Füllungsbasis? Fleisch = PROTEIN. Veggie-/vegan-Cues werden modifier-aware und bewusst vorsichtig behandelt.",
       "note": "Klärung nötig: Burger-Basis bleibt ohne explizite Patty-Angabe offen."
     },
+    "Hotdog": {
+      "base_items": ["Brot", "Wurst"],
+      "optional_items": ["Senf", "Ketchup"],
+      "needs_clarification": "Klassisch, vegetarisch oder vegan? Explizite modifier-aware Varianten bleiben stärker als dieser generische Restaurant-Fallback.",
+      "note": "Generischer Hotdog-Fallback: Brot + Wurst. Vegetarische/vegane Hotdogs bleiben bewusst über die bestehenden Wurst-Varianten modelliert."
+    },
+    "Hotdog mit Pommes": {
+      "base_items": ["Brot", "Wurst", "Pommes"],
+      "optional_items": ["Senf", "Ketchup", "Mayonnaise"],
+      "needs_clarification": "Klassisch, vegetarisch oder vegan? Explizite modifier-aware Varianten bleiben stärker als dieser generische Restaurant-Fallback.",
+      "note": "Generischer Restaurant-Fallback: Hotdog plus Pommes. Modifier-aware Varianten wie vegetarischer oder veganer Hotdog mit Pommes bleiben vorsichtig über die bestehenden Wurst-Canonicals modelliert."
+    },
     "Cheeseburger": {
       "base_items": ["Brötchen", "Hackfleisch", "Käse", "Salat", "Tomate"],
       "optional_items": ["Ketchup", "Senf", "Zwiebel", "Gurke"],
@@ -303,6 +315,18 @@
       "optional_items": ["Zitronensaft", "Ketchup", "Mayonnaise"],
       "needs_clarification": null,
       "note": "NOT_OK: intrinsisch konfliktuelle Fischstäbchen plus Pommes. Nutzt das Prepared-Protein-Canonical direkt statt Fisch+Panade lose nachzubauen. Mit Mayonnaise: zusätzlich high_fat FETT."
+    },
+    "Chicken Nuggets mit Pommes": {
+      "base_items": ["Chicken Nuggets", "Pommes"],
+      "optional_items": ["Ketchup", "Mayonnaise"],
+      "needs_clarification": null,
+      "note": "NOT_OK: intrinsisch konfliktuelle Chicken Nuggets plus Pommes. Nutzt das Prepared-Protein-Canonical direkt statt Nuggets+Panade lose nachzubauen."
+    },
+    "Nuggets mit Pommes": {
+      "base_items": ["Chicken Nuggets", "Pommes"],
+      "optional_items": ["Ketchup", "Mayonnaise"],
+      "needs_clarification": "Chicken Nuggets oder andere Nuggets-Variante?",
+      "note": "Restaurant-Default: ohne weitere Präzisierung wird dies vorsichtig als Chicken Nuggets mit Pommes behandelt."
     },
 
     "Ratatouille": {

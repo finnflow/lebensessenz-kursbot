@@ -178,10 +178,13 @@ def _resolve_modifier_specs(
             sausage_name = "Vegane Wurst"
         elif ModifierTag.VEGETARIAN in tags:
             sausage_name = "Vegetarische Wurst"
-        return [
+        resolved_items = [
             _ResolvedModifierItem("Brot"),
             _ResolvedModifierItem(sausage_name, sausage_tags),
         ]
+        if "pommes" in normalized_text:
+            resolved_items.append(_ResolvedModifierItem("Pommes"))
+        return resolved_items
 
     if "patty" in normalized_text:
         if ModifierTag.VEGAN in tags:

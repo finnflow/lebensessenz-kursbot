@@ -162,6 +162,8 @@ def test_core_item_risk_and_guidance_references_stay_validation_clean():
         "Vegetarisches Patty": (["UNKNOWN_BINDERS"], ["CHECK_BINDERS"]),
         "Vegane Wurst": (["UNKNOWN_BINDERS"], ["CHECK_BINDERS"]),
         "Vegetarische Wurst": (["UNKNOWN_BINDERS"], ["CHECK_BINDERS"]),
+        "Veganes Schnitzel": (["UNKNOWN_BINDERS"], ["CHECK_BINDERS"]),
+        "Vegetarisches Schnitzel": (["UNKNOWN_BINDERS"], ["CHECK_BINDERS"]),
         "Chicken Nuggets": (["UNKNOWN_BINDERS"], ["CHECK_BINDERS"]),
         "Fischstäbchen": ([], []),
         "Paniertes Schnitzel": ([], []),
