@@ -359,12 +359,12 @@
     },
     "Burger": {
       "base_items": [
-        "Brötchen"
+        "Brot"
       ],
       "needs_clarification": "Welche Patty-/Füllungsbasis? Fleisch = PROTEIN. Veggie-/vegan-Cues werden modifier-aware und bewusst vorsichtig behandelt.",
       "note": "Klärung nötig: Burger-Basis bleibt ohne explizite Patty-Angabe offen.",
       "optional_items": [
-        "Salat",
+        "Kopfsalat",
         "Tomate",
         "Zwiebel",
         "Gurke"
@@ -463,10 +463,10 @@
     },
     "Cheeseburger": {
       "base_items": [
-        "Brötchen",
+        "Brot",
         "Hackfleisch",
         "Käse",
-        "Salat",
+        "Kopfsalat",
         "Tomate"
       ],
       "needs_clarification": null,
@@ -2174,7 +2174,7 @@
     },
     "Pizza": {
       "base_items": [
-        "Weizenteig",
+        "Pizzateig",
         "Tomatensauce",
         "Käse"
       ],
@@ -2186,14 +2186,14 @@
     },
     "Pizza Margherita": {
       "base_items": [
-        "Weizenteig",
+        "Pizzateig",
         "Tomatensauce",
-        "Mozzarella",
+        "Käse",
         "Basilikum",
         "Olivenöl"
       ],
       "needs_clarification": null,
-      "note": "NOT_OK: KH (Teig) + MILCH (Mozzarella)",
+      "note": "NOT_OK: KH (Teig) + MILCH (Käse, typischerweise Mozzarella)",
       "optional_items": []
     },
     "Poke Bowl": {
@@ -2826,10 +2826,10 @@
         "Reis"
       ],
       "needs_clarification": "Welche Sorte? Nigiri/Maki mit Fisch (PROTEIN) oder vegetarisch (z.B. Avocado, Gurke)?",
-      "note": "Fisch-Sushi = NOT_OK: KH (Reis) + PROTEIN (Fisch). Avocado-Maki = KH + FETT (CONDITIONAL auf Menge)",
+      "note": "Fisch-Sushi = NOT_OK: KH (Reis) + PROTEIN (Fisch). Avocado-Maki bleibt im aktuellen Modell KH + FETT mit Mengen-Guidance (keine harte Verbotsregel nur durch FETT).",
       "optional_items": [
-        "Sojasoße",
-        "Wasabi",
+        "Sojasauce",
+        "Meerrettich",
         "Ingwer"
       ]
     },
@@ -3051,7 +3051,7 @@
     },
     "Veggie Burger": {
       "base_items": [
-        "Brötchen",
+        "Brot",
         "Vegetarisches Patty"
       ],
       "needs_clarification": "Welche Patty-Basis genau? Modifier-aware vegetarische Varianten bleiben ohne klare Produktbasis bewusst vorsichtig.",
@@ -3141,7 +3141,7 @@
       "needs_clarification": "Welche Füllung? Fleisch, Falafel, Gemüse?",
       "note": "Tortilla = KH. Je nach Füllung: Fleisch = NOT_OK (KH+PROTEIN), Falafel = NOT_OK (KH+HUELSENFRUECHTE), rein Gemüse = OK",
       "optional_items": [
-        "Salat",
+        "Kopfsalat",
         "Tomate"
       ]
     },

@@ -62,6 +62,46 @@ def test_hotdog_compounds_exist_as_generic_restaurant_fallbacks():
     assert hotdog_with_fries["optional_items"] == ["Senf", "Ketchup", "Mayonnaise"]
 
 
+def test_target_compound_families_use_aligned_canonical_labels():
+    ontology = Ontology()
+
+    burger = ontology.get_compound("Burger")
+    veggie_burger = ontology.get_compound("Veggie Burger")
+    pizza = ontology.get_compound("Pizza")
+    pizza_margherita = ontology.get_compound("Pizza Margherita")
+    wrap = ontology.get_compound("Wrap")
+    sushi = ontology.get_compound("Sushi")
+
+    assert burger is not None
+    assert burger["base_items"] == ["Brot"]
+    assert burger["optional_items"] == ["Kopfsalat", "Tomate", "Zwiebel", "Gurke"]
+
+    assert veggie_burger is not None
+    assert veggie_burger["base_items"] == ["Brot", "Vegetarisches Patty"]
+
+    assert pizza is not None
+    assert pizza["base_items"] == ["Pizzateig", "Tomatensauce", "Käse"]
+
+    assert pizza_margherita is not None
+    assert pizza_margherita["base_items"] == ["Pizzateig", "Tomatensauce", "Käse", "Basilikum", "Olivenöl"]
+
+    assert wrap is not None
+    assert wrap["base_items"] == ["Tortilla"]
+    assert wrap["optional_items"] == ["Kopfsalat", "Tomate"]
+
+    assert sushi is not None
+    assert sushi["base_items"] == ["Reis"]
+    assert sushi["optional_items"] == ["Sojasauce", "Meerrettich", "Ingwer"]
+
+
+def test_sushi_compound_optional_condiments_are_lookup_clean():
+    analysis = normalize_dish("Sushi")
+
+    assert [item.canonical for item in analysis.items] == ["Reis"]
+    assert [item.canonical for item in analysis.assumed_items] == ["Sojasauce", "Meerrettich", "Ingwer"]
+    assert analysis.unknown_items == []
+
+
 def test_schnitzel_mit_pommes_uses_prepared_and_potato_canonicals():
     analysis = normalize_dish("Schnitzel mit Pommes")
 
