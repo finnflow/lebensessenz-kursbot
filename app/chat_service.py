@@ -44,15 +44,12 @@ from app.vision_service import (
     extract_food_from_image,
     VisionAnalysisError,
 )
-from app.image_handler import ImageValidationError
 from trennkost.analyzer import (
-    detect_food_query,
-    detect_breakfast_context,
     detect_temporal_separation,
     analyze_text as trennkost_analyze_text,
     analyze_vision as trennkost_analyze_vision,
 )
-from trennkost.formatter import format_results_for_llm, build_rag_query
+from trennkost.formatter import build_rag_query
 from trennkost.models import TrennkostResult
 
 from app.chat_modes import ChatMode, ChatModifiers, detect_chat_mode
@@ -75,6 +72,8 @@ from app.prompt_builder import (
     assemble_prompt,
     build_ui_intent_block,
 )
+
+_LAST_MENU_RESULTS_BY_CONVERSATION: Dict[str, List[TrennkostResult]] = {}
 
 
 # ── UI intent normalizer ──────────────────────────────────────────────
@@ -181,6 +180,41 @@ def update_conversation_summary(conversation_id: str, conv_data: Dict[str, Any])
 
 
 # ── Pipeline steps ────────────────────────────────────────────────────
+
+def _cache_menu_results(
+    conversation_id: str,
+    mode: ChatMode,
+    trennkost_results: Optional[List[TrennkostResult]],
+) -> None:
+    if mode == ChatMode.MENU_ANALYSIS and trennkost_results:
+        _LAST_MENU_RESULTS_BY_CONVERSATION[conversation_id] = list(trennkost_results)
+
+
+def _get_cached_menu_results(conversation_id: str) -> Optional[List[TrennkostResult]]:
+    cached = _LAST_MENU_RESULTS_BY_CONVERSATION.get(conversation_id)
+    if not cached:
+        return None
+    return list(cached)
+
+
+def _resolve_trennkost_results(
+    conversation_id: str,
+    analysis_query: str,
+    mode: ChatMode,
+    vision_extraction: Optional[Dict],
+) -> Optional[List[TrennkostResult]]:
+    trennkost_results = None
+    if mode == ChatMode.MENU_FOLLOWUP:
+        trennkost_results = _get_cached_menu_results(conversation_id)
+        if trennkost_results:
+            print(f"[PIPELINE] MENU_FOLLOWUP reused {len(trennkost_results)} cached menu result(s)")
+
+    if trennkost_results is None:
+        trennkost_results = _run_engine(analysis_query, vision_extraction, mode)
+
+    _cache_menu_results(conversation_id, mode, trennkost_results)
+    return trennkost_results
+
 
 def _setup_conversation(
     conversation_id: Optional[str],
@@ -565,7 +599,12 @@ def _handle_food_analysis(
         if resolved:
             analysis_query = resolved
 
-    trennkost_results = _run_engine(analysis_query, vision_data.get("vision_extraction"), mode)
+    trennkost_results = _resolve_trennkost_results(
+        conversation_id=conversation_id,
+        analysis_query=analysis_query,
+        mode=mode,
+        vision_extraction=vision_data.get("vision_extraction"),
+    )
 
     if DEBUG_RAG and trennkost_results:
         for r in trennkost_results:
@@ -893,7 +932,12 @@ def _prepare_stream(
             resolved = resolve_context_references(normalized_message, recent)
             if resolved:
                 analysis_query = resolved
-        trennkost_results = _run_engine(analysis_query, None, mode)
+        trennkost_results = _resolve_trennkost_results(
+            conversation_id=conversation_id,
+            analysis_query=analysis_query,
+            mode=mode,
+            vision_extraction=None,
+        )
 
     # Recipe search
     recipe_results: Optional[List[Dict]] = None

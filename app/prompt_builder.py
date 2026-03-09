@@ -6,7 +6,7 @@ SYSTEM_INSTRUCTIONS lives here; mode-specific builders compose the user-side pro
 """
 from typing import Optional, List, Dict, Any
 
-from trennkost.models import TrennkostResult, Verdict
+from trennkost.models import TrennkostResult, Verdict, TrafficLight
 from trennkost.formatter import format_results_for_llm
 
 
@@ -118,11 +118,42 @@ def build_engine_block(
     return parts
 
 
+_MENU_VERDICT_ORDER = {
+    Verdict.OK: 0,
+    Verdict.CONDITIONAL: 1,
+    Verdict.NOT_OK: 2,
+    Verdict.UNKNOWN: 3,
+}
+
+_MENU_TRAFFIC_ORDER = {
+    TrafficLight.GREEN: 0,
+    TrafficLight.YELLOW: 1,
+    TrafficLight.RED: 2,
+}
+
+
+def _menu_sort_key(result: TrennkostResult) -> tuple:
+    guidance_signal = len(result.guidance_facts) + len(result.guidance_codes)
+    return (
+        _MENU_VERDICT_ORDER.get(result.verdict, 99),
+        _MENU_TRAFFIC_ORDER.get(result.traffic_light, 99),
+        1 if result.required_questions else 0,
+        -guidance_signal,
+        result.dish_name.lower(),
+    )
+
+
+def _rank_menu_results(trennkost_results: List[TrennkostResult]) -> List[TrennkostResult]:
+    """Deterministic menu ranking: verdict > traffic light > clarification > weak guidance tie-break."""
+    return sorted(trennkost_results, key=_menu_sort_key)
+
+
 def build_menu_injection(trennkost_results: List[TrennkostResult]) -> List[str]:
     """SPEISEKARTE-MODUS: inject OK/conditional dish lists for menu analysis."""
+    ranked_results = _rank_menu_results(trennkost_results)
     parts = []
-    ok_dishes = [r.dish_name for r in trennkost_results if r.verdict.value == "OK"]
-    cond_dishes = [r.dish_name for r in trennkost_results if r.verdict.value == "CONDITIONAL"]
+    ok_dishes = [r.dish_name for r in ranked_results if r.verdict.value == "OK"]
+    cond_dishes = [r.dish_name for r in ranked_results if r.verdict.value == "CONDITIONAL"]
     parts.append("SPEISEKARTE-MODUS:")
     parts.append("Der User hat eine SPEISEKARTE/MENÜ geschickt und möchte wissen was er bestellen kann.")
     if ok_dishes:
@@ -339,9 +370,10 @@ def build_prompt_menu_overview(
     user_message: str,
 ) -> str:
     """Answer instructions for menu analysis (multiple dishes)."""
-    ok_dishes = [r.dish_name for r in trennkost_results if r.verdict.value == "OK"]
-    conditional_dishes = [r.dish_name for r in trennkost_results if r.verdict.value == "CONDITIONAL"]
-    not_ok_dishes = [r.dish_name for r in trennkost_results if r.verdict.value == "NOT_OK"]
+    ranked_results = _rank_menu_results(trennkost_results)
+    ok_dishes = [r.dish_name for r in ranked_results if r.verdict.value == "OK"]
+    conditional_dishes = [r.dish_name for r in ranked_results if r.verdict.value == "CONDITIONAL"]
+    not_ok_dishes = [r.dish_name for r in ranked_results if r.verdict.value == "NOT_OK"]
 
     return (
         f"USER'S ORIGINAL MESSAGE: {user_message}\n\n"
