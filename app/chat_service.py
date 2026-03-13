@@ -53,9 +53,13 @@ from trennkost.formatter import build_rag_query
 from trennkost.models import TrennkostResult
 
 from app.chat_modes import ChatMode, ChatModifiers, detect_chat_mode
+from app.grounding_policy import (
+    FALLBACK_SENTENCE,
+    evaluate_grounding_policy,
+    should_emit_fallback_sentence,
+)
 from app.prompt_builder import (
     SYSTEM_INSTRUCTIONS,
-    FALLBACK_SENTENCE,
     build_base_context,
     build_engine_block,
     build_menu_injection,
@@ -328,28 +332,6 @@ def _build_rag_query(
         standalone_query = rewrite_standalone_query(summary, last_messages[:-1], user_message)
 
     return expand_alias_terms(standalone_query)
-
-
-def _check_fallback(
-    trennkost_results: Optional[List[TrennkostResult]],
-    mode: ChatMode,
-    best_dist: float,
-    is_partial: bool,
-    course_context: str,
-) -> Tuple[bool, str]:
-    """Check if we should return fallback (no relevant content found).
-
-    Returns (should_fallback, reason) where reason is 'no_snippets' or 'other'.
-    """
-    if trennkost_results:
-        return False, ""
-    if mode == ChatMode.RECIPE_REQUEST:
-        return False, ""
-    if best_dist > DISTANCE_THRESHOLD and not is_partial:
-        return True, "no_snippets"
-    if not course_context.strip():
-        return True, "no_snippets"
-    return False, ""
 
 
 def _build_prompt_parts(
@@ -737,11 +719,16 @@ def _finalize_response(
 
     # 7. Fallback check
     best_dist = min(dists) if dists else 999.0
-    should_fb, fb_reason = _check_fallback(trennkost_results, mode, best_dist, is_partial, course_context)
-    # need/plan allow general process help even without snippets
-    if should_fb and fb_reason == "no_snippets" and ui_intent in {"need", "plan"}:
-        should_fb = False
-    if should_fb:
+    grounding_decision = evaluate_grounding_policy(
+        trennkost_results=trennkost_results,
+        mode=mode,
+        best_dist=best_dist,
+        is_partial=is_partial,
+        course_context=course_context,
+        ui_intent=ui_intent,
+        distance_threshold=DISTANCE_THRESHOLD,
+    )
+    if should_emit_fallback_sentence(grounding_decision):
         create_message(conversation_id, "assistant", FALLBACK_SENTENCE, intent=ui_intent)
         conv_data_updated = get_conversation(conversation_id)
         if should_update_summary(conversation_id, conv_data_updated):
@@ -985,10 +972,16 @@ def _prepare_stream(
     course_context = build_context(docs, metas)
 
     best_dist = min(dists) if dists else 999.0
-    should_fb, fb_reason = _check_fallback(trennkost_results, mode, best_dist, is_partial, course_context)
-    if should_fb and fb_reason == "no_snippets" and ui_intent in {"need", "plan"}:
-        should_fb = False
-    if should_fb:
+    grounding_decision = evaluate_grounding_policy(
+        trennkost_results=trennkost_results,
+        mode=mode,
+        best_dist=best_dist,
+        is_partial=is_partial,
+        course_context=course_context,
+        ui_intent=ui_intent,
+        distance_threshold=DISTANCE_THRESHOLD,
+    )
+    if should_emit_fallback_sentence(grounding_decision):
         create_message(conversation_id, "assistant", FALLBACK_SENTENCE, intent=ui_intent)
         conv_data_updated = get_conversation(conversation_id)
         if should_update_summary(conversation_id, conv_data_updated):

@@ -6,11 +6,9 @@ SYSTEM_INSTRUCTIONS lives here; mode-specific builders compose the user-side pro
 """
 from typing import Optional, List, Dict, Any
 
+from app.grounding_policy import FALLBACK_SENTENCE
 from trennkost.models import TrennkostResult, Verdict, TrafficLight
 from trennkost.formatter import format_results_for_llm
-
-
-FALLBACK_SENTENCE = "Diese Information steht nicht im bereitgestellten Kursmaterial."
 
 SYSTEM_INSTRUCTIONS = f"""Du bist ein kurs-assistierender Bot.
 
@@ -174,7 +172,7 @@ def build_vision_failed_block() -> List[str]:
         "BILD-ANALYSE FEHLGESCHLAGEN:",
         "Das hochgeladene Bild konnte nicht analysiert werden.",
         "Bitte den User, die Gerichte oder Zutaten als Text aufzulisten.",
-        "SAGE NICHT 'Diese Information steht nicht im Kursmaterial'!\n",
+        f"SAGE NICHT '{FALLBACK_SENTENCE}'!\n",
     ]
 
 
