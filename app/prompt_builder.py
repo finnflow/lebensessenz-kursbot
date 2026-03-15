@@ -8,7 +8,10 @@ from typing import Optional, List, Dict, Any
 
 from app.breakfast_policy import (
     build_breakfast_block_lines,
+    build_breakfast_food_analysis_instruction,
     build_breakfast_knowledge_instruction,
+    build_breakfast_obst_kh_instruction,
+    build_breakfast_recipe_instruction,
 )
 from app.grounding_policy import FALLBACK_SENTENCE
 from trennkost.models import TrennkostResult, Verdict, TrafficLight
@@ -237,22 +240,9 @@ def build_clarification_block(needs_clarification: str) -> List[str]:
 
 def _breakfast_section(is_breakfast: bool, has_obst_kh: bool) -> str:
     if is_breakfast:
-        return (
-            "- FRÜHSTÜCK-SPEZIFISCH (User fragt nach Frühstück!):\n"
-            "  1. Empfehle ZUERST die fettarme Option aus dem FRÜHSTÜCKS-HINWEIS oben.\n"
-            "  2. Erkläre KURZ warum: Entgiftung läuft bis mittags, fettarme Kost optimal.\n"
-            "  3. Erwähne das zweistufige Frühstücks-Konzept (1. Obst → 2. fettfreie KH).\n"
-            "  4. Falls User auf fettreiche Option besteht: erlaubt, aber mit freundlichem Hinweis.\n"
-            "  5. Konkrete fettarme Empfehlungen: Obst, Grüner Smoothie, Overnight-Oats, Porridge,\n"
-            "     Reis-Pudding, Hirse-Grieß, glutenfreies Brot mit Gemüse + max 1-2 TL Avocado.\n"
-        )
+        return build_breakfast_food_analysis_instruction()
     if has_obst_kh:
-        return (
-            "- OBST+KH KONFLIKT ERKANNT: Empfehle das zweistufige Frühstücks-Konzept:\n"
-            "  → Stufe 1: Erst das Obst (Banane, Mango etc.) ALLEIN essen — 20-30 Min. warten\n"
-            "  → Stufe 2: Dann das KH-Gericht (Porridge/Bowl/Haferflocken) OHNE Obst\n"
-            "  NICHT '3 Stunden Abstand' sagen — die Lösung ist: Obst VORHER essen, kurz warten.\n"
-        )
+        return build_breakfast_obst_kh_instruction()
     return ""
 
 
@@ -576,10 +566,7 @@ def build_prompt_recipe_request(
         )
 
     if is_breakfast:
-        parts.append(
-            "FRÜHSTÜCK: Empfehle bevorzugt fettarme Frühstücks-Rezepte "
-            "(Obst, Smoothie, Overnight-Oats, Porridge).\n"
-        )
+        parts.append(build_breakfast_recipe_instruction())
 
     parts.append(
         "STIL:\n"
