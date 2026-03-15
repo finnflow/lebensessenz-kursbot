@@ -19,8 +19,11 @@ from trennkost.models import (
     TrennkostResult,
 )
 from trennkost.ontology import get_ontology, resolve_effective_group
-from trennkost.normalizer import normalize_dish
 from trennkost.engine import evaluate_dish
+from trennkost.resolved_input import (
+    adapt_resolved_input_to_dish_analysis,
+    build_resolved_input,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -457,16 +460,15 @@ def analyze_text(
         List of TrennkostResult (one per dish)
     """
     parsed = _parse_text_input(text)
+    resolved_inputs = [build_resolved_input(dish_info) for dish_info in parsed]
     results = []
 
-    for dish_info in parsed:
-        dish_name = dish_info["name"]
-        raw_items = dish_info["items"]
+    for resolved_input in resolved_inputs:
+        dish_name = resolved_input.dish_name
 
-        # Normalize through the pipeline
-        analysis = normalize_dish(
-            dish_name=dish_name,
-            raw_items=raw_items,
+        # Adapt the internal boundary back to the canonical engine contract.
+        analysis = adapt_resolved_input_to_dish_analysis(
+            resolved_input,
             llm_fn=llm_fn,
         )
 
