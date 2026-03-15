@@ -20,9 +20,12 @@ from trennkost.models import (
 )
 from trennkost.ontology import get_ontology, resolve_effective_group
 from trennkost.engine import evaluate_dish
+from trennkost.normalizer import normalize_dish
 from trennkost.resolved_input import (
     adapt_resolved_input_to_dish_analysis,
+    adapt_resolved_vision_input_to_dish_analysis,
     build_resolved_input,
+    build_resolved_vision_input,
 )
 
 logger = logging.getLogger(__name__)
@@ -549,31 +552,20 @@ def analyze_vision(
     Returns:
         List of TrennkostResult
     """
+    resolved_inputs = [build_resolved_vision_input(dish) for dish in vision_dishes]
     results = []
+    ontology = get_ontology()
 
-    for dish in vision_dishes:
-        name = dish.get("name", "Mahlzeit")
-        visible_items = dish.get("items", [])
-        uncertain = dish.get("uncertain_items", [])
-
-        # Build food items
-        ontology = get_ontology()
-        items = [ontology.lookup_to_food_item(i) for i in visible_items]
-        assumed = [
-            ontology.lookup_to_food_item(
-                i, assumed=True, assumption_reason="Auf dem Bild nicht sicher erkennbar"
-            )
-            for i in uncertain
-        ]
-        unknowns = [
-            i.raw_name for i in items + assumed if i.group == FoodGroup.UNKNOWN
-        ]
+    for resolved_input in resolved_inputs:
+        name = resolved_input.dish_name
+        uncertain = resolved_input.uncertain
+        analysis = adapt_resolved_vision_input_to_dish_analysis(
+            resolved_input,
+            mode=mode,
+        )
+        unknowns = analysis.unknown_items
 
         if mode == "strict":
-            analysis = DishAnalysis(
-                dish_name=name, items=items,
-                unknown_items=unknowns, assumed_items=[],
-            )
             result = evaluate_dish(analysis, mode=evaluation_mode)
             # Add uncertain items as questions — but skip irrelevant ones (herbs/spices)
             if uncertain:
@@ -605,16 +597,14 @@ def analyze_vision(
                     result.active_mode_verdict = Verdict.CONDITIONAL
                     result.summary = f"{name}: Bedingt OK — einige Zutaten unsicher."
         else:
-            analysis = DishAnalysis(
-                dish_name=name, items=items,
-                unknown_items=unknowns, assumed_items=assumed,
-            )
             result = evaluate_dish(analysis, mode=evaluation_mode)
 
         # LLM-classify any remaining unknowns
         if unknowns and llm_fn:
             analysis_with_llm = normalize_dish(
-                dish_name=name, raw_items=visible_items, llm_fn=llm_fn,
+                dish_name=name,
+                raw_items=resolved_input.explicit or None,
+                llm_fn=llm_fn,
             )
             result = evaluate_dish(analysis_with_llm, mode=evaluation_mode)
 
