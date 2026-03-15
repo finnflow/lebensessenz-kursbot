@@ -35,6 +35,7 @@ from trennkost.ontology import (
     get_ontology,
     resolve_combination_group,
 )
+from trennkost.health_recommendations import build_health_recommendation_problems
 
 logger = logging.getLogger(__name__)
 
@@ -254,22 +255,7 @@ class TrennkostEngine:
                 ))
 
         # ── Special health recommendations (not Trennkost rules) ────
-        # Zucker (refined white sugar) is Trennkost-conform but not recommended
-        zucker_items = [
-            item for item in all_items
-            if item.canonical and item.canonical.lower() == "zucker"
-        ]
-        if zucker_items:
-            zucker_labels = [f"{item.raw_name} → Zucker" for item in zucker_items]
-            problems.append(RuleProblem(
-                rule_id="H001",  # H = Health recommendation (not Trennkost rule)
-                description="Zucker (weißer Industriezucker) sollte vermieden werden",
-                severity=Severity.INFO,
-                affected_items=zucker_labels,
-                affected_groups=["KH"],
-                source_ref="modul-1.1,modul-1.2",
-                explanation="Zucker ist zwar Trennkost-konform als Kohlenhydrat, wird aber im Kursmaterial als schädlich beschrieben. Besser: Honig, Ahornsirup oder Kokosblütenzucker verwenden.",
-            ))
+        problems.extend(build_health_recommendation_problems(all_items))
 
         # ── Check for multiple PROTEIN subgroups (R018) ─────────────
         # Different protein sources (FLEISCH, FISCH, EIER) should not be combined
