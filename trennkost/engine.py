@@ -36,6 +36,7 @@ from trennkost.ontology import (
     resolve_combination_group,
 )
 from trennkost.health_recommendations import build_health_recommendation_problems
+from trennkost.protein_rules import build_r018_mixed_protein_problem
 
 logger = logging.getLogger(__name__)
 
@@ -257,32 +258,10 @@ class TrennkostEngine:
         # ── Special health recommendations (not Trennkost rules) ────
         problems.extend(build_health_recommendation_problems(all_items))
 
-        # ── Check for multiple PROTEIN subgroups (R018) ─────────────
-        # Different protein sources (FLEISCH, FISCH, EIER) should not be combined
-        protein_subgroups = subgroups_found.get(CombinationGroup.PROTEIN.value, set())
-        if len(protein_subgroups) >= 2:
-            # Group items by subgroup to show which protein types are mixed
-            subgroup_items = defaultdict(list)
-            for item in all_items:
-                if resolve_combination_group(item, mode=mode) == CombinationGroup.PROTEIN and item.subgroup:
-                    label = self._format_item_label(item)
-                    subgroup_items[item.subgroup.value].append(label)
-
-            # Build affected items list showing subgroups
-            affected_items = []
-            for subgroup in sorted(subgroup_items.keys()):
-                for item in subgroup_items[subgroup]:
-                    affected_items.append(f"{item} ({subgroup})")
-
-            problems.append(RuleProblem(
-                rule_id="R018",
-                description="Verschiedene Proteinquellen nicht kombinieren",
-                severity=Severity.CRITICAL,
-                affected_items=affected_items,
-                affected_groups=["PROTEIN"],
-                source_ref="modul-1.1/page-004,modul-1.1/page-001",
-                explanation="Pro Mahlzeit sollte nur EINE Art von konzentriertem Lebensmittel gewählt werden. Fisch/Fleisch/Eier sind unterschiedliche Proteinquellen und sollten nicht miteinander kombiniert werden. Das Verdauungssystem ist nicht dafür geschaffen, mehr als ein konzentriertes Lebensmittel gleichzeitig zu verdauen.",
-            ))
+        # ── Special deterministic protein rules ─────────────────────
+        r018_problem = build_r018_mixed_protein_problem(all_items, mode=mode)
+        if r018_problem is not None:
+            problems.append(r018_problem)
 
         # ── Build required questions ────────────────────────────────
         required_questions = self._build_questions(
