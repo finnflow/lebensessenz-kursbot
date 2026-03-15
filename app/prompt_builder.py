@@ -6,6 +6,10 @@ SYSTEM_INSTRUCTIONS lives here; mode-specific builders compose the user-side pro
 """
 from typing import Optional, List, Dict, Any
 
+from app.breakfast_policy import (
+    build_breakfast_block_lines,
+    build_breakfast_knowledge_instruction,
+)
 from app.grounding_policy import FALLBACK_SENTENCE
 from trennkost.models import TrennkostResult, Verdict, TrafficLight
 from trennkost.formatter import format_results_for_llm
@@ -194,24 +198,7 @@ def build_vision_legacy_block(vision_analysis: Dict[str, Any]) -> List[str]:
 
 def build_breakfast_block() -> List[str]:
     """Standalone breakfast guidance when no engine results."""
-    return [
-        "FRÜHSTÜCKS-HINWEIS (Kurs Modul 1.2):",
-        "Das Kursmaterial empfiehlt ein zweistufiges Frühstück:",
-        "  1. Frühstück: Frisches Obst ODER Grüner Smoothie (fettfrei)",
-        "     → Obst verdaut in 20-30 Min, Bananen/Trockenobst 45-60 Min",
-        "  2. Frühstück (falls 1. nicht reicht): Fettfreie Kohlenhydrate (max 1-2 TL Fett)",
-        "     → Empfehlungen: Overnight-Oats, Porridge, Reis-Pudding, Hirse-Grieß,",
-        "       glutenfreies Brot mit Gurke/Tomate + max 1-2 TL Avocado",
-        "",
-        "WARUM FETTARM VOR MITTAGS?",
-        "  Bis mittags läuft die Entgiftung des Körpers auf Hochtouren.",
-        "  Leichte Kost spart Verdauungsenergie → mehr Energie für Entgiftung/Entschlackung.",
-        "  Fettreiche Lebensmittel belasten die Verdauung und behindern diesen Prozess.",
-        "",
-        "ANWEISUNG: Erwähne das zweistufige Frühstücks-Konzept PROAKTIV in deiner Antwort!",
-        "Empfehle IMMER zuerst die fettarme Option (Obst/Smoothie, dann ggf. fettfreie KH).",
-        "",
-    ]
+    return build_breakfast_block_lines()
 
 
 def build_menu_followup_block() -> List[str]:
@@ -422,16 +409,7 @@ def build_prompt_knowledge(
     """Answer instructions for general knowledge queries."""
     breakfast_instruction = ""
     if is_breakfast:
-        breakfast_instruction = (
-            "- FRÜHSTÜCK-SPEZIFISCH (User fragt nach Frühstück!):\n"
-            "  Das Kursmaterial empfiehlt ein zweistufiges Frühstück:\n"
-            "  1. Frühstück: Frisches Obst ODER Grüner Smoothie (fettfrei)\n"
-            "     → Obst verdaut in 20-30 Min, dann 2. Frühstück möglich\n"
-            "  2. Frühstück: Fettfreie Kohlenhydrate (max 1-2 TL Fett)\n"
-            "     → Overnight-Oats, Porridge, Reis-Pudding, Hirse, glutenfreies Brot + Gemüse\n"
-            "  WARUM: Bis mittags läuft Entgiftung — fettarme Kost spart Verdauungsenergie.\n"
-            "  → Empfehle IMMER zuerst die fettarme Option. Bei Insistieren: erlaubt, aber mit Hinweis.\n"
-        )
+        breakfast_instruction = build_breakfast_knowledge_instruction()
 
     return (
         "ANTWORT (deutsch, natürlich, materialgebunden):\n"
