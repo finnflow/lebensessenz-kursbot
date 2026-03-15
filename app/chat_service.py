@@ -559,6 +559,19 @@ def _handle_recipe_from_ingredients_mode(
     return {"conversationId": conversation_id, "answer": response, "sources": []}
 
 
+def _prepare_analysis_query(
+    normalized_message: str,
+    recent: List[Dict[str, Any]],
+    mode: ChatMode,
+) -> str:
+    """Share the existing FOOD_ANALYSIS context-reference resolver path."""
+    if mode != ChatMode.FOOD_ANALYSIS:
+        return normalized_message
+
+    resolved = resolve_context_references(normalized_message, recent)
+    return resolved or normalized_message
+
+
 def _handle_food_analysis(
     conversation_id: str,
     normalized_message: str,
@@ -575,11 +588,7 @@ def _handle_food_analysis(
     Steps 3e + 4: context-reference resolution, Trennkost engine, then finalize.
     Handles FOOD_ANALYSIS, MENU_ANALYSIS, MENU_FOLLOWUP.
     """
-    analysis_query = normalized_message
-    if mode == ChatMode.FOOD_ANALYSIS:
-        resolved = resolve_context_references(normalized_message, recent)
-        if resolved:
-            analysis_query = resolved
+    analysis_query = _prepare_analysis_query(normalized_message, recent, mode)
 
     trennkost_results = _resolve_trennkost_results(
         conversation_id=conversation_id,
@@ -912,13 +921,9 @@ def _prepare_stream(
                 "sources": result.get("sources", []), "ui_intent": ui_intent}
 
     # Food analysis: run engine if applicable
-    analysis_query = normalized_message
+    analysis_query = _prepare_analysis_query(normalized_message, recent, mode)
     trennkost_results = None
     if mode in (ChatMode.FOOD_ANALYSIS, ChatMode.MENU_ANALYSIS, ChatMode.MENU_FOLLOWUP):
-        if mode == ChatMode.FOOD_ANALYSIS:
-            resolved = resolve_context_references(normalized_message, recent)
-            if resolved:
-                analysis_query = resolved
         trennkost_results = _resolve_trennkost_results(
             conversation_id=conversation_id,
             analysis_query=analysis_query,
