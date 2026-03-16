@@ -1,4 +1,4 @@
-"""Regression tests for extracted R018 mixed-protein rule handling."""
+"""Regression tests for subgroup-specific R018 mixed-protein handling."""
 import sys
 from pathlib import Path
 
@@ -29,7 +29,7 @@ def _protein_item(name: str, subgroup: FoodSubgroup) -> FoodItem:
     )
 
 
-def test_single_protein_subgroup_has_no_r018():
+def test_same_protein_subgroup_has_no_r018():
     items = [
         _protein_item("Hähnchen", FoodSubgroup.FLEISCH),
         _protein_item("Rindfleisch", FoodSubgroup.FLEISCH),
@@ -40,7 +40,7 @@ def test_single_protein_subgroup_has_no_r018():
     assert problem is None
 
 
-def test_two_protein_subgroups_create_exactly_one_r018():
+def test_distinct_protein_subgroups_emit_r018():
     items = [
         _protein_item("Hähnchen", FoodSubgroup.FLEISCH),
         _protein_item("Ei", FoodSubgroup.EIER),

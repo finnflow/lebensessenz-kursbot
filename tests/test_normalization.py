@@ -1,8 +1,48 @@
 """
 Test suite for input normalization with follow-up protection.
 """
+from types import SimpleNamespace
+
 import pytest
+import app.input_service as input_service
 from app.chat_service import normalize_input
+
+
+def _fake_response(content: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+    )
+
+
+def _extract_current_message(prompt: str) -> str:
+    return (
+        prompt.split("**Aktuelle Nachricht:**", 1)[1]
+        .split("**Normalisierte Nachricht:**", 1)[0]
+        .strip()
+    )
+
+
+@pytest.fixture(autouse=True)
+def stub_normalize_llm(monkeypatch):
+    canned_responses = {
+        "danm": "dann",
+        "Ist Resi mit Hähnchen ok?": "Ist Reis mit Hähnchen ok?",
+        "Is chicken with rice ok?": "Ist Hähnchen mit Reis ok?",
+        "Kann ich chicken mit Reis essen?": "Kann ich Hähnchen mit Reis essen?",
+        "Apfel 30 minuten vor Reis": "Apfel 30 min vor Reis",
+        "Apfel eine halbe Stunde vor Reis": "Apfel 30 min vor Reis",
+        "den Fisch": "den Fisch",
+        "ok": "ok",
+        "egal": "egal",
+        "Was kann ich essen": "Was kann ich essen?",
+    }
+
+    def fake_create(*args, **kwargs):
+        prompt = kwargs["messages"][0]["content"]
+        current_message = _extract_current_message(prompt)
+        return _fake_response(canned_responses.get(current_message, current_message))
+
+    monkeypatch.setattr(input_service.client.chat.completions, "create", fake_create)
 
 
 class TestTypoCorrection:
@@ -60,10 +100,9 @@ class TestFollowUpProtection:
         ]
         result = normalize_input("den Fisch", recent_messages, is_new_conversation=False)
 
-        # Should NOT be expanded to full sentence
-        # Should be short, just the food choice
-        assert len(result.split()) <= 5, f"Follow-up was over-expanded: '{result}'"
-        assert "fisch" in result.lower()
+        assert result == "den Fisch"
+        assert len(result.split()) == 2
+        assert not result.endswith("?")
 
     def test_ok_preserved(self):
         """'ok' should stay as is"""
@@ -72,8 +111,7 @@ class TestFollowUpProtection:
         ]
         result = normalize_input("ok", recent_messages, is_new_conversation=False)
 
-        # Should stay short
-        assert len(result) < 10, f"'ok' was over-expanded: '{result}'"
+        assert result == "ok"
 
     def test_egal_preserved(self):
         """'egal' should stay as is"""
@@ -82,25 +120,27 @@ class TestFollowUpProtection:
         ]
         result = normalize_input("egal", recent_messages, is_new_conversation=False)
 
-        # Should stay short
-        assert len(result) < 15, f"'egal' was over-expanded: '{result}'"
+        assert result == "egal"
 
     def test_standalone_expanded(self):
         """Standalone questions should be normalized/expanded"""
         # No context, new conversation
         result = normalize_input("Was kann ich essen", [], is_new_conversation=True)
 
-        # Should be normalized but not over-expanded (no 3x length increase)
-        assert len(result) > 0
-        # Should still be reasonable
+        assert result == "Was kann ich essen?"
         assert len(result) < len("Was kann ich essen") * 3
 
 
 class TestLongMessagesSkipped:
     """Test that long messages (>200 chars) skip normalization for performance."""
 
-    def test_long_message_unchanged(self):
+    def test_long_message_unchanged(self, monkeypatch):
         """Long messages should pass through unchanged"""
+        monkeypatch.setattr(
+            input_service.client.chat.completions,
+            "create",
+            lambda *args, **kwargs: pytest.fail("LLM should not be called for long inputs"),
+        )
         long_msg = "A" * 250
         result = normalize_input(long_msg, [], is_new_conversation=True)
         assert result == long_msg
@@ -109,15 +149,19 @@ class TestLongMessagesSkipped:
 class TestSafetyChecks:
     """Test safety mechanisms to prevent over-expansion."""
 
-    def test_3x_length_rejected(self):
+    def test_3x_length_rejected(self, monkeypatch):
         """If normalized is >3x original length, use original"""
-        # This test is hard to trigger, but the function should handle it
-        # If normalization somehow produces very long output, it should reject it
+        monkeypatch.setattr(
+            input_service.client.chat.completions,
+            "create",
+            lambda *args, **kwargs: _fake_response(
+                "Kann ich den Fisch zusammen mit einer großen Beilage und mehreren anderen Sachen essen?"
+            ),
+        )
         short_msg = "Fisch"
         result = normalize_input(short_msg, [], is_new_conversation=True)
 
-        # Result should not be wildly longer than input
-        assert len(result) < len(short_msg) * 3
+        assert result == short_msg
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""Regression tests for extracted H001 health recommendation handling."""
+"""Regression tests for extracted H001 health/helper recommendation handling."""
 import sys
 from pathlib import Path
 
@@ -18,7 +18,7 @@ def engine():
     return TrennkostEngine()
 
 
-def test_h001_created_once_when_sugar_is_present():
+def test_health_helper_emits_h001_when_sugar_is_present():
     items = [
         FoodItem(raw_name="Zucker", canonical="Zucker"),
         FoodItem(raw_name="Reis", canonical="Reis"),
@@ -50,7 +50,7 @@ def test_h001_aggregates_multiple_sugar_items_in_stable_order():
     ]
 
 
-def test_no_sugar_means_no_h001():
+def test_health_helper_skips_h001_without_sugar():
     items = [
         FoodItem(raw_name="Reis", canonical="Reis"),
         FoodItem(raw_name="Hähnchen", canonical="Hähnchen"),
@@ -61,7 +61,7 @@ def test_no_sugar_means_no_h001():
     assert problems == []
 
 
-def test_h001_severity_remains_info():
+def test_health_helper_marks_h001_as_info():
     items = [FoodItem(raw_name="Zucker", canonical="Zucker")]
 
     problem = build_h001_sugar_problem(items)
