@@ -334,6 +334,20 @@ def _build_rag_query(
     return expand_alias_terms(standalone_query)
 
 
+def _apply_legacy_vision_guardrail(
+    vision_data: Dict[str, Any],
+    trennkost_results: Optional[List[TrennkostResult]],
+) -> Dict[str, Any]:
+    """Keep legacy vision semantics out of downstream RAG/prompting once engine results exist."""
+    if not trennkost_results:
+        return vision_data
+
+    guarded_vision_data = dict(vision_data)
+    guarded_vision_data["vision_analysis"] = None
+    guarded_vision_data["food_groups"] = None
+    return guarded_vision_data
+
+
 def _build_prompt_parts(
     mode: ChatMode,
     modifiers: ChatModifiers,
@@ -693,12 +707,16 @@ def _finalize_response(
     if analysis_query is None:
         analysis_query = normalized_message
 
+    vision_data_for_downstream = _apply_legacy_vision_guardrail(
+        vision_data,
+        trennkost_results,
+    )
     summary      = conv_data.get("summary_text")
     last_messages = get_last_n_messages(conversation_id, LAST_N)
 
     # 6. Build RAG query + retrieve
     standalone_query = _build_rag_query(
-        trennkost_results, vision_data.get("food_groups"),
+        trennkost_results, vision_data_for_downstream.get("food_groups"),
         image_path, summary, last_messages, normalized_message,
         modifiers.is_breakfast,
     )
@@ -746,7 +764,7 @@ def _finalize_response(
 
     # 8. Build prompt
     prompt_parts, answer_instructions = _build_prompt_parts(
-        mode, modifiers, trennkost_results, vision_data,
+        mode, modifiers, trennkost_results, vision_data_for_downstream,
         summary, last_messages, analysis_query, recipe_results,
         ui_intent=ui_intent,
     )
