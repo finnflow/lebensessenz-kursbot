@@ -25,6 +25,10 @@ class ResolvedInput:
     unknown: List[str] = field(default_factory=list)
 
 
+def _normalized_key(name: str) -> str:
+    return name.strip().lower()
+
+
 def build_resolved_input(parsed_dish: Dict[str, Any]) -> ResolvedInput:
     """
     Lift the existing text parser output into the internal boundary model.
@@ -74,6 +78,8 @@ def adapt_resolved_vision_input_to_dish_analysis(
     """
     ontology = get_ontology()
     items = [ontology.lookup_to_food_item(name) for name in resolved_input.explicit]
+    explicit_keys = {_normalized_key(item.raw_name) for item in items}
+
     assumed_items = [
         ontology.lookup_to_food_item(
             name,
@@ -91,13 +97,37 @@ def adapt_resolved_vision_input_to_dish_analysis(
         for name in resolved_input.uncertain
     ]
 
-    analysis_assumed_items = [] if mode == "strict" else assumed_items + uncertain_items
-    unknown_items = [
-        item.raw_name
-        for item in items + assumed_items + uncertain_items
-        if item.group == FoodGroup.UNKNOWN
-    ]
-    unknown_items.extend(resolved_input.unknown)
+    boundary_candidates = assumed_items + uncertain_items
+    deduped_assumed_items = []
+    seen_assumed_keys = set()
+    for item in boundary_candidates:
+        key = _normalized_key(item.raw_name)
+        if key in explicit_keys or key in seen_assumed_keys:
+            continue
+        if item.group == FoodGroup.UNKNOWN:
+            continue
+        seen_assumed_keys.add(key)
+        deduped_assumed_items.append(item)
+
+    analysis_assumed_items = [] if mode == "strict" else deduped_assumed_items
+
+    unknown_items = []
+    seen_unknown_keys = set()
+    for item in items + boundary_candidates:
+        if item.group != FoodGroup.UNKNOWN:
+            continue
+        key = _normalized_key(item.raw_name)
+        if key in seen_unknown_keys:
+            continue
+        seen_unknown_keys.add(key)
+        unknown_items.append(item.raw_name)
+
+    for raw_name in resolved_input.unknown:
+        key = _normalized_key(raw_name)
+        if key in seen_unknown_keys:
+            continue
+        seen_unknown_keys.add(key)
+        unknown_items.append(raw_name)
 
     return DishAnalysis(
         dish_name=resolved_input.dish_name,
