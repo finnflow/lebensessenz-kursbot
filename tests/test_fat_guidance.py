@@ -18,11 +18,11 @@ def engine():
     return TrennkostEngine()
 
 
-def test_fat_and_fruit_stays_not_ok(engine):
+def test_fat_and_fruit_is_conditional(engine):
     analysis = normalize_dish("Test", raw_items=["Apfel", "Olivenöl"])
     result = engine.evaluate(analysis)
 
-    assert result.verdict == Verdict.NOT_OK
+    assert result.verdict == Verdict.CONDITIONAL
     assert any(problem.rule_id == "R014" for problem in result.problems)
     assert result.guidance_codes == []
 

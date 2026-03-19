@@ -96,8 +96,8 @@ ENGINE_GOLD_CASES_P0 = [
     {
         "id": "apfel_oel_not_ok",
         "raw_items": ["Apfel", "Olivenöl"],
-        "strict_verdict": "NOT_OK",
-        "light_verdict": "NOT_OK",
+        "strict_verdict": "CONDITIONAL",
+        "light_verdict": "CONDITIONAL",
         "mode_relaxation_applied": False,
         "traffic_light_exact": None,
         "must_have_risk_codes": set(),
@@ -137,7 +137,7 @@ ENGINE_GOLD_CASES_P1 = [
     {
         "id": "banane_mandeln_light_relaxed",
         "raw_items": ["Banane", "Mandeln"],
-        "strict_verdict": "NOT_OK",
+        "strict_verdict": "CONDITIONAL",
         "light_verdict": "OK",
         "mode_relaxation_applied": True,
         "traffic_light_exact": None,
@@ -149,7 +149,7 @@ ENGINE_GOLD_CASES_P1 = [
     {
         "id": "dattel_mandeln_light_relaxed",
         "raw_items": ["Dattel", "Mandeln"],
-        "strict_verdict": "NOT_OK",
+        "strict_verdict": "CONDITIONAL",
         "light_verdict": "OK",
         "mode_relaxation_applied": True,
         "traffic_light_exact": None,

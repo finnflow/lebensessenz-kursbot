@@ -77,7 +77,8 @@ SUMMARY_GROUP_LABELS = {
     CombinationGroup.FETT.value: "Fette",
 }
 
-MODE_RELAXATION_CODE = "LIGHT_MODE_RELAXED"
+# TODO(vollwert-mode): legacy "light" naming left in place intentionally; rename fully later without changing logic.
+VOLLWERT_MODE_RELAXATION_CODE = "LIGHT_MODE_RELAXED"
 
 
 class TrennkostEngine:
@@ -139,10 +140,10 @@ class TrennkostEngine:
         traffic_light = self._aggregate_traffic_light(risk_facts)
 
         mode_relaxation_applied = (
-            active_mode == EvaluationMode.LIGHT
+            active_mode == EvaluationMode.VOLLWERT
             and active_result["verdict"] != strict_result["verdict"]
         )
-        mode_delta_codes = [MODE_RELAXATION_CODE] if mode_relaxation_applied else []
+        mode_delta_codes = [VOLLWERT_MODE_RELAXATION_CODE] if mode_relaxation_applied else []
 
         return TrennkostResult(
             dish_name=analysis.dish_name,

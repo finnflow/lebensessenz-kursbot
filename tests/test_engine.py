@@ -155,6 +155,28 @@ class TestRuleEngine:
         result = engine.evaluate(analysis)
         assert result.verdict == Verdict.NOT_OK
 
+    def test_obst_fett_conditional(self, engine, ontology):
+        """R014: OBST + FETT → CONDITIONAL"""
+        analysis = self._make_analysis("Test", ["Apfel", "Olivenöl"], ontology)
+        result = engine.evaluate(analysis)
+        assert result.verdict == Verdict.CONDITIONAL
+        assert any(p.rule_id == "R014" for p in result.problems)
+        assert all(p.severity.name == "WARNING" for p in result.problems if p.rule_id == "R014")
+
+    def test_milch_milch_not_ok(self, engine, ontology):
+        """R019: MILCH + MILCH → NOT_OK"""
+        analysis = self._make_analysis("Test", ["Joghurt", "Parmesan"], ontology)
+        result = engine.evaluate(analysis)
+        assert result.verdict == Verdict.NOT_OK
+        assert any(p.rule_id == "R019" for p in result.problems)
+
+    def test_huelse_huelse_not_ok(self, engine, ontology):
+        """R020: HUELSENFRUECHTE + HUELSENFRUECHTE → NOT_OK"""
+        analysis = self._make_analysis("Test", ["Linsen", "Kichererbsen"], ontology)
+        result = engine.evaluate(analysis)
+        assert result.verdict == Verdict.NOT_OK
+        assert any(p.rule_id == "R020" for p in result.problems)
+
     def test_smoothie_ok(self, engine, ontology):
         """R012: OBST + BLATTGRUEN → OK (Smoothie-Ausnahme)"""
         analysis = self._make_analysis("Smoothie", ["Banane", "Spinat"], ontology)

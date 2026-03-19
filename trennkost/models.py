@@ -26,7 +26,7 @@ class FoodGroup(str, Enum):
 
 
 class CombinationGroup(str, Enum):
-    """Target grouping model for future strict/light combination logic."""
+    """Target grouping model for future strict/vollwert combination logic."""
     FRUIT_WATERY = "FRUIT_WATERY"
     FRUIT_DENSE = "FRUIT_DENSE"
     DRIED_FRUIT = "DRIED_FRUIT"
@@ -91,7 +91,15 @@ class TrafficLight(str, Enum):
 
 class EvaluationMode(str, Enum):
     STRICT = "strict"
+    VOLLWERT = "light"
+    # TODO(vollwert-mode): legacy "light" naming left in place intentionally; rename fully later without changing logic.
     LIGHT = "light"
+
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str) and value.strip().lower() == "vollwert":
+            return cls.VOLLWERT
+        return super()._missing_(value)
 
 
 class ModifierTag(str, Enum):
@@ -131,6 +139,7 @@ class FoodItem(BaseModel):
     subgroup: Optional[FoodSubgroup] = None
     food_family: Optional[str] = None
     group_strict: Optional[CombinationGroup] = None
+    # TODO(vollwert-mode): legacy "light" naming left in place intentionally; rename fully later without changing logic.
     group_light: Optional[CombinationGroup] = None
     post_meal_wait_profile: Optional[str] = None
     modifier_policy: Optional[str] = None
@@ -253,6 +262,7 @@ class OntologyEntry(BaseModel):
     group: FoodGroup = FoodGroup.UNKNOWN
     subgroup: Optional[FoodSubgroup] = None
     group_strict: Optional[CombinationGroup] = None
+    # TODO(vollwert-mode): legacy "light" naming left in place intentionally; rename fully later without changing logic.
     group_light: Optional[CombinationGroup] = None
     post_meal_wait_profile: Optional[str] = None
     modifier_policy: Optional[str] = None

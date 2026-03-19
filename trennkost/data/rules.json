@@ -58,6 +58,24 @@
       "explanation": "Pro Mahlzeit sollte nur EINE Art von konzentriertem Lebensmittel gewählt werden. Fisch/Fleisch/Eier und Milchprodukte sind beide konzentrierte Proteinquellen und sollten nicht kombiniert werden."
     },
     {
+      "rule_id": "R019",
+      "description": "Mehrere Milchprodukte nicht kombinieren",
+      "condition": {"pair": ["MILCH", "MILCH"]},
+      "verdict": "NOT_OK",
+      "severity": "CRITICAL",
+      "source_ref": "modul-1.1/page-004",
+      "explanation": "Milchprodukte zählen zu den konzentrierten Lebensmitteln. Pro Mahlzeit sollte nur EINE konzentrierte Milch-Komponente gewählt werden."
+    },
+    {
+      "rule_id": "R020",
+      "description": "Mehrere Hülsenfrüchte nicht kombinieren",
+      "condition": {"pair": ["HUELSENFRUECHTE", "HUELSENFRUECHTE"]},
+      "verdict": "NOT_OK",
+      "severity": "CRITICAL",
+      "source_ref": "modul-1.1/page-004,modul-1.1/page-006",
+      "explanation": "Hülsenfrüchte sind schwer verdaulich und sollen in einer Mahlzeit nicht untereinander kombiniert werden. Sie bleiben für diesen MVP nur mit Gemüse/Salat und kleinen Mengen Fett vorgesehen."
+    },
+    {
       "rule_id": "R007",
       "description": "Obst nicht mit Kohlenhydraten kombinieren",
       "condition": {"pair": ["OBST", "KH"]},
@@ -114,12 +132,12 @@
     },
     {
       "rule_id": "R014",
-      "description": "Obst + Fett vermeiden",
+      "description": "Obst + Fett mengen-sensitiv beurteilen",
       "condition": {"pair": ["OBST", "FETT"]},
-      "verdict": "NOT_OK",
-      "severity": "CRITICAL",
+      "verdict": "CONDITIONAL",
+      "severity": "WARNING",
       "source_ref": "modul-1.2/page-002",
-      "explanation": "Obst sollte möglichst pur genossen werden. Fettquellen verlangsamen die schnelle Verdauung von Obst. Beim Frühstück gilt: möglichst ohne Fett (max. 1-2 TL Nussmus in einem anschließenden Frühstück sind OK, aber nicht direkt MIT dem Obst)."
+      "explanation": "Obst sollte möglichst pur genossen werden. Kleine Fettmengen bis ca. 1 TL sind noch okay; bei mehr bzw. unklarer Menge bleibt die Kombination nur bedingt empfehlenswert, weil Fett die schnelle Verdauung von Obst verlangsamt."
     },
     {
       "rule_id": "R015",
@@ -160,7 +178,7 @@
   ],
 
   "rule_priority": [
-    "R001", "R002", "R003", "R004", "R005", "R006",
+    "R001", "R002", "R003", "R004", "R005", "R006", "R019", "R020",
     "R007", "R008", "R009", "R010",
     "R012", "R013", "R014",
     "R015", "R016",
@@ -168,7 +186,7 @@
   ],
 
   "_notes": {
-    "pair_rules": "R001-R010 plus fruit/fat and smoothie checks are evaluated before OK notes.",
+    "pair_rules": "R001-R010 plus targeted same-group, fruit/fat, and smoothie checks are evaluated before OK notes.",
     "ok_rules": "R012-R016: Explicitly allowed combinations or compatibility notes.",
     "conditional": "R050-R051: Uncertainty flags.",
     "priority": "Higher severity wins. CRITICAL > WARNING > INFO. NOT_OK > CONDITIONAL > OK.",

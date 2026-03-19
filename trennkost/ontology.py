@@ -47,7 +47,7 @@ STRICT_GROUP_DEFAULTS: Dict[FoodGroup, CombinationGroup] = {
     FoodGroup.UNKNOWN: CombinationGroup.UNKNOWN,
 }
 
-LIGHT_GROUP_DEFAULTS: Dict[FoodGroup, CombinationGroup] = {
+VOLLWERT_GROUP_DEFAULTS: Dict[FoodGroup, CombinationGroup] = {
     FoodGroup.OBST: CombinationGroup.FRUIT_WATERY,
     FoodGroup.TROCKENOBST: CombinationGroup.KH,
     FoodGroup.NEUTRAL: CombinationGroup.NEUTRAL,
@@ -101,7 +101,7 @@ def resolve_combination_group(
     if evaluation_mode == EvaluationMode.STRICT:
         return item.group_strict or STRICT_GROUP_DEFAULTS.get(item.group, CombinationGroup.UNKNOWN)
 
-    return item.group_light or LIGHT_GROUP_DEFAULTS.get(item.group, CombinationGroup.UNKNOWN)
+    return item.group_light or VOLLWERT_GROUP_DEFAULTS.get(item.group, CombinationGroup.UNKNOWN)
 
 
 def resolve_strict_combination_group(
@@ -293,6 +293,7 @@ class Ontology:
                 f"Ontology row {line_number} for '{canonical}' has unknown strict group '{group_strict_raw}'"
             )
 
+        # TODO(vollwert-mode): legacy "light" naming left in place intentionally; rename fully later without changing logic.
         group_light_raw = (row.get("group_light") or "").strip()
         if group_light_raw and group_light_raw not in CombinationGroup._value2member_map_:
             self._record_issue(
@@ -309,7 +310,7 @@ class Ontology:
         )
         group_light = self._parse_combination_group(
             row.get("group_light"),
-            fallback=LIGHT_GROUP_DEFAULTS[group],
+            fallback=VOLLWERT_GROUP_DEFAULTS[group],
         )
         risk_codes = self._parse_csv_list(row.get("risk_codes"))
         guidance_codes = self._parse_csv_list(row.get("guidance_codes"))
