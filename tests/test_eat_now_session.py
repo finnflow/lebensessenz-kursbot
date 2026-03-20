@@ -10,7 +10,7 @@ import app.chat_service as chat_service
 import app.database as database
 import app.migrations as migrations
 from app.chat_modes import ChatMode, ChatModifiers, detect_chat_mode
-from app.eat_now_session import apply_session_action
+from app.eat_now_session import apply_session_action, build_menu_matrix, build_session_payload
 from trennkost.models import RequiredQuestion, TrafficLight, TrennkostResult, Verdict
 
 
@@ -130,9 +130,10 @@ def test_menu_analysis_creates_session_and_persists_active_state(monkeypatch):
         "Gebratene Nudeln",
     ]
     assert [dish["rank"] for dish in session["dishMatrix"]] == [1, 2, 3]
-    assert [dish["label"] for dish in session["visibleOptions"]] == [
-        "Seetangsalat",
-        "Miso Tofu Suppe",
+    assert [option["action"] for option in session["visibleOptions"]] == [
+        "other_option",
+        "more_trennkost",
+        "waiter_phrase",
     ]
 
     active_state = database.get_active_menu_state(conversation_id)
@@ -276,6 +277,40 @@ def test_waiter_phrase_is_deterministic():
     )
 
 
+def test_visible_options_only_expose_session_actions_with_correct_visibility():
+    single_recommendable_payload = build_session_payload(
+        "menu_one",
+        "dish_01",
+        build_menu_matrix(
+            [
+                _make_result("Seetangsalat", Verdict.OK, TrafficLight.GREEN),
+                _make_result("Gebratene Nudeln", Verdict.NOT_OK, TrafficLight.RED),
+            ]
+        ),
+    )
+    multiple_recommendable_payload = build_session_payload(
+        "menu_two",
+        "dish_01",
+        build_menu_matrix(
+            [
+                _make_result("Seetangsalat", Verdict.OK, TrafficLight.GREEN),
+                _make_result("Miso Tofu Suppe", Verdict.CONDITIONAL, TrafficLight.YELLOW, has_open_question=True),
+                _make_result("Gebratene Nudeln", Verdict.NOT_OK, TrafficLight.RED),
+            ]
+        ),
+    )
+
+    assert [option["action"] for option in single_recommendable_payload["visibleOptions"]] == [
+        "more_trennkost",
+        "waiter_phrase",
+    ]
+    assert [option["action"] for option in multiple_recommendable_payload["visibleOptions"]] == [
+        "other_option",
+        "more_trennkost",
+        "waiter_phrase",
+    ]
+
+
 def test_chat_endpoint_allows_empty_message_for_session_action(monkeypatch):
     seen = {}
 
@@ -291,11 +326,11 @@ def test_chat_endpoint_allows_empty_message_for_session_action(monkeypatch):
             "conversationId": conversation_id or "conv-test",
             "answer": "Session answer",
             "sources": [],
-            "session": {
-                "type": "eat_now",
-                "menuStateId": "menu_active",
-                "focusDishKey": "dish_01",
-                "dishMatrix": [
+                "session": {
+                    "type": "eat_now",
+                    "menuStateId": "menu_active",
+                    "focusDishKey": "dish_01",
+                    "dishMatrix": [
                     {
                         "dishKey": "dish_01",
                         "label": "Seetangsalat",
@@ -304,19 +339,14 @@ def test_chat_endpoint_allows_empty_message_for_session_action(monkeypatch):
                         "trafficLight": "GREEN",
                         "hasOpenQuestion": False,
                     }
-                ],
-                "visibleOptions": [
-                    {
-                        "dishKey": "dish_01",
-                        "label": "Seetangsalat",
-                        "rank": 1,
-                        "verdict": "OK",
-                        "trafficLight": "GREEN",
-                        "hasOpenQuestion": False,
-                    }
-                ],
-            },
-        }
+                    ],
+                    "visibleOptions": [
+                        {"action": "other_option"},
+                        {"action": "more_trennkost"},
+                        {"action": "waiter_phrase"},
+                    ],
+                },
+            }
 
     monkeypatch.setattr(main, "handle_chat", _fake_handle_chat)
 

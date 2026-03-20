@@ -69,15 +69,20 @@ def derive_visible_options(
     dish_matrix: List[Dict[str, Any]],
     focus_dish_key: str,
 ) -> List[Dict[str, Any]]:
-    """Return the focused dish plus the remaining recommendable alternatives."""
-    focus_dish = _find_dish(dish_matrix, focus_dish_key)
-    visible_options = [focus_dish]
+    """Return the visible follow-up actions for the current eat-now focus."""
+    _find_dish(dish_matrix, focus_dish_key)
 
-    for dish in dish_matrix:
-        if dish["dishKey"] == focus_dish_key:
-            continue
-        if _is_recommendable(dish):
-            visible_options.append(dish)
+    visible_options = [
+        {"action": "more_trennkost"},
+        {"action": "waiter_phrase"},
+    ]
+
+    has_other_recommendable = any(
+        dish["dishKey"] != focus_dish_key and _is_recommendable(dish)
+        for dish in dish_matrix
+    )
+    if has_other_recommendable:
+        visible_options.insert(0, {"action": "other_option"})
 
     return visible_options
 
@@ -99,7 +104,7 @@ def build_session_payload(
         "menuStateId": menu_state_id,
         "focusDishKey": focus_dish_key,
         "dishMatrix": [_with_rank(dish, rank_lookup) for dish in dish_matrix],
-        "visibleOptions": [_with_rank(dish, rank_lookup) for dish in visible_options],
+        "visibleOptions": visible_options,
     }
 
 

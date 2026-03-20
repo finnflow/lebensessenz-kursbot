@@ -132,12 +132,16 @@ class EatNowDishResponse(BaseModel):
     hasOpenQuestion: bool
 
 
+class EatNowVisibleOptionResponse(BaseModel):
+    action: Literal["other_option", "more_trennkost", "waiter_phrase"]
+
+
 class EatNowSessionResponse(BaseModel):
     type: Literal["eat_now"]
     menuStateId: str
     focusDishKey: str
     dishMatrix: List[EatNowDishResponse]
-    visibleOptions: List[EatNowDishResponse]
+    visibleOptions: List[EatNowVisibleOptionResponse]
 
 
 class ChatRequest(BaseModel):
