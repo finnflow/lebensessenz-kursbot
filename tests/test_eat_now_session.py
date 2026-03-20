@@ -222,7 +222,47 @@ def test_other_option_switches_focus_correctly_without_persisting_empty_message(
     assert response["session"]["focusDishKey"] == "dish_02"
     assert response["answer"] == 'Eine weitere empfehlbare Option ist "Miso Tofu Suppe".'
     assert database.get_active_menu_state(conversation_id)["focus_dish_key"] == "dish_02"
-    assert database.get_messages(conversation_id) == []
+    messages = database.get_messages(conversation_id)
+    assert len(messages) == 1
+    assert messages[0]["role"] == "assistant"
+    assert messages[0]["content"] == 'Eine weitere empfehlbare Option ist "Miso Tofu Suppe".'
+
+
+def test_session_action_uses_summary_check_after_persisting_assistant_message(monkeypatch):
+    conversation_id = database.create_conversation()
+    dish_matrix = chat_service.build_menu_matrix(_make_menu_matrix())
+    database.save_active_menu_state(conversation_id, "menu_active", "dish_01", dish_matrix)
+    seen = {}
+
+    def _should_update_summary(conv_id, conv_data):
+        seen["should_conv_id"] = conv_id
+        seen["message_count_at_check"] = len(database.get_messages(conv_id))
+        return True
+
+    def _update_summary(conv_id, conv_data):
+        seen["update_conv_id"] = conv_id
+        seen["message_count_at_update"] = len(database.get_messages(conv_id))
+
+    monkeypatch.setattr(chat_service, "should_update_summary", _should_update_summary)
+    monkeypatch.setattr(chat_service, "update_conversation_summary", _update_summary)
+
+    response = chat_service.handle_chat(
+        conversation_id=conversation_id,
+        user_message="",
+        session={
+            "type": "eat_now",
+            "menuStateId": "menu_active",
+            "sessionAction": "waiter_phrase",
+        },
+    )
+
+    assert response["answer"] == 'Ich nehme bitte "Seetangsalat".'
+    assert seen == {
+        "should_conv_id": conversation_id,
+        "message_count_at_check": 1,
+        "update_conv_id": conversation_id,
+        "message_count_at_update": 1,
+    }
 
 
 def test_more_trennkost_jumps_to_best_option_then_confirms_current_focus():
@@ -377,6 +417,46 @@ def test_chat_endpoint_allows_empty_message_for_session_action(monkeypatch):
             "menuStateId": "menu_active",
             "sessionAction": "waiter_phrase",
         },
+    }
+
+
+def test_chat_image_endpoint_allows_empty_message_with_image_and_eat_intent(monkeypatch):
+    seen = {}
+
+    def _fake_save_image(file_content, filename):
+        seen["saved_image"] = (filename, file_content)
+        return "/tmp/menu.jpg"
+
+    def _fake_handle_chat(conversation_id, user_message, guest_id=None, image_path=None, intent=None, session=None):
+        seen["handle_chat"] = {
+            "conversation_id": conversation_id,
+            "user_message": user_message,
+            "image_path": image_path,
+            "intent": intent,
+        }
+        return {
+            "conversationId": conversation_id or "conv-image",
+            "answer": "Bild analysiert",
+            "sources": [],
+        }
+
+    monkeypatch.setattr(main, "save_image", _fake_save_image)
+    monkeypatch.setattr(main, "handle_chat", _fake_handle_chat)
+
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/api/v1/chat/image",
+            data={"message": "", "intent": "eat"},
+            files={"image": ("menu.jpg", b"fake-image", "image/jpeg")},
+        )
+
+    assert response.status_code == 200
+    assert seen["saved_image"] == ("menu.jpg", b"fake-image")
+    assert seen["handle_chat"] == {
+        "conversation_id": None,
+        "user_message": "",
+        "image_path": "/tmp/menu.jpg",
+        "intent": "eat",
     }
 
 

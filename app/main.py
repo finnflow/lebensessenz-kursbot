@@ -19,7 +19,7 @@ from app.migrations import run_migrations
 from app.auth import router as auth_router
 from app.entitlements import router as entitlements_router
 from app.clients import MODEL, TOP_K, LAST_N, SUMMARY_THRESHOLD
-from app.chat_service import handle_chat, handle_chat_stream_async
+from app.chat_service import handle_chat, handle_chat_stream_async, normalize_ui_intent
 from app.eat_now_session import EatNowSessionClientError
 from app.image_handler import save_image, ImageValidationError
 from app.feedback_service import export_feedback
@@ -270,7 +270,7 @@ async def chat_stream(request: ChatRequest):
 @app.post("/chat/image", response_model=ChatResponse, response_model_exclude_none=True)
 @app.post("/api/v1/chat/image", response_model=ChatResponse, response_model_exclude_none=True)
 async def chat_with_image(
-    message: str = Form(...),
+    message: str = Form(""),
     conversationId: Optional[str] = Form(None),
     guestId: Optional[str] = Form(None),
     intent: Optional[str] = Form(None),
@@ -280,7 +280,7 @@ async def chat_with_image(
     Chat endpoint with optional image upload for meal analysis.
 
     Supports multipart/form-data with:
-    - message: User question/message (required)
+    - message: User question/message (optional for image + intent=eat)
     - conversationId: Existing conversation ID (optional)
     - guestId: Guest identifier (optional)
     - image: Image file (JPG, PNG, HEIC, WebP) (optional)
@@ -291,7 +291,8 @@ async def chat_with_image(
     - Generates Trennkost-based evaluation
     """
     message = message.strip()
-    if not message:
+    allow_empty_image_message = bool(image and normalize_ui_intent(intent) == "eat")
+    if not message and not allow_empty_image_message:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     image_path = None

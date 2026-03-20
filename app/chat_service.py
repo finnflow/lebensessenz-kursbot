@@ -635,6 +635,11 @@ def _handle_eat_now_session_action(
         update_active_menu_focus(conversation_id, updated_focus_dish_key)
         menu_state["focus_dish_key"] = updated_focus_dish_key
 
+    create_message(conversation_id, "assistant", answer_text)
+    conv_data_updated = get_conversation(conversation_id)
+    if conv_data_updated and should_update_summary(conversation_id, conv_data_updated):
+        update_conversation_summary(conversation_id, conv_data_updated)
+
     return {
         "conversationId": conversation_id,
         "answer": answer_text,
@@ -904,7 +909,7 @@ def handle_chat(
 
     # ── Intent shortcut: empty message + valid intent → first question ──
     # Returns a fixed opening question without any LLM call or user message row.
-    if user_message.strip() == "" and ui_intent in _VALID_INTENTS:
+    if user_message.strip() == "" and ui_intent in _VALID_INTENTS and not image_path:
         if not conversation_id:
             conversation_id = create_conversation(guest_id=guest_id)
         if guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
