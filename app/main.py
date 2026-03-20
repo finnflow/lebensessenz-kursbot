@@ -133,7 +133,8 @@ class EatNowDishResponse(BaseModel):
 
 
 class EatNowVisibleOptionResponse(BaseModel):
-    action: Literal["other_option", "more_trennkost", "waiter_phrase"]
+    id: Literal["other_option", "more_trennkost", "waiter_phrase"]
+    label: str
 
 
 class EatNowSessionResponse(BaseModel):

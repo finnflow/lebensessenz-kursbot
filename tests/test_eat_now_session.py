@@ -101,6 +101,10 @@ def _make_menu_matrix():
     ]
 
 
+def _visible_option(option_id: str, label: str):
+    return {"id": option_id, "label": label}
+
+
 def test_menu_analysis_creates_session_and_persists_active_state(monkeypatch):
     conversation_id = database.create_conversation()
     results = _make_menu_matrix()
@@ -130,10 +134,10 @@ def test_menu_analysis_creates_session_and_persists_active_state(monkeypatch):
         "Gebratene Nudeln",
     ]
     assert [dish["rank"] for dish in session["dishMatrix"]] == [1, 2, 3]
-    assert [option["action"] for option in session["visibleOptions"]] == [
-        "other_option",
-        "more_trennkost",
-        "waiter_phrase",
+    assert session["visibleOptions"] == [
+        _visible_option("other_option", "Etwas anderes"),
+        _visible_option("more_trennkost", "Trennkost-näher"),
+        _visible_option("waiter_phrase", "So dem Kellner sagen"),
     ]
 
     active_state = database.get_active_menu_state(conversation_id)
@@ -300,14 +304,14 @@ def test_visible_options_only_expose_session_actions_with_correct_visibility():
         ),
     )
 
-    assert [option["action"] for option in single_recommendable_payload["visibleOptions"]] == [
-        "more_trennkost",
-        "waiter_phrase",
+    assert single_recommendable_payload["visibleOptions"] == [
+        _visible_option("more_trennkost", "Trennkost-näher"),
+        _visible_option("waiter_phrase", "So dem Kellner sagen"),
     ]
-    assert [option["action"] for option in multiple_recommendable_payload["visibleOptions"]] == [
-        "other_option",
-        "more_trennkost",
-        "waiter_phrase",
+    assert multiple_recommendable_payload["visibleOptions"] == [
+        _visible_option("other_option", "Etwas anderes"),
+        _visible_option("more_trennkost", "Trennkost-näher"),
+        _visible_option("waiter_phrase", "So dem Kellner sagen"),
     ]
 
 
@@ -341,9 +345,9 @@ def test_chat_endpoint_allows_empty_message_for_session_action(monkeypatch):
                     }
                     ],
                     "visibleOptions": [
-                        {"action": "other_option"},
-                        {"action": "more_trennkost"},
-                        {"action": "waiter_phrase"},
+                        _visible_option("other_option", "Etwas anderes"),
+                        _visible_option("more_trennkost", "Trennkost-näher"),
+                        _visible_option("waiter_phrase", "So dem Kellner sagen"),
                     ],
                 },
             }

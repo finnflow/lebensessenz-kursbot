@@ -14,6 +14,11 @@ class EatNowSessionClientError(Exception):
 
 
 _RECOMMENDABLE_VERDICTS = {Verdict.OK.value, Verdict.CONDITIONAL.value}
+_VISIBLE_OPTION_LABELS = {
+    "other_option": "Etwas anderes",
+    "more_trennkost": "Trennkost-näher",
+    "waiter_phrase": "So dem Kellner sagen",
+}
 
 
 def _find_dish(dish_matrix: List[Dict[str, Any]], dish_key: str) -> Dict[str, Any]:
@@ -73,8 +78,8 @@ def derive_visible_options(
     _find_dish(dish_matrix, focus_dish_key)
 
     visible_options = [
-        {"action": "more_trennkost"},
-        {"action": "waiter_phrase"},
+        {"id": "more_trennkost", "label": _VISIBLE_OPTION_LABELS["more_trennkost"]},
+        {"id": "waiter_phrase", "label": _VISIBLE_OPTION_LABELS["waiter_phrase"]},
     ]
 
     has_other_recommendable = any(
@@ -82,7 +87,7 @@ def derive_visible_options(
         for dish in dish_matrix
     )
     if has_other_recommendable:
-        visible_options.insert(0, {"action": "other_option"})
+        visible_options.insert(0, {"id": "other_option", "label": _VISIBLE_OPTION_LABELS["other_option"]})
 
     return visible_options
 
