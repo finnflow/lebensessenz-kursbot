@@ -105,6 +105,29 @@ def _visible_option(option_id: str, label: str):
     return {"id": option_id, "label": label}
 
 
+def _assert_recommendation_ready_session(session):
+    assert session["type"] == "eat_now"
+    assert session["menuStateId"]
+    assert session["focusDishKey"]
+    assert session["dishMatrix"]
+    assert session["visibleOptions"]
+
+
+def _derive_primary_and_secondary(session):
+    primary = next(
+        dish for dish in session["dishMatrix"] if dish["dishKey"] == session["focusDishKey"]
+    )
+    secondary = next(
+        (
+            dish
+            for dish in session["dishMatrix"]
+            if dish["dishKey"] != session["focusDishKey"] and dish["verdict"] != "NOT_OK"
+        ),
+        None,
+    )
+    return primary, secondary
+
+
 def test_menu_analysis_creates_session_and_persists_active_state(monkeypatch):
     conversation_id = database.create_conversation()
     results = _make_menu_matrix()
@@ -149,6 +172,85 @@ def test_menu_analysis_creates_session_and_persists_active_state(monkeypatch):
         "Gebratene Nudeln",
     ]
     assert all("rank" not in dish for dish in active_state["dish_matrix"])
+
+
+def test_handle_chat_returns_recommendation_ready_session_for_pasted_menu_text(monkeypatch):
+    def _fake_resolve_trennkost_results(**kwargs):
+        assert kwargs["mode"] == ChatMode.MENU_ANALYSIS
+        return _make_menu_matrix()
+
+    monkeypatch.setattr(chat_service, "normalize_input", lambda user_message, *_args: user_message)
+    monkeypatch.setattr(chat_service, "classify_intent", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(chat_service, "_resolve_trennkost_results", _fake_resolve_trennkost_results)
+    monkeypatch.setattr(chat_service, "_finalize_response", _fake_finalize_response)
+
+    response = chat_service.handle_chat(
+        conversation_id=None,
+        user_message=(
+            "Mittagskarte\n"
+            "1. Seetangsalat 5,90 EUR\n"
+            "2. Miso Tofu Suppe 6,50 EUR\n"
+            "3. Gebratene Nudeln 9,50 EUR"
+        ),
+        guest_id="guest-text",
+    )
+
+    session = response["session"]
+    primary, secondary = _derive_primary_and_secondary(session)
+    _assert_recommendation_ready_session(session)
+    assert response["answer"] == "LLM_ANSWER"
+    assert primary["label"] == "Seetangsalat"
+    assert secondary["label"] == "Miso Tofu Suppe"
+
+    active_state = database.get_active_menu_state(response["conversationId"])
+    assert active_state["menu_state_id"] == session["menuStateId"]
+    assert active_state["focus_dish_key"] == session["focusDishKey"]
+
+
+def test_handle_chat_returns_recommendation_ready_session_for_menu_image(monkeypatch):
+    def _fake_process_vision(image_path, user_message):
+        assert image_path == "/tmp/menu.jpg"
+        assert user_message == ""
+        return {
+            "vision_analysis": None,
+            "food_groups": None,
+            "vision_extraction": {
+                "type": "menu",
+                "dishes": [{"name": "Seetangsalat", "items": ["Seetang"]}],
+            },
+            "vision_is_menu": True,
+            "vision_failed": False,
+        }
+
+    def _fake_resolve_trennkost_results(**kwargs):
+        assert kwargs["mode"] == ChatMode.MENU_ANALYSIS
+        assert kwargs["vision_extraction"]["type"] == "menu"
+        return _make_menu_matrix()
+
+    monkeypatch.setattr(chat_service, "normalize_input", lambda user_message, *_args: user_message)
+    monkeypatch.setattr(chat_service, "classify_intent", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(chat_service, "_process_vision", _fake_process_vision)
+    monkeypatch.setattr(chat_service, "_resolve_trennkost_results", _fake_resolve_trennkost_results)
+    monkeypatch.setattr(chat_service, "_finalize_response", _fake_finalize_response)
+
+    response = chat_service.handle_chat(
+        conversation_id=None,
+        user_message="",
+        guest_id="guest-image",
+        image_path="/tmp/menu.jpg",
+        intent="eat",
+    )
+
+    session = response["session"]
+    primary, secondary = _derive_primary_and_secondary(session)
+    _assert_recommendation_ready_session(session)
+    assert response["answer"] == "LLM_ANSWER"
+    assert primary["label"] == "Seetangsalat"
+    assert secondary["label"] == "Miso Tofu Suppe"
+
+    active_state = database.get_active_menu_state(response["conversationId"])
+    assert active_state["menu_state_id"] == session["menuStateId"]
+    assert active_state["focus_dish_key"] == session["focusDishKey"]
 
 
 def test_new_menu_analysis_replaces_previous_active_state(monkeypatch):
