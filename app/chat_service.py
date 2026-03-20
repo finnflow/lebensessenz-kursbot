@@ -3,6 +3,7 @@ import json
 import os
 import re
 import time
+import uuid
 from typing import AsyncGenerator, Generator, Optional, List, Dict, Any, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
@@ -35,7 +36,17 @@ from app.database import (
     update_conversation_title,
     generate_title_from_message,
     conversation_belongs_to_guest,
+    get_active_menu_state,
+    save_active_menu_state,
     set_conversation_start_intent,
+    update_active_menu_focus,
+)
+from app.eat_now_session import (
+    EatNowSessionClientError,
+    apply_session_action,
+    build_menu_matrix,
+    build_session_payload,
+    pick_initial_focus_dish_key,
 )
 from app.vision_service import (
     analyze_meal_image,
@@ -586,6 +597,56 @@ def _prepare_analysis_query(
     return resolved or normalized_message
 
 
+def _has_eat_now_session_action(session: Optional[Dict[str, Any]]) -> bool:
+    return bool(session and session.get("type") == "eat_now" and session.get("sessionAction"))
+
+
+def _handle_eat_now_session_action(
+    conversation_id: Optional[str],
+    guest_id: Optional[str],
+    session: Dict[str, Any],
+) -> Dict[str, Any]:
+    if not conversation_id:
+        raise EatNowSessionClientError(400, "conversationId is required for eat_now session actions")
+
+    conv_data = get_conversation(conversation_id)
+    if not conv_data:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    if guest_id and not conversation_belongs_to_guest(conversation_id, guest_id):
+        raise ValueError(f"Access denied to conversation {conversation_id}")
+
+    requested_menu_state_id = session.get("menuStateId")
+    if not requested_menu_state_id:
+        raise EatNowSessionClientError(400, "menuStateId is required for eat_now session actions")
+
+    menu_state = get_active_menu_state(conversation_id)
+    if not menu_state:
+        raise EatNowSessionClientError(400, "No active eat_now menu session exists for this conversation")
+
+    if requested_menu_state_id != menu_state["menu_state_id"]:
+        raise EatNowSessionClientError(400, "menuStateId does not match the active menu state for this conversation")
+
+    updated_focus_dish_key, answer_text = apply_session_action(
+        menu_state,
+        session["sessionAction"],
+    )
+    if updated_focus_dish_key != menu_state.get("focus_dish_key"):
+        update_active_menu_focus(conversation_id, updated_focus_dish_key)
+        menu_state["focus_dish_key"] = updated_focus_dish_key
+
+    return {
+        "conversationId": conversation_id,
+        "answer": answer_text,
+        "sources": [],
+        "session": build_session_payload(
+            menu_state["menu_state_id"],
+            menu_state["focus_dish_key"],
+            menu_state["dish_matrix"],
+        ),
+    }
+
+
 def _handle_food_analysis(
     conversation_id: str,
     normalized_message: str,
@@ -616,13 +677,33 @@ def _handle_food_analysis(
             print(f"[TRENNKOST] {r.dish_name}: {r.verdict.value} | "
                   f"problems={len(r.problems)} | questions={len(r.required_questions)}")
 
-    return _finalize_response(
+    session_payload = None
+    if mode == ChatMode.MENU_ANALYSIS and trennkost_results:
+        dish_matrix = build_menu_matrix(trennkost_results)
+        menu_state_id = f"menu_{uuid.uuid4().hex}"
+        focus_dish_key = pick_initial_focus_dish_key(dish_matrix)
+        save_active_menu_state(
+            conversation_id,
+            menu_state_id,
+            focus_dish_key,
+            dish_matrix,
+        )
+        session_payload = build_session_payload(
+            menu_state_id,
+            focus_dish_key,
+            dish_matrix,
+        )
+
+    response = _finalize_response(
         conversation_id, normalized_message, vision_data, mode, modifiers,
         is_new, conv_data, image_path,
         trennkost_results=trennkost_results,
         analysis_query=analysis_query,
         ui_intent=ui_intent,
     )
+    if session_payload:
+        response["session"] = session_payload
+    return response
 
 
 def _handle_recipe_request(
@@ -800,6 +881,7 @@ def handle_chat(
     guest_id: Optional[str] = None,
     image_path: Optional[str] = None,
     intent: Optional[str] = None,
+    session: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Chat request dispatcher.
@@ -816,6 +898,9 @@ def handle_chat(
     """
     # ── 1. Setup ──────────────────────────────────────────────────────
     ui_intent = normalize_ui_intent(intent)
+
+    if _has_eat_now_session_action(session):
+        return _handle_eat_now_session_action(conversation_id, guest_id, session)
 
     # ── Intent shortcut: empty message + valid intent → first question ──
     # Returns a fixed opening question without any LLM call or user message row.

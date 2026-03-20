@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import uuid
 from datetime import datetime
@@ -26,7 +27,10 @@ def init_db():
             summary_text TEXT,
             summary_updated_at TEXT,
             summary_message_cursor INTEGER DEFAULT 0,
-            start_intent TEXT
+            start_intent TEXT,
+            active_menu_state_id TEXT,
+            active_menu_focus_dish_key TEXT,
+            active_menu_dish_matrix_json TEXT
         )
     """)
 
@@ -257,6 +261,91 @@ def update_conversation_title(conversation_id: str, title: str):
         conn.execute("""
             UPDATE conversations SET title = ? WHERE id = ?
         """, (title, conversation_id))
+
+
+def save_active_menu_state(
+    conversation_id: str,
+    menu_state_id: str,
+    focus_dish_key: str,
+    dish_matrix: List[Dict[str, Any]],
+):
+    """Persist the active eat-now menu state for a conversation."""
+    now = datetime.utcnow().isoformat()
+    dish_matrix_json = json.dumps(dish_matrix, ensure_ascii=False)
+
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE conversations
+            SET active_menu_state_id = ?,
+                active_menu_focus_dish_key = ?,
+                active_menu_dish_matrix_json = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (menu_state_id, focus_dish_key, dish_matrix_json, now, conversation_id),
+        )
+        if cursor.rowcount == 0:
+            raise ValueError(f"Conversation {conversation_id} not found")
+
+
+def get_active_menu_state(conversation_id: str) -> Optional[Dict[str, Any]]:
+    """Return the persisted active eat-now menu state, if present."""
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            SELECT active_menu_state_id, active_menu_focus_dish_key, active_menu_dish_matrix_json
+            FROM conversations
+            WHERE id = ?
+            """,
+            (conversation_id,),
+        )
+        row = cursor.fetchone()
+        if not row or not row["active_menu_state_id"]:
+            return None
+
+        dish_matrix_json = row["active_menu_dish_matrix_json"] or "[]"
+        return {
+            "menu_state_id": row["active_menu_state_id"],
+            "focus_dish_key": row["active_menu_focus_dish_key"],
+            "dish_matrix": json.loads(dish_matrix_json),
+        }
+
+
+def update_active_menu_focus(conversation_id: str, focus_dish_key: str):
+    """Update only the current focus inside the active eat-now menu state."""
+    now = datetime.utcnow().isoformat()
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE conversations
+            SET active_menu_focus_dish_key = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (focus_dish_key, now, conversation_id),
+        )
+        if cursor.rowcount == 0:
+            raise ValueError(f"Conversation {conversation_id} not found")
+
+
+def clear_active_menu_state(conversation_id: str):
+    """Clear the persisted active eat-now menu state for a conversation."""
+    now = datetime.utcnow().isoformat()
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE conversations
+            SET active_menu_state_id = NULL,
+                active_menu_focus_dish_key = NULL,
+                active_menu_dish_matrix_json = NULL,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (now, conversation_id),
+        )
+        if cursor.rowcount == 0:
+            raise ValueError(f"Conversation {conversation_id} not found")
 
 def generate_title_from_message(message: str, max_words: int = 10) -> str:
     """Generate a title from the first user message."""

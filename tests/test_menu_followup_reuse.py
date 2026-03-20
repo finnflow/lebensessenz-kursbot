@@ -9,8 +9,9 @@ from trennkost.models import TrafficLight, TrennkostResult, Verdict
 
 
 @pytest.fixture(autouse=True)
-def _clear_menu_cache():
+def _clear_menu_cache(monkeypatch):
     chat_service._LAST_MENU_RESULTS_BY_CONVERSATION.clear()
+    monkeypatch.setattr(chat_service, "save_active_menu_state", lambda *_args, **_kwargs: None)
     yield
     chat_service._LAST_MENU_RESULTS_BY_CONVERSATION.clear()
 

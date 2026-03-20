@@ -85,6 +85,31 @@ def run_migrations():
                 ADD COLUMN start_intent TEXT
             """)
 
+        # Re-read conversations columns after potential changes
+        cursor.execute("PRAGMA table_info(conversations)")
+        columns = [row[1] for row in cursor.fetchall()]
+
+        if 'active_menu_state_id' not in columns:
+            print("  ✓ Adding active_menu_state_id column to conversations table...")
+            cursor.execute("""
+                ALTER TABLE conversations
+                ADD COLUMN active_menu_state_id TEXT
+            """)
+
+        if 'active_menu_focus_dish_key' not in columns:
+            print("  ✓ Adding active_menu_focus_dish_key column to conversations table...")
+            cursor.execute("""
+                ALTER TABLE conversations
+                ADD COLUMN active_menu_focus_dish_key TEXT
+            """)
+
+        if 'active_menu_dish_matrix_json' not in columns:
+            print("  ✓ Adding active_menu_dish_matrix_json column to conversations table...")
+            cursor.execute("""
+                ALTER TABLE conversations
+                ADD COLUMN active_menu_dish_matrix_json TEXT
+            """)
+
         print("✅ Migrations completed successfully!")
 
 if __name__ == "__main__":

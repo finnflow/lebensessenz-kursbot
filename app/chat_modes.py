@@ -37,7 +37,7 @@ class ChatModifiers:
 # ── Menu-reference detection ──────────────────────────────────────────
 
 _MENU_REF_PATTERN = re.compile(
-    r"(von der |auf der |von dieser )?(speisekarte|karte|menü|menu)"
+    r"(von der |auf der |von dieser )?\b(speisekarte|karte|menü|menu)\b"
     r"|ein anderes gericht"
     r"|was anderes (von|auf|aus)"
     r"|gibt.s (noch |auch )?(was|etwas) anderes",
@@ -48,6 +48,36 @@ _MENU_REF_PATTERN = re.compile(
 def is_menu_reference(text: str) -> bool:
     """Check if user text references a previously sent menu/Speisekarte."""
     return bool(_MENU_REF_PATTERN.search(text))
+
+
+_MENU_TEXT_KEYWORD_RE = re.compile(
+    r"\b(speisekarte|karte|men[üu]|menu|vorspeisen|hauptgerichte|dessert|desserts)\b",
+    re.IGNORECASE,
+)
+_MENU_PRICE_RE = re.compile(r"\b\d{1,3}(?:[.,]\d{2})?\s*(?:€|eur)\b", re.IGNORECASE)
+
+
+def _looks_like_pasted_menu_text(text: str) -> bool:
+    """Conservative heuristic for pasted text menus without image upload."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) < 3:
+        return False
+
+    price_lines = sum(bool(_MENU_PRICE_RE.search(line)) for line in lines)
+    dish_like_lines = 0
+
+    for line in lines:
+        if line.endswith("?"):
+            continue
+        words = re.findall(r"[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß'/-]*", line)
+        if 1 <= len(words) <= 12 and 4 <= len(line) <= 120:
+            dish_like_lines += 1
+
+    has_menu_keyword = bool(_MENU_TEXT_KEYWORD_RE.search(text))
+    if has_menu_keyword and (price_lines >= 1 or dish_like_lines >= 3):
+        return True
+
+    return price_lines >= 2 and dish_like_lines >= 3
 
 
 # ── Recipe-request detection ──────────────────────────────────────────
@@ -337,6 +367,10 @@ def detect_chat_mode(
     # 3. Menu reference in text
     if is_menu_ref:
         return ChatMode.MENU_FOLLOWUP, modifiers
+
+    # 3.2. Pasted text menu (new conversation or direct paste without image)
+    if _looks_like_pasted_menu_text(user_message):
+        return ChatMode.MENU_ANALYSIS, modifiers
 
     # 3.5. Compliance check: user submitting own recipe for verification
     # Must run BEFORE recipe-request detection to avoid "rezept" keyword mis-match.
