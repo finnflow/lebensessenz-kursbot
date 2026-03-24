@@ -39,6 +39,8 @@ origins = [
     "http://localhost:4321",   # Astro dev
     "http://localhost:5173",   # Vite dev (RicsSite)
     "http://127.0.0.1:5173",   # Vite dev via IP
+    "http://localhost:4173",   # Alternate Vite dev port
+    "http://127.0.0.1:4173",   # Alternate Vite dev port via IP
     "https://lebensessenz.de", # production
 ]
 
