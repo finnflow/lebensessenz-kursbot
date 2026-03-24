@@ -859,6 +859,27 @@ def test_detect_chat_mode_starts_menu_analysis_for_simple_multiline_menu_without
     assert mode == ChatMode.MENU_ANALYSIS
 
 
+def test_detect_chat_mode_prefers_menu_analysis_over_menu_followup_for_pasted_menu_text():
+    mode, _ = detect_chat_mode(
+        user_message=(
+            "Speisekarte:\n"
+            "Gegrillter Lachs mit Reis und Brokkoli\n"
+            "Penne Arrabbiata\n"
+            "Ofenkartoffel mit Kräuterquark"
+        ),
+        image_path=None,
+        vision_type=None,
+        is_new_conversation=False,
+        recent_message_count=2,
+        last_messages=[
+            {"role": "assistant", "content": "Bist du im Restaurant oder zu Hause?"},
+            {"role": "user", "content": "Im Restaurant."},
+        ],
+    )
+
+    assert mode == ChatMode.MENU_ANALYSIS
+
+
 @pytest.mark.parametrize(
     "user_message",
     [

@@ -411,13 +411,13 @@ def detect_chat_mode(
     if image_path:
         return ChatMode.FOOD_ANALYSIS, modifiers
 
-    # 3. Menu reference in text
-    if is_menu_ref:
-        return ChatMode.MENU_FOLLOWUP, modifiers
-
-    # 3.2. Pasted text menu (new conversation or direct paste without image)
+    # 3. Pasted text menu (new conversation or fresh menu pasted into an existing one)
     if _looks_like_pasted_menu_text(user_message):
         return ChatMode.MENU_ANALYSIS, modifiers
+
+    # 3.2. Menu reference in text
+    if is_menu_ref:
+        return ChatMode.MENU_FOLLOWUP, modifiers
 
     # 3.5. Compliance check: user submitting own recipe for verification
     # Must run BEFORE recipe-request detection to avoid "rezept" keyword mis-match.
