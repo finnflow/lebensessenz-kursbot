@@ -19,6 +19,9 @@ _VISIBLE_OPTION_LABELS = {
     "more_trennkost": "Trennkost-näher",
     "waiter_phrase": "So dem Kellner sagen",
 }
+SESSION_STAGE_RECOMMENDATION_READY = "recommendation_ready"
+SESSION_STAGE_DECISION_LOOP = "decision_loop"
+SESSION_STAGE_COMPLETED = "completed"
 
 
 def _find_dish(dish_matrix: List[Dict[str, Any]], dish_key: str) -> Dict[str, Any]:
@@ -96,21 +99,36 @@ def build_session_payload(
     menu_state_id: str,
     focus_dish_key: str,
     dish_matrix: List[Dict[str, Any]],
+    stage: str = SESSION_STAGE_RECOMMENDATION_READY,
 ) -> Dict[str, Any]:
     """Build the API session payload, deriving rank from the matrix position only."""
     rank_lookup = {
         dish["dishKey"]: index
         for index, dish in enumerate(dish_matrix, start=1)
     }
-    visible_options = derive_visible_options(dish_matrix, focus_dish_key)
+    visible_options = (
+        []
+        if stage == SESSION_STAGE_COMPLETED
+        else derive_visible_options(dish_matrix, focus_dish_key)
+    )
 
     return {
         "type": "eat_now",
         "menuStateId": menu_state_id,
+        "stage": stage,
         "focusDishKey": focus_dish_key,
         "dishMatrix": [_with_rank(dish, rank_lookup) for dish in dish_matrix],
         "visibleOptions": visible_options,
     }
+
+
+def stage_for_session_action(action: str) -> str:
+    """Return the persisted stage for a supported eat-now session action."""
+    if action in {"other_option", "more_trennkost"}:
+        return SESSION_STAGE_DECISION_LOOP
+    if action == "waiter_phrase":
+        return SESSION_STAGE_COMPLETED
+    raise ValueError(f"Unsupported eat-now session action: {action}")
 
 
 def apply_session_action(

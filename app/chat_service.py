@@ -47,6 +47,9 @@ from app.eat_now_session import (
     build_menu_matrix,
     build_session_payload,
     pick_initial_focus_dish_key,
+    stage_for_session_action,
+    SESSION_STAGE_COMPLETED,
+    SESSION_STAGE_RECOMMENDATION_READY,
 )
 from app.vision_service import (
     analyze_meal_image,
@@ -89,6 +92,11 @@ from app.prompt_builder import (
 )
 
 _LAST_MENU_RESULTS_BY_CONVERSATION: Dict[str, List[TrennkostResult]] = {}
+_MENU_ANALYSIS_INLINE_SEPARATOR_RE = re.compile(r"\s*(?:/|\||•|·|;)\s*")
+_MENU_ANALYSIS_HEADER_RE = re.compile(
+    r"^(?:speisekarte|karte|men[üu]|menu|mittagskarte|abendkarte)\s*[:\-]?\s*",
+    re.IGNORECASE,
+)
 
 
 # ── UI intent normalizer ──────────────────────────────────────────────
@@ -590,6 +598,23 @@ def _prepare_analysis_query(
     mode: ChatMode,
 ) -> str:
     """Share the existing FOOD_ANALYSIS context-reference resolver path."""
+    if mode == ChatMode.MENU_ANALYSIS:
+        lines = [line.strip() for line in normalized_message.splitlines() if line.strip()]
+        if not lines:
+            return normalized_message
+
+        normalized_lines = []
+        for line_index, line in enumerate(lines):
+            parts = _MENU_ANALYSIS_INLINE_SEPARATOR_RE.split(line) if _MENU_ANALYSIS_INLINE_SEPARATOR_RE.search(line) else [line]
+            for part_index, part in enumerate(parts):
+                candidate = part.strip()
+                if line_index == 0 and part_index == 0:
+                    candidate = _MENU_ANALYSIS_HEADER_RE.sub("", candidate)
+                if candidate:
+                    normalized_lines.append(candidate)
+
+        return "\n".join(normalized_lines) if len(normalized_lines) > 1 else normalized_message
+
     if mode != ChatMode.FOOD_ANALYSIS:
         return normalized_message
 
@@ -622,18 +647,26 @@ def _handle_eat_now_session_action(
 
     menu_state = get_active_menu_state(conversation_id)
     if not menu_state:
-        raise EatNowSessionClientError(400, "No active eat_now menu session exists for this conversation")
+        raise EatNowSessionClientError(409, "No active eat_now menu session exists for this conversation")
 
     if requested_menu_state_id != menu_state["menu_state_id"]:
-        raise EatNowSessionClientError(400, "menuStateId does not match the active menu state for this conversation")
+        raise EatNowSessionClientError(409, "menuStateId does not match the active menu state for this conversation")
+
+    if menu_state.get("stage") == SESSION_STAGE_COMPLETED:
+        raise EatNowSessionClientError(409, "The active eat_now menu session is already completed")
 
     updated_focus_dish_key, answer_text = apply_session_action(
         menu_state,
         session["sessionAction"],
     )
-    if updated_focus_dish_key != menu_state.get("focus_dish_key"):
-        update_active_menu_focus(conversation_id, updated_focus_dish_key)
+    next_stage = stage_for_session_action(session["sessionAction"])
+    if (
+        updated_focus_dish_key != menu_state.get("focus_dish_key")
+        or next_stage != menu_state.get("stage")
+    ):
+        update_active_menu_focus(conversation_id, updated_focus_dish_key, stage=next_stage)
         menu_state["focus_dish_key"] = updated_focus_dish_key
+        menu_state["stage"] = next_stage
 
     create_message(conversation_id, "assistant", answer_text)
     conv_data_updated = get_conversation(conversation_id)
@@ -648,6 +681,7 @@ def _handle_eat_now_session_action(
             menu_state["menu_state_id"],
             menu_state["focus_dish_key"],
             menu_state["dish_matrix"],
+            menu_state["stage"],
         ),
     }
 
@@ -692,11 +726,13 @@ def _handle_food_analysis(
             menu_state_id,
             focus_dish_key,
             dish_matrix,
+            stage=SESSION_STAGE_RECOMMENDATION_READY,
         )
         session_payload = build_session_payload(
             menu_state_id,
             focus_dish_key,
             dish_matrix,
+            SESSION_STAGE_RECOMMENDATION_READY,
         )
 
     response = _finalize_response(

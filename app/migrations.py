@@ -110,6 +110,20 @@ def run_migrations():
                 ADD COLUMN active_menu_dish_matrix_json TEXT
             """)
 
+        if 'active_menu_stage' not in columns:
+            print("  ✓ Adding active_menu_stage column to conversations table...")
+            cursor.execute("""
+                ALTER TABLE conversations
+                ADD COLUMN active_menu_stage TEXT
+            """)
+
+        cursor.execute("""
+            UPDATE conversations
+            SET active_menu_stage = 'recommendation_ready'
+            WHERE active_menu_state_id IS NOT NULL
+              AND (active_menu_stage IS NULL OR TRIM(active_menu_stage) = '')
+        """)
+
         print("✅ Migrations completed successfully!")
 
 if __name__ == "__main__":

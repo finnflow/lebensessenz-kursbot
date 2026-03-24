@@ -30,7 +30,8 @@ def init_db():
             start_intent TEXT,
             active_menu_state_id TEXT,
             active_menu_focus_dish_key TEXT,
-            active_menu_dish_matrix_json TEXT
+            active_menu_dish_matrix_json TEXT,
+            active_menu_stage TEXT
         )
     """)
 
@@ -268,6 +269,7 @@ def save_active_menu_state(
     menu_state_id: str,
     focus_dish_key: str,
     dish_matrix: List[Dict[str, Any]],
+    stage: str = "recommendation_ready",
 ):
     """Persist the active eat-now menu state for a conversation."""
     now = datetime.utcnow().isoformat()
@@ -280,10 +282,11 @@ def save_active_menu_state(
             SET active_menu_state_id = ?,
                 active_menu_focus_dish_key = ?,
                 active_menu_dish_matrix_json = ?,
+                active_menu_stage = ?,
                 updated_at = ?
             WHERE id = ?
             """,
-            (menu_state_id, focus_dish_key, dish_matrix_json, now, conversation_id),
+            (menu_state_id, focus_dish_key, dish_matrix_json, stage, now, conversation_id),
         )
         if cursor.rowcount == 0:
             raise ValueError(f"Conversation {conversation_id} not found")
@@ -294,7 +297,7 @@ def get_active_menu_state(conversation_id: str) -> Optional[Dict[str, Any]]:
     with get_db() as conn:
         cursor = conn.execute(
             """
-            SELECT active_menu_state_id, active_menu_focus_dish_key, active_menu_dish_matrix_json
+            SELECT active_menu_state_id, active_menu_focus_dish_key, active_menu_dish_matrix_json, active_menu_stage
             FROM conversations
             WHERE id = ?
             """,
@@ -309,21 +312,34 @@ def get_active_menu_state(conversation_id: str) -> Optional[Dict[str, Any]]:
             "menu_state_id": row["active_menu_state_id"],
             "focus_dish_key": row["active_menu_focus_dish_key"],
             "dish_matrix": json.loads(dish_matrix_json),
+            "stage": row["active_menu_stage"] or "recommendation_ready",
         }
 
 
-def update_active_menu_focus(conversation_id: str, focus_dish_key: str):
-    """Update only the current focus inside the active eat-now menu state."""
+def update_active_menu_focus(conversation_id: str, focus_dish_key: str, stage: Optional[str] = None):
+    """Update the current focus, and optionally the stage, inside the active eat-now menu state."""
     now = datetime.utcnow().isoformat()
     with get_db() as conn:
-        cursor = conn.execute(
+        if stage is None:
+            query = """
+                UPDATE conversations
+                SET active_menu_focus_dish_key = ?,
+                    updated_at = ?
+                WHERE id = ?
             """
-            UPDATE conversations
-            SET active_menu_focus_dish_key = ?,
-                updated_at = ?
-            WHERE id = ?
-            """,
-            (focus_dish_key, now, conversation_id),
+            params = (focus_dish_key, now, conversation_id)
+        else:
+            query = """
+                UPDATE conversations
+                SET active_menu_focus_dish_key = ?,
+                    active_menu_stage = ?,
+                    updated_at = ?
+                WHERE id = ?
+            """
+            params = (focus_dish_key, stage, now, conversation_id)
+        cursor = conn.execute(
+            query,
+            params,
         )
         if cursor.rowcount == 0:
             raise ValueError(f"Conversation {conversation_id} not found")
@@ -339,6 +355,7 @@ def clear_active_menu_state(conversation_id: str):
             SET active_menu_state_id = NULL,
                 active_menu_focus_dish_key = NULL,
                 active_menu_dish_matrix_json = NULL,
+                active_menu_stage = NULL,
                 updated_at = ?
             WHERE id = ?
             """,

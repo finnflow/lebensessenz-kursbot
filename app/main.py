@@ -14,13 +14,14 @@ from app.database import (
     get_messages,
     get_conversations_by_guest,
     conversation_belongs_to_guest,
+    get_active_menu_state,
 )
 from app.migrations import run_migrations
 from app.auth import router as auth_router
 from app.entitlements import router as entitlements_router
 from app.clients import MODEL, TOP_K, LAST_N, SUMMARY_THRESHOLD
 from app.chat_service import handle_chat, handle_chat_stream_async, normalize_ui_intent
-from app.eat_now_session import EatNowSessionClientError
+from app.eat_now_session import EatNowSessionClientError, build_session_payload
 from app.image_handler import save_image, ImageValidationError
 from app.feedback_service import export_feedback
 from trennkost.analyzer import analyze_text as trennkost_analyze_text, format_results_for_llm
@@ -140,6 +141,7 @@ class EatNowVisibleOptionResponse(BaseModel):
 class EatNowSessionResponse(BaseModel):
     type: Literal["eat_now"]
     menuStateId: str
+    stage: Literal["recommendation_ready", "decision_loop", "completed"]
     focusDishKey: str
     dishMatrix: List[EatNowDishResponse]
     visibleOptions: List[EatNowVisibleOptionResponse]
@@ -385,7 +387,17 @@ def get_conversation_messages(request: Request, conversation_id: str, guest_id: 
         raise HTTPException(status_code=403, detail="Access denied")
 
     messages = get_messages(conversation_id)
-    return {"messages": messages}
+    menu_state = get_active_menu_state(conversation_id)
+    current_session = None
+    if menu_state:
+        current_session = build_session_payload(
+            menu_state["menu_state_id"],
+            menu_state["focus_dish_key"],
+            menu_state["dish_matrix"],
+            menu_state["stage"],
+        )
+
+    return {"messages": messages, "currentSession": current_session}
 
 @app.delete("/conversations/{conversation_id}")
 @app.delete("/api/v1/conversations/{conversation_id}")
