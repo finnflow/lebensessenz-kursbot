@@ -31,6 +31,7 @@ def init_db():
             active_menu_state_id TEXT,
             active_menu_focus_dish_key TEXT,
             active_menu_dish_matrix_json TEXT,
+            active_menu_dish_briefs_json TEXT,
             active_menu_stage TEXT
         )
     """)
@@ -99,6 +100,22 @@ def get_db():
         raise
     finally:
         conn.close()
+
+
+def _conversation_columns(conn: sqlite3.Connection) -> set:
+    cursor = conn.execute("PRAGMA table_info(conversations)")
+    return {row["name"] if isinstance(row, sqlite3.Row) else row[1] for row in cursor.fetchall()}
+
+
+def _ensure_active_menu_dish_briefs_column(conn: sqlite3.Connection) -> None:
+    if "active_menu_dish_briefs_json" in _conversation_columns(conn):
+        return
+    conn.execute(
+        """
+        ALTER TABLE conversations
+        ADD COLUMN active_menu_dish_briefs_json TEXT
+        """
+    )
 
 def create_conversation(guest_id: Optional[str] = None, title: Optional[str] = None) -> str:
     """Create a new conversation and return its ID."""
@@ -270,23 +287,27 @@ def save_active_menu_state(
     focus_dish_key: str,
     dish_matrix: List[Dict[str, Any]],
     stage: str = "recommendation_ready",
+    dish_briefs: Optional[Dict[str, Any]] = None,
 ):
     """Persist the active eat-now menu state for a conversation."""
     now = datetime.utcnow().isoformat()
     dish_matrix_json = json.dumps(dish_matrix, ensure_ascii=False)
+    dish_briefs_json = json.dumps(dish_briefs or {}, ensure_ascii=False)
 
     with get_db() as conn:
+        _ensure_active_menu_dish_briefs_column(conn)
         cursor = conn.execute(
             """
             UPDATE conversations
             SET active_menu_state_id = ?,
                 active_menu_focus_dish_key = ?,
                 active_menu_dish_matrix_json = ?,
+                active_menu_dish_briefs_json = ?,
                 active_menu_stage = ?,
                 updated_at = ?
             WHERE id = ?
             """,
-            (menu_state_id, focus_dish_key, dish_matrix_json, stage, now, conversation_id),
+            (menu_state_id, focus_dish_key, dish_matrix_json, dish_briefs_json, stage, now, conversation_id),
         )
         if cursor.rowcount == 0:
             raise ValueError(f"Conversation {conversation_id} not found")
@@ -295,9 +316,11 @@ def save_active_menu_state(
 def get_active_menu_state(conversation_id: str) -> Optional[Dict[str, Any]]:
     """Return the persisted active eat-now menu state, if present."""
     with get_db() as conn:
+        _ensure_active_menu_dish_briefs_column(conn)
         cursor = conn.execute(
             """
-            SELECT active_menu_state_id, active_menu_focus_dish_key, active_menu_dish_matrix_json, active_menu_stage
+            SELECT active_menu_state_id, active_menu_focus_dish_key, active_menu_dish_matrix_json,
+                   active_menu_dish_briefs_json, active_menu_stage
             FROM conversations
             WHERE id = ?
             """,
@@ -308,10 +331,12 @@ def get_active_menu_state(conversation_id: str) -> Optional[Dict[str, Any]]:
             return None
 
         dish_matrix_json = row["active_menu_dish_matrix_json"] or "[]"
+        dish_briefs_json = row["active_menu_dish_briefs_json"] or "{}"
         return {
             "menu_state_id": row["active_menu_state_id"],
             "focus_dish_key": row["active_menu_focus_dish_key"],
             "dish_matrix": json.loads(dish_matrix_json),
+            "dish_briefs": json.loads(dish_briefs_json),
             "stage": row["active_menu_stage"] or "recommendation_ready",
         }
 
@@ -349,12 +374,14 @@ def clear_active_menu_state(conversation_id: str):
     """Clear the persisted active eat-now menu state for a conversation."""
     now = datetime.utcnow().isoformat()
     with get_db() as conn:
+        _ensure_active_menu_dish_briefs_column(conn)
         cursor = conn.execute(
             """
             UPDATE conversations
             SET active_menu_state_id = NULL,
                 active_menu_focus_dish_key = NULL,
                 active_menu_dish_matrix_json = NULL,
+                active_menu_dish_briefs_json = NULL,
                 active_menu_stage = NULL,
                 updated_at = ?
             WHERE id = ?

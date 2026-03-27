@@ -10,7 +10,7 @@ import app.chat_service as chat_service
 import app.database as database
 import app.migrations as migrations
 from app.chat_modes import ChatMode, ChatModifiers, detect_chat_mode
-from app.eat_now_session import apply_session_action, build_menu_matrix, build_session_payload
+from app.eat_now_session import apply_session_action, build_dish_briefs, build_menu_matrix, build_session_payload
 from trennkost.models import RequiredQuestion, TrafficLight, TrennkostResult, Verdict
 
 
@@ -96,6 +96,7 @@ def _fake_finalize_response(
 def _make_menu_matrix():
     return [
         _make_result("Gebratene Nudeln", Verdict.NOT_OK, TrafficLight.RED),
+        _make_result("Zucchinipfanne", Verdict.OK, TrafficLight.GREEN),
         _make_result("Miso Tofu Suppe", Verdict.CONDITIONAL, TrafficLight.YELLOW, has_open_question=True),
         _make_result("Seetangsalat", Verdict.OK, TrafficLight.GREEN),
     ]
@@ -110,8 +111,12 @@ def _assert_recommendation_ready_session(session):
     assert session["menuStateId"]
     assert session["stage"] == "recommendation_ready"
     assert session["focusDishKey"]
+    assert session["defaultDishKey"] == "dish_01"
+    assert session["selectableDishKeys"] == ["dish_01", "dish_02"]
+    assert session["selectableCount"] == 2
+    assert set(session["dishBriefs"]) == {"dish_01", "dish_02"}
     assert session["dishMatrix"]
-    assert session["visibleOptions"]
+    assert session["visibleOptions"] == [_visible_option("waiter_phrase", "So dem Kellner sagen")]
 
 
 def _derive_primary_and_secondary(session):
@@ -119,12 +124,7 @@ def _derive_primary_and_secondary(session):
         dish for dish in session["dishMatrix"] if dish["dishKey"] == session["focusDishKey"]
     )
     secondary = next(
-        (
-            dish
-            for dish in session["dishMatrix"]
-            if dish["dishKey"] != session["focusDishKey"] and dish["verdict"] != "NOT_OK"
-        ),
-        None,
+        dish for dish in session["dishMatrix"] if dish["dishKey"] == session["selectableDishKeys"][1]
     )
     return primary, secondary
 
@@ -153,17 +153,23 @@ def test_menu_analysis_creates_session_and_persists_active_state(monkeypatch):
     assert session["type"] == "eat_now"
     assert session["stage"] == "recommendation_ready"
     assert session["focusDishKey"] == "dish_01"
+    assert session["defaultDishKey"] == "dish_01"
+    assert session["selectableDishKeys"] == ["dish_01", "dish_02"]
+    assert session["selectableCount"] == 2
     assert [dish["label"] for dish in session["dishMatrix"]] == [
         "Seetangsalat",
+        "Zucchinipfanne",
         "Miso Tofu Suppe",
         "Gebratene Nudeln",
     ]
-    assert [dish["rank"] for dish in session["dishMatrix"]] == [1, 2, 3]
+    assert [dish["rank"] for dish in session["dishMatrix"]] == [1, 2, 3, 4]
     assert session["visibleOptions"] == [
-        _visible_option("other_option", "Etwas anderes"),
-        _visible_option("more_trennkost", "Trennkost-näher"),
         _visible_option("waiter_phrase", "So dem Kellner sagen"),
     ]
+    assert session["dishBriefs"] == {
+        "dish_01": {"why": ["Test"], "orderHints": [], "afterMealHints": []},
+        "dish_02": {"why": ["Test"], "orderHints": [], "afterMealHints": []},
+    }
 
     active_state = database.get_active_menu_state(conversation_id)
     assert active_state["menu_state_id"] == session["menuStateId"]
@@ -171,10 +177,12 @@ def test_menu_analysis_creates_session_and_persists_active_state(monkeypatch):
     assert active_state["stage"] == "recommendation_ready"
     assert [dish["label"] for dish in active_state["dish_matrix"]] == [
         "Seetangsalat",
+        "Zucchinipfanne",
         "Miso Tofu Suppe",
         "Gebratene Nudeln",
     ]
     assert all("rank" not in dish for dish in active_state["dish_matrix"])
+    assert active_state["dish_briefs"] == session["dishBriefs"]
 
 
 def test_handle_chat_returns_recommendation_ready_session_for_pasted_menu_text(monkeypatch):
@@ -203,7 +211,7 @@ def test_handle_chat_returns_recommendation_ready_session_for_pasted_menu_text(m
     _assert_recommendation_ready_session(session)
     assert response["answer"] == "LLM_ANSWER"
     assert primary["label"] == "Seetangsalat"
-    assert secondary["label"] == "Miso Tofu Suppe"
+    assert secondary["label"] == "Zucchinipfanne"
 
     active_state = database.get_active_menu_state(response["conversationId"])
     assert active_state["menu_state_id"] == session["menuStateId"]
@@ -242,7 +250,7 @@ def test_handle_chat_returns_session_for_slash_separated_menu_text_even_with_rec
     _assert_recommendation_ready_session(session)
     assert response["answer"] == "LLM_ANSWER"
     assert primary["label"] == "Seetangsalat"
-    assert secondary["label"] == "Miso Tofu Suppe"
+    assert secondary["label"] == "Zucchinipfanne"
 
 
 def test_handle_chat_returns_recommendation_ready_session_for_menu_image(monkeypatch):
@@ -284,7 +292,7 @@ def test_handle_chat_returns_recommendation_ready_session_for_menu_image(monkeyp
     _assert_recommendation_ready_session(session)
     assert response["answer"] == "LLM_ANSWER"
     assert primary["label"] == "Seetangsalat"
-    assert secondary["label"] == "Miso Tofu Suppe"
+    assert secondary["label"] == "Zucchinipfanne"
 
     active_state = database.get_active_menu_state(response["conversationId"])
     assert active_state["menu_state_id"] == session["menuStateId"]
@@ -347,10 +355,24 @@ def test_new_menu_analysis_replaces_previous_active_state(monkeypatch):
     ]
 
 
-def test_other_option_switches_focus_correctly_without_persisting_empty_message():
+def _persist_menu_state(conversation_id: str, focus_dish_key: str = "dish_01", stage: str = "recommendation_ready"):
+    results = _make_menu_matrix()
+    dish_matrix = chat_service.build_menu_matrix(results)
+    dish_briefs = build_dish_briefs(results)
+    database.save_active_menu_state(
+        conversation_id,
+        "menu_active",
+        focus_dish_key,
+        dish_matrix,
+        stage=stage,
+        dish_briefs=dish_briefs,
+    )
+    return dish_matrix, dish_briefs
+
+
+def test_select_dish_switches_focus_without_persisting_empty_message():
     conversation_id = database.create_conversation()
-    dish_matrix = chat_service.build_menu_matrix(_make_menu_matrix())
-    database.save_active_menu_state(conversation_id, "menu_active", "dish_01", dish_matrix)
+    _persist_menu_state(conversation_id)
 
     response = chat_service.handle_chat(
         conversation_id=conversation_id,
@@ -358,25 +380,136 @@ def test_other_option_switches_focus_correctly_without_persisting_empty_message(
         session={
             "type": "eat_now",
             "menuStateId": "menu_active",
-            "sessionAction": "other_option",
+            "sessionAction": "select_dish",
+            "targetDishKey": "dish_02",
         },
     )
 
     assert response["session"]["focusDishKey"] == "dish_02"
     assert response["session"]["stage"] == "decision_loop"
-    assert response["answer"] == 'Eine weitere empfehlbare Option ist "Miso Tofu Suppe".'
+    assert response["answer"] == ""
     assert database.get_active_menu_state(conversation_id)["focus_dish_key"] == "dish_02"
     assert database.get_active_menu_state(conversation_id)["stage"] == "decision_loop"
-    messages = database.get_messages(conversation_id)
-    assert len(messages) == 1
-    assert messages[0]["role"] == "assistant"
-    assert messages[0]["content"] == 'Eine weitere empfehlbare Option ist "Miso Tofu Suppe".'
+    assert database.get_messages(conversation_id) == []
 
 
-def test_session_action_uses_summary_check_after_persisting_assistant_message(monkeypatch):
+def test_select_dish_requires_target_dish_key():
     conversation_id = database.create_conversation()
-    dish_matrix = chat_service.build_menu_matrix(_make_menu_matrix())
-    database.save_active_menu_state(conversation_id, "menu_active", "dish_01", dish_matrix)
+    _persist_menu_state(conversation_id)
+
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "conversationId": conversation_id,
+                "message": "",
+                "session": {
+                    "type": "eat_now",
+                    "menuStateId": "menu_active",
+                    "sessionAction": "select_dish",
+                },
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "BAD_REQUEST"
+
+
+def test_select_dish_rejects_non_selectable_target():
+    conversation_id = database.create_conversation()
+    _persist_menu_state(conversation_id)
+
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "conversationId": conversation_id,
+                "message": "",
+                "session": {
+                    "type": "eat_now",
+                    "menuStateId": "menu_active",
+                    "sessionAction": "select_dish",
+                    "targetDishKey": "dish_03",
+                },
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "BAD_REQUEST"
+
+
+def test_waiter_phrase_is_deterministic():
+    closed_focus_state = {
+        "menu_state_id": "menu_closed",
+        "focus_dish_key": "dish_01",
+        "dish_matrix": chat_service.build_menu_matrix(
+            [_make_result("Seetangsalat", Verdict.OK, TrafficLight.GREEN)]
+        ),
+    }
+    open_focus_state = {
+        "menu_state_id": "menu_open",
+        "focus_dish_key": "dish_01",
+        "dish_matrix": chat_service.build_menu_matrix(
+            [_make_result("Miso Tofu Suppe", Verdict.CONDITIONAL, TrafficLight.YELLOW, has_open_question=True)]
+        ),
+    }
+
+    assert apply_session_action(closed_focus_state, "waiter_phrase") == (
+        "dish_01",
+        'Ich nehme bitte "Seetangsalat".',
+    )
+    assert apply_session_action(open_focus_state, "waiter_phrase") == (
+        "dish_01",
+        'Koennten Sie mir bitte kurz sagen, welche Zutaten genau in "Miso Tofu Suppe" sind und wie es zubereitet wird?',
+    )
+
+
+def test_selectable_dish_keys_only_include_ok_dishes():
+    dish_matrix = build_menu_matrix(_make_menu_matrix())
+    dish_briefs = build_dish_briefs(_make_menu_matrix())
+    payload = build_session_payload(
+        "menu_two",
+        "dish_01",
+        dish_matrix,
+        dish_briefs=dish_briefs,
+    )
+
+    assert payload["selectableDishKeys"] == ["dish_01", "dish_02"]
+    assert payload["selectableCount"] == 2
+    assert [dish["verdict"] for dish in payload["dishMatrix"]] == [
+        "OK",
+        "OK",
+        "CONDITIONAL",
+        "NOT_OK",
+    ]
+    assert payload["dishBriefs"] == {
+        "dish_01": {"why": ["Test"], "orderHints": [], "afterMealHints": []},
+        "dish_02": {"why": ["Test"], "orderHints": [], "afterMealHints": []},
+    }
+    assert payload["visibleOptions"] == [_visible_option("waiter_phrase", "So dem Kellner sagen")]
+
+
+def test_dish_briefs_are_returned_in_current_session():
+    conversation_id = database.create_conversation(guest_id="guest-load")
+    _persist_menu_state(conversation_id)
+
+    with TestClient(main.app) as client:
+        response = client.get(
+            f"/api/v1/conversations/{conversation_id}/messages",
+            params={"guest_id": "guest-load"},
+        )
+
+    assert response.status_code == 200
+    current_session = response.json()["currentSession"]
+    assert current_session["dishBriefs"] == {
+        "dish_01": {"why": ["Test"], "orderHints": [], "afterMealHints": []},
+        "dish_02": {"why": ["Test"], "orderHints": [], "afterMealHints": []},
+    }
+
+
+def test_waiter_phrase_remains_terminal(monkeypatch):
+    conversation_id = database.create_conversation()
+    _persist_menu_state(conversation_id)
     seen = {}
 
     def _should_update_summary(conv_id, conv_data):
@@ -413,98 +546,53 @@ def test_session_action_uses_summary_check_after_persisting_assistant_message(mo
     }
 
 
-def test_more_trennkost_jumps_to_best_option_then_confirms_current_focus():
+def test_completed_session_rejects_further_selection_actions_with_409():
     conversation_id = database.create_conversation()
-    dish_matrix = chat_service.build_menu_matrix(_make_menu_matrix())
-    database.save_active_menu_state(conversation_id, "menu_active", "dish_02", dish_matrix)
+    _persist_menu_state(conversation_id, stage="completed")
 
-    first = chat_service.handle_chat(
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "conversationId": conversation_id,
+                "message": "",
+                "session": {
+                    "type": "eat_now",
+                    "menuStateId": "menu_active",
+                    "sessionAction": "select_dish",
+                    "targetDishKey": "dish_02",
+                },
+            },
+        )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "CONFLICT"
+
+
+def test_reload_of_conversation_returns_same_eat_now_state():
+    conversation_id = database.create_conversation(guest_id="guest-reload")
+    _persist_menu_state(conversation_id)
+
+    first_response = chat_service.handle_chat(
         conversation_id=conversation_id,
         user_message="",
+        guest_id="guest-reload",
         session={
             "type": "eat_now",
             "menuStateId": "menu_active",
-            "sessionAction": "more_trennkost",
-        },
-    )
-    second = chat_service.handle_chat(
-        conversation_id=conversation_id,
-        user_message="",
-        session={
-            "type": "eat_now",
-            "menuStateId": "menu_active",
-            "sessionAction": "more_trennkost",
+            "sessionAction": "select_dish",
+            "targetDishKey": "dish_02",
         },
     )
 
-    assert first["session"]["focusDishKey"] == "dish_01"
-    assert first["session"]["stage"] == "decision_loop"
-    assert first["answer"] == '"Seetangsalat" ist die trennkost-freundlichste Wahl auf der Karte.'
-    assert second["session"]["focusDishKey"] == "dish_01"
-    assert second["session"]["stage"] == "decision_loop"
-    assert second["answer"] == '"Seetangsalat" bleibt die trennkost-freundlichste Wahl.'
+    with TestClient(main.app) as client:
+        response = client.get(
+            f"/api/v1/conversations/{conversation_id}/messages",
+            params={"guest_id": "guest-reload"},
+        )
 
-
-def test_waiter_phrase_is_deterministic():
-    closed_focus_state = {
-        "menu_state_id": "menu_closed",
-        "focus_dish_key": "dish_01",
-        "dish_matrix": chat_service.build_menu_matrix(
-            [_make_result("Seetangsalat", Verdict.OK, TrafficLight.GREEN)]
-        ),
-    }
-    open_focus_state = {
-        "menu_state_id": "menu_open",
-        "focus_dish_key": "dish_01",
-        "dish_matrix": chat_service.build_menu_matrix(
-            [_make_result("Miso Tofu Suppe", Verdict.CONDITIONAL, TrafficLight.YELLOW, has_open_question=True)]
-        ),
-    }
-
-    assert apply_session_action(closed_focus_state, "waiter_phrase") == (
-        "dish_01",
-        'Ich nehme bitte "Seetangsalat".',
-    )
-    assert apply_session_action(open_focus_state, "waiter_phrase") == (
-        "dish_01",
-        'Koennten Sie mir bitte kurz sagen, welche Zutaten genau in "Miso Tofu Suppe" sind und wie es zubereitet wird?',
-    )
-
-
-def test_visible_options_only_expose_session_actions_with_correct_visibility():
-    single_recommendable_payload = build_session_payload(
-        "menu_one",
-        "dish_01",
-        build_menu_matrix(
-            [
-                _make_result("Seetangsalat", Verdict.OK, TrafficLight.GREEN),
-                _make_result("Gebratene Nudeln", Verdict.NOT_OK, TrafficLight.RED),
-            ]
-        ),
-    )
-    multiple_recommendable_payload = build_session_payload(
-        "menu_two",
-        "dish_01",
-        build_menu_matrix(
-            [
-                _make_result("Seetangsalat", Verdict.OK, TrafficLight.GREEN),
-                _make_result("Miso Tofu Suppe", Verdict.CONDITIONAL, TrafficLight.YELLOW, has_open_question=True),
-                _make_result("Gebratene Nudeln", Verdict.NOT_OK, TrafficLight.RED),
-            ]
-        ),
-    )
-
-    assert single_recommendable_payload["visibleOptions"] == [
-        _visible_option("more_trennkost", "Trennkost-näher"),
-        _visible_option("waiter_phrase", "So dem Kellner sagen"),
-    ]
-    assert single_recommendable_payload["stage"] == "recommendation_ready"
-    assert multiple_recommendable_payload["visibleOptions"] == [
-        _visible_option("other_option", "Etwas anderes"),
-        _visible_option("more_trennkost", "Trennkost-näher"),
-        _visible_option("waiter_phrase", "So dem Kellner sagen"),
-    ]
-    assert multiple_recommendable_payload["stage"] == "recommendation_ready"
+    assert response.status_code == 200
+    assert response.json()["currentSession"] == first_response["session"]
 
 
 def test_chat_endpoint_allows_empty_message_for_session_action(monkeypatch):
@@ -527,6 +615,12 @@ def test_chat_endpoint_allows_empty_message_for_session_action(monkeypatch):
                     "menuStateId": "menu_active",
                     "stage": "completed",
                     "focusDishKey": "dish_01",
+                    "defaultDishKey": "dish_01",
+                    "selectableDishKeys": ["dish_01"],
+                    "selectableCount": 1,
+                    "dishBriefs": {
+                        "dish_01": {"why": ["Test"], "orderHints": [], "afterMealHints": []}
+                    },
                     "dishMatrix": [
                     {
                         "dishKey": "dish_01",
@@ -611,8 +705,7 @@ def test_chat_image_endpoint_allows_empty_message_with_image_and_eat_intent(monk
 
 def test_missing_menu_state_id_returns_400_not_404():
     conversation_id = database.create_conversation()
-    dish_matrix = chat_service.build_menu_matrix(_make_menu_matrix())
-    database.save_active_menu_state(conversation_id, "menu_active", "dish_01", dish_matrix)
+    _persist_menu_state(conversation_id)
 
     with TestClient(main.app) as client:
         response = client.post(
@@ -622,7 +715,8 @@ def test_missing_menu_state_id_returns_400_not_404():
                 "message": "",
                 "session": {
                     "type": "eat_now",
-                    "sessionAction": "other_option",
+                    "sessionAction": "select_dish",
+                    "targetDishKey": "dish_02",
                 },
             },
         )
@@ -640,7 +734,8 @@ def test_missing_conversation_id_for_session_action_returns_400():
                 "session": {
                     "type": "eat_now",
                     "menuStateId": "menu_active",
-                    "sessionAction": "other_option",
+                    "sessionAction": "select_dish",
+                    "targetDishKey": "dish_02",
                 },
             },
         )
@@ -661,7 +756,8 @@ def test_no_active_session_returns_409_conflict():
                 "session": {
                     "type": "eat_now",
                     "menuStateId": "menu_missing",
-                    "sessionAction": "other_option",
+                    "sessionAction": "select_dish",
+                    "targetDishKey": "dish_02",
                 },
             },
         )
@@ -672,8 +768,14 @@ def test_no_active_session_returns_409_conflict():
 
 def test_wrong_and_stale_menu_state_id_return_client_errors():
     conversation_id = database.create_conversation()
-    first_matrix = chat_service.build_menu_matrix(_make_menu_matrix())
-    database.save_active_menu_state(conversation_id, "menu_old", "dish_01", first_matrix)
+    first_matrix, first_briefs = _persist_menu_state(conversation_id)
+    database.save_active_menu_state(
+        conversation_id,
+        "menu_old",
+        "dish_01",
+        first_matrix,
+        dish_briefs=first_briefs,
+    )
 
     with TestClient(main.app) as client:
         wrong_response = client.post(
@@ -684,18 +786,26 @@ def test_wrong_and_stale_menu_state_id_return_client_errors():
                 "session": {
                     "type": "eat_now",
                     "menuStateId": "menu_wrong",
-                    "sessionAction": "other_option",
+                    "sessionAction": "select_dish",
+                    "targetDishKey": "dish_02",
                 },
             },
         )
 
-        second_matrix = chat_service.build_menu_matrix(
-            [
-                _make_result("Sommerrolle", Verdict.OK, TrafficLight.GREEN),
-                _make_result("Pho", Verdict.CONDITIONAL, TrafficLight.YELLOW, has_open_question=True),
-            ]
+        second_results = [
+            _make_result("Sommerrolle", Verdict.OK, TrafficLight.GREEN),
+            _make_result("Pho", Verdict.OK, TrafficLight.GREEN),
+            _make_result("Currysuppe", Verdict.CONDITIONAL, TrafficLight.YELLOW, has_open_question=True),
+        ]
+        second_matrix = chat_service.build_menu_matrix(second_results)
+        second_briefs = build_dish_briefs(second_results)
+        database.save_active_menu_state(
+            conversation_id,
+            "menu_new",
+            "dish_01",
+            second_matrix,
+            dish_briefs=second_briefs,
         )
-        database.save_active_menu_state(conversation_id, "menu_new", "dish_01", second_matrix)
 
         stale_response = client.post(
             "/api/v1/chat",
@@ -705,7 +815,8 @@ def test_wrong_and_stale_menu_state_id_return_client_errors():
                 "session": {
                     "type": "eat_now",
                     "menuStateId": "menu_old",
-                    "sessionAction": "other_option",
+                    "sessionAction": "select_dish",
+                    "targetDishKey": "dish_02",
                 },
             },
         )
@@ -716,38 +827,9 @@ def test_wrong_and_stale_menu_state_id_return_client_errors():
     assert stale_response.json()["error"]["code"] == "CONFLICT"
 
 
-def test_completed_session_rejects_further_actions_with_409():
-    conversation_id = database.create_conversation()
-    dish_matrix = chat_service.build_menu_matrix(_make_menu_matrix())
-    database.save_active_menu_state(
-        conversation_id,
-        "menu_done",
-        "dish_01",
-        dish_matrix,
-        stage="completed",
-    )
-
-    with TestClient(main.app) as client:
-        response = client.post(
-            "/api/v1/chat",
-            json={
-                "conversationId": conversation_id,
-                "message": "",
-                "session": {
-                    "type": "eat_now",
-                    "menuStateId": "menu_done",
-                    "sessionAction": "other_option",
-                },
-            },
-        )
-
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "CONFLICT"
-
-
-def test_conversation_load_returns_current_session_with_stage():
+def test_conversation_load_returns_current_session_with_stage_and_briefs():
     conversation_id = database.create_conversation(guest_id="guest-load")
-    dish_matrix = chat_service.build_menu_matrix(_make_menu_matrix())
+    dish_matrix, dish_briefs = _persist_menu_state(conversation_id, stage="completed")
     database.create_message(conversation_id, "assistant", "Bestehende Nachricht")
     database.save_active_menu_state(
         conversation_id,
@@ -755,6 +837,7 @@ def test_conversation_load_returns_current_session_with_stage():
         "dish_01",
         dish_matrix,
         stage="completed",
+        dish_briefs=dish_briefs,
     )
 
     with TestClient(main.app) as client:
@@ -769,6 +852,7 @@ def test_conversation_load_returns_current_session_with_stage():
     assert payload["currentSession"]["menuStateId"] == "menu_done"
     assert payload["currentSession"]["stage"] == "completed"
     assert payload["currentSession"]["visibleOptions"] == []
+    assert payload["currentSession"]["dishBriefs"] == dish_briefs
 
 
 def test_conversation_load_returns_null_current_session_when_absent():

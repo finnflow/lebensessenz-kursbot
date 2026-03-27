@@ -4,6 +4,8 @@ Dieser v0.1-Contract leitet sich aus dem heutigen Chat-Vertrag in `app/main.py`,
 
 `Eat-now` bleibt additiv auf dem bestehenden Chat-Vertrag. Der Root-Request bleibt `conversationId`, `guestId`, `message`, `intent`; für Eat-now kommt optional ein verschachteltes `session`-Objekt dazu. `intent` bleibt ein grober Routing-Hinweis wie bisher. Wenn `session.sessionAction` gesetzt ist, ist diese Aktion für Eat-now maßgeblich.
 
+> Additiver Stand V0.4: Der produktive Eat-now-Stand erweitert den v0.1-Contract um eine kleine Auswahlfläche nur für `OK`-Gerichte. Die v0.1-Beschreibung unten bleibt als Historie nützlich, wird aber für die aktuelle UI durch den V0.4-Delta in Abschnitt 5 ergänzt.
+
 **Minimaler backend-owned Session-State**
 
 Persistiert:
@@ -268,6 +270,59 @@ Konzeptionell über den bestehenden Bild-Chat-Endpunkt. Der Request bleibt Multi
   }
 }
 ```
+
+# 5. Additiver V0.4-Delta
+
+V0.4 bleibt auf derselben Chat-Route und demselben `session`-Objekt, verschiebt aber die primäre UI von generischen Folgeaktionen auf eine kleine, stabile Auswahlrail für klar `OK` bewertete Gerichte.
+
+**Persistenz**
+
+Zusätzlich zur eingefrorenen `dishMatrix` wird pro aktivem Menüzustand ein minimaler `dishBriefs`-Block persistiert. Er enthält nur die upfront erzeugten, deterministischen Kurzdetails für auswählbare `OK`-Gerichte:
+
+- `why: string[]`
+- `orderHints: string[]`
+- `afterMealHints: string[]`
+
+Damit liefern `currentSession`, Reload und `completed` denselben Eat-now-Zustand ohne neuen LLM-Call beim späteren Dish-Select.
+
+**Request**
+
+Für die V0.4-UI ist `session.sessionAction` effektiv:
+
+- `select_dish`
+- `waiter_phrase`
+
+Regeln:
+
+- `targetDishKey` ist nur für `select_dish` erlaubt und dort Pflicht.
+- `select_dish` darf nur auf `OK`-Gerichte aus derselben gespeicherten Session zeigen.
+- `message` darf bei Session-Actions weiterhin leer sein.
+- Bestehende interne Actions wie `other_option` oder `more_trennkost` müssen nicht aktiv entfernt werden, sind aber nicht mehr Grundlage der V0.4-UI.
+
+**Response**
+
+Die Session-Response wird additiv erweitert um:
+
+- `defaultDishKey`
+- `selectableDishKeys`
+- `selectableCount`
+- `dishBriefs`
+
+Regeln:
+
+- `dishMatrix` darf weiterhin alle analysierten Gerichte enthalten.
+- `selectableDishKeys` enthält nur `OK`-Gerichte in stabiler Ranking-Reihenfolge.
+- `defaultDishKey` ist die ursprüngliche beste `OK`-Wahl und bleibt über spätere Selektionen stabil.
+- `dishBriefs` existiert nur für `selectableDishKeys`, nicht für `CONDITIONAL` oder `NOT_OK`.
+- Wenn keine `OK`-Gerichte existieren, bleiben `selectableDishKeys` und `dishBriefs` leer und `defaultDishKey` ist `null`.
+
+**Visible Options / Stage**
+
+- Initiale Analyse: `stage = recommendation_ready`
+- `select_dish`: `stage = decision_loop`
+- `waiter_phrase`: `stage = completed`
+
+Für V0.4 trägt `visibleOptions` effektiv nur noch `waiter_phrase`, solange die Session nicht `completed` ist. Im Status `completed` ist `visibleOptions` leer.
 
 ```json
 {

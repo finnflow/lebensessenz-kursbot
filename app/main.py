@@ -1,5 +1,5 @@
 import os
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.exceptions import RequestValidationError
@@ -123,7 +123,8 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 class EatNowSessionRequest(BaseModel):
     type: Literal["eat_now"]
     menuStateId: Optional[str] = None
-    sessionAction: Optional[Literal["other_option", "more_trennkost", "waiter_phrase"]] = None
+    sessionAction: Optional[Literal["select_dish", "waiter_phrase", "other_option", "more_trennkost"]] = None
+    targetDishKey: Optional[str] = None
 
 
 class EatNowDishResponse(BaseModel):
@@ -140,11 +141,21 @@ class EatNowVisibleOptionResponse(BaseModel):
     label: str
 
 
+class EatNowDishBriefResponse(BaseModel):
+    why: List[str]
+    orderHints: List[str]
+    afterMealHints: List[str]
+
+
 class EatNowSessionResponse(BaseModel):
     type: Literal["eat_now"]
     menuStateId: str
     stage: Literal["recommendation_ready", "decision_loop", "completed"]
     focusDishKey: str
+    defaultDishKey: Optional[str] = None
+    selectableDishKeys: List[str]
+    selectableCount: int
+    dishBriefs: Dict[str, EatNowDishBriefResponse]
     dishMatrix: List[EatNowDishResponse]
     visibleOptions: List[EatNowVisibleOptionResponse]
 
@@ -397,6 +408,7 @@ def get_conversation_messages(request: Request, conversation_id: str, guest_id: 
             menu_state["focus_dish_key"],
             menu_state["dish_matrix"],
             menu_state["stage"],
+            dish_briefs=menu_state.get("dish_briefs"),
         )
 
     return {"messages": messages, "currentSession": current_session}

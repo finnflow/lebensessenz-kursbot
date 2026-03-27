@@ -44,6 +44,7 @@ from app.database import (
 from app.eat_now_session import (
     EatNowSessionClientError,
     apply_session_action,
+    build_dish_briefs,
     build_menu_matrix,
     build_session_payload,
     pick_initial_focus_dish_key,
@@ -655,11 +656,21 @@ def _handle_eat_now_session_action(
     if menu_state.get("stage") == SESSION_STAGE_COMPLETED:
         raise EatNowSessionClientError(409, "The active eat_now menu session is already completed")
 
-    updated_focus_dish_key, answer_text = apply_session_action(
-        menu_state,
-        session["sessionAction"],
-    )
-    next_stage = stage_for_session_action(session["sessionAction"])
+    session_action = session["sessionAction"]
+    target_dish_key = session.get("targetDishKey")
+    if session_action == "select_dish" and not target_dish_key:
+        raise EatNowSessionClientError(400, "targetDishKey is required for select_dish")
+
+    try:
+        updated_focus_dish_key, answer_text = apply_session_action(
+            menu_state,
+            session_action,
+            target_dish_key=target_dish_key,
+        )
+    except ValueError as exc:
+        raise EatNowSessionClientError(400, str(exc)) from exc
+
+    next_stage = stage_for_session_action(session_action)
     if (
         updated_focus_dish_key != menu_state.get("focus_dish_key")
         or next_stage != menu_state.get("stage")
@@ -668,10 +679,11 @@ def _handle_eat_now_session_action(
         menu_state["focus_dish_key"] = updated_focus_dish_key
         menu_state["stage"] = next_stage
 
-    create_message(conversation_id, "assistant", answer_text)
-    conv_data_updated = get_conversation(conversation_id)
-    if conv_data_updated and should_update_summary(conversation_id, conv_data_updated):
-        update_conversation_summary(conversation_id, conv_data_updated)
+    if answer_text:
+        create_message(conversation_id, "assistant", answer_text)
+        conv_data_updated = get_conversation(conversation_id)
+        if conv_data_updated and should_update_summary(conversation_id, conv_data_updated):
+            update_conversation_summary(conversation_id, conv_data_updated)
 
     return {
         "conversationId": conversation_id,
@@ -682,6 +694,7 @@ def _handle_eat_now_session_action(
             menu_state["focus_dish_key"],
             menu_state["dish_matrix"],
             menu_state["stage"],
+            dish_briefs=menu_state.get("dish_briefs"),
         ),
     }
 
@@ -719,6 +732,7 @@ def _handle_food_analysis(
     session_payload = None
     if mode == ChatMode.MENU_ANALYSIS and trennkost_results:
         dish_matrix = build_menu_matrix(trennkost_results)
+        dish_briefs = build_dish_briefs(trennkost_results)
         menu_state_id = f"menu_{uuid.uuid4().hex}"
         focus_dish_key = pick_initial_focus_dish_key(dish_matrix)
         save_active_menu_state(
@@ -727,12 +741,14 @@ def _handle_food_analysis(
             focus_dish_key,
             dish_matrix,
             stage=SESSION_STAGE_RECOMMENDATION_READY,
+            dish_briefs=dish_briefs,
         )
         session_payload = build_session_payload(
             menu_state_id,
             focus_dish_key,
             dish_matrix,
             SESSION_STAGE_RECOMMENDATION_READY,
+            dish_briefs=dish_briefs,
         )
 
     response = _finalize_response(

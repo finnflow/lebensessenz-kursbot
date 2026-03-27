@@ -110,6 +110,13 @@ def run_migrations():
                 ADD COLUMN active_menu_dish_matrix_json TEXT
             """)
 
+        if 'active_menu_dish_briefs_json' not in columns:
+            print("  ✓ Adding active_menu_dish_briefs_json column to conversations table...")
+            cursor.execute("""
+                ALTER TABLE conversations
+                ADD COLUMN active_menu_dish_briefs_json TEXT
+            """)
+
         if 'active_menu_stage' not in columns:
             print("  ✓ Adding active_menu_stage column to conversations table...")
             cursor.execute("""
