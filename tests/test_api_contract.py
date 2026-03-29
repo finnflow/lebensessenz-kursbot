@@ -62,3 +62,20 @@ def test_chat_validation_error():
     assert "code" in data["error"]
     assert data["error"]["code"] == "VALIDATION_ERROR"
     assert "message" in data["error"]
+
+
+def test_openapi_eat_now_v04_session_literals():
+    schema = client.get("/openapi.json").json()
+
+    session_action_schema = schema["components"]["schemas"]["EatNowSessionRequest"]["properties"][
+        "sessionAction"
+    ]
+    session_action_literals = next(
+        option["enum"] for option in session_action_schema["anyOf"] if "enum" in option
+    )
+    visible_option_id_schema = schema["components"]["schemas"]["EatNowVisibleOptionResponse"][
+        "properties"
+    ]["id"]
+
+    assert session_action_literals == ["select_dish", "waiter_phrase"]
+    assert visible_option_id_schema["const"] == "waiter_phrase"

@@ -37,7 +37,7 @@ class ChatModifiers:
 # ── Menu-reference detection ──────────────────────────────────────────
 
 _MENU_REF_PATTERN = re.compile(
-    r"(von der |auf der |von dieser )?(speisekarte|karte|menü|menu)"
+    r"(von der |auf der |von dieser )?\b(speisekarte|karte|menü|menu)\b"
     r"|ein anderes gericht"
     r"|was anderes (von|auf|aus)"
     r"|gibt.s (noch |auch )?(was|etwas) anderes",
@@ -48,6 +48,83 @@ _MENU_REF_PATTERN = re.compile(
 def is_menu_reference(text: str) -> bool:
     """Check if user text references a previously sent menu/Speisekarte."""
     return bool(_MENU_REF_PATTERN.search(text))
+
+
+_MENU_TEXT_KEYWORD_RE = re.compile(
+    r"\b(speisekarte|karte|men[üu]|menu|vorspeisen|hauptgerichte|dessert|desserts)\b",
+    re.IGNORECASE,
+)
+_MENU_PRICE_RE = re.compile(r"\b\d{1,3}(?:[.,]\d{2})?\s*(?:€|eur)\b", re.IGNORECASE)
+_MENU_TEXT_SEGMENT_SEPARATOR_RE = re.compile(r"\s*(?:/|\||•|·|;)\s*")
+_MENU_LIST_MARKER_RE = re.compile(r"^\s*(?:\d+[.)-]?\s*|[-*•]\s*)")
+_MENU_CONVERSATIONAL_RE = re.compile(
+    r"\?|"
+    r"\b(kann|darf|soll|muss|wie|was|warum|wieso|weshalb|ich|wir|du|man|rezept|kochen|zubereiten|machen)\b",
+    re.IGNORECASE,
+)
+_MENU_INGREDIENT_UNIT_RE = re.compile(
+    r"\b\d+\s*(?:g|kg|ml|l|el|tl|stk|stück|stücke|scheiben?)\b",
+    re.IGNORECASE,
+)
+_MENU_DISH_WORD_RE = re.compile(r"[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß'/-]*")
+
+
+def _normalize_menu_candidate(segment: str) -> str:
+    candidate = _MENU_LIST_MARKER_RE.sub("", segment.strip())
+    candidate = _MENU_PRICE_RE.sub("", candidate)
+    return candidate.strip(" -–—,:")
+
+
+def _is_dish_like_menu_candidate(segment: str) -> bool:
+    candidate = _normalize_menu_candidate(segment)
+    if not candidate or candidate.endswith("?"):
+        return False
+    if _MENU_INGREDIENT_UNIT_RE.search(candidate):
+        return False
+    words = _MENU_DISH_WORD_RE.findall(candidate)
+    return 1 <= len(words) <= 12 and 4 <= len(candidate) <= 120
+
+
+def _looks_like_pasted_menu_text(text: str) -> bool:
+    """Conservative heuristic for pasted text menus without image upload."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    price_lines = sum(bool(_MENU_PRICE_RE.search(line)) for line in lines)
+    dish_like_lines = sum(_is_dish_like_menu_candidate(line) for line in lines)
+
+    has_menu_keyword = bool(_MENU_TEXT_KEYWORD_RE.search(text))
+    if has_menu_keyword and (price_lines >= 1 or dish_like_lines >= 3):
+        return True
+
+    if price_lines >= 2 and dish_like_lines >= 3:
+        return True
+
+    if _MENU_CONVERSATIONAL_RE.search(text):
+        return False
+
+    segments = []
+    for line in lines:
+        parts = _MENU_TEXT_SEGMENT_SEPARATOR_RE.split(line) if _MENU_TEXT_SEGMENT_SEPARATOR_RE.search(line) else [line]
+        segments.extend(
+            candidate
+            for candidate in (_normalize_menu_candidate(part) for part in parts)
+            if candidate
+        )
+
+    if len(segments) < 3:
+        return False
+
+    dish_like_segments = [segment for segment in segments if _is_dish_like_menu_candidate(segment)]
+    if len(dish_like_segments) != len(segments):
+        return False
+
+    multi_word_segments = [
+        segment for segment in dish_like_segments
+        if len(_MENU_DISH_WORD_RE.findall(segment)) >= 2
+    ]
+    longish_segments = [segment for segment in dish_like_segments if len(segment) >= 12]
+    return len(multi_word_segments) >= 2 or (
+        len(multi_word_segments) >= 1 and len(longish_segments) >= 2
+    )
 
 
 # ── Recipe-request detection ──────────────────────────────────────────
@@ -334,7 +411,11 @@ def detect_chat_mode(
     if image_path:
         return ChatMode.FOOD_ANALYSIS, modifiers
 
-    # 3. Menu reference in text
+    # 3. Pasted text menu (new conversation or fresh menu pasted into an existing one)
+    if _looks_like_pasted_menu_text(user_message):
+        return ChatMode.MENU_ANALYSIS, modifiers
+
+    # 3.2. Menu reference in text
     if is_menu_ref:
         return ChatMode.MENU_FOLLOWUP, modifiers
 

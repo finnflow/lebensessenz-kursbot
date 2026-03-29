@@ -1,5 +1,5 @@
 import os
-from typing import List, Optional
+from typing import Dict, List, Literal, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.exceptions import RequestValidationError
@@ -14,12 +14,14 @@ from app.database import (
     get_messages,
     get_conversations_by_guest,
     conversation_belongs_to_guest,
+    get_active_menu_state,
 )
 from app.migrations import run_migrations
 from app.auth import router as auth_router
 from app.entitlements import router as entitlements_router
 from app.clients import MODEL, TOP_K, LAST_N, SUMMARY_THRESHOLD
-from app.chat_service import handle_chat, handle_chat_stream_async
+from app.chat_service import handle_chat, handle_chat_stream_async, normalize_ui_intent
+from app.eat_now_session import EatNowSessionClientError, build_session_payload
 from app.image_handler import save_image, ImageValidationError
 from app.feedback_service import export_feedback
 from trennkost.analyzer import analyze_text as trennkost_analyze_text, format_results_for_llm
@@ -37,6 +39,8 @@ origins = [
     "http://localhost:4321",   # Astro dev
     "http://localhost:5173",   # Vite dev (RicsSite)
     "http://127.0.0.1:5173",   # Vite dev via IP
+    "http://localhost:4173",   # Alternate Vite dev port
+    "http://127.0.0.1:4173",   # Alternate Vite dev port via IP
     "https://lebensessenz.de", # production
 ]
 
@@ -70,6 +74,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         400: "BAD_REQUEST",
         403: "ACCESS_DENIED",
         404: "NOT_FOUND",
+        409: "CONFLICT",
     }
     error_code = code_map.get(exc.status_code, "HTTP_ERROR")
     return JSONResponse(
@@ -78,6 +83,22 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "error": {
                 "code": error_code,
                 "message": exc.detail,
+            }
+        },
+    )
+
+@app.exception_handler(EatNowSessionClientError)
+async def eat_now_session_client_error_handler(request: Request, exc: EatNowSessionClientError):
+    code_map = {
+        400: "BAD_REQUEST",
+        409: "CONFLICT",
+    }
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": code_map.get(exc.status_code, "HTTP_ERROR"),
+                "message": exc.message,
             }
         },
     )
@@ -99,6 +120,46 @@ UPLOAD_DIR = os.getenv("UPLOAD_DIR", "storage/uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
+class EatNowSessionRequest(BaseModel):
+    type: Literal["eat_now"]
+    menuStateId: Optional[str] = None
+    sessionAction: Optional[Literal["select_dish", "waiter_phrase"]] = None
+    targetDishKey: Optional[str] = None
+
+
+class EatNowDishResponse(BaseModel):
+    dishKey: str
+    label: str
+    rank: int
+    verdict: str
+    trafficLight: str
+    hasOpenQuestion: bool
+
+
+class EatNowVisibleOptionResponse(BaseModel):
+    id: Literal["waiter_phrase"]
+    label: str
+
+
+class EatNowDishBriefResponse(BaseModel):
+    why: List[str]
+    orderHints: List[str]
+    afterMealHints: List[str]
+
+
+class EatNowSessionResponse(BaseModel):
+    type: Literal["eat_now"]
+    menuStateId: str
+    stage: Literal["recommendation_ready", "decision_loop", "completed"]
+    focusDishKey: str
+    defaultDishKey: Optional[str] = None
+    selectableDishKeys: List[str]
+    selectableCount: int
+    dishBriefs: Dict[str, EatNowDishBriefResponse]
+    dishMatrix: List[EatNowDishResponse]
+    visibleOptions: List[EatNowVisibleOptionResponse]
+
+
 class ChatRequest(BaseModel):
     conversationId: Optional[str] = None
     message: str
@@ -106,11 +167,13 @@ class ChatRequest(BaseModel):
     userId: Optional[str] = None    # reserved for future auth; not passed to handle_chat
     courseId: Optional[str] = None  # reserved for future multi-course support
     intent: Optional[str] = None    # optional hint for chat mode routing
+    session: Optional[EatNowSessionRequest] = None
 
 class ChatResponse(BaseModel):
     conversationId: str
     answer: str
     sources: list
+    session: Optional[EatNowSessionResponse] = None
 
 class HealthResponse(BaseModel):
     ok: bool
@@ -161,8 +224,8 @@ def get_config():
         ),
     )
 
-@app.post("/chat", response_model=ChatResponse)
-@app.post("/api/v1/chat", response_model=ChatResponse)
+@app.post("/chat", response_model=ChatResponse, response_model_exclude_none=True)
+@app.post("/api/v1/chat", response_model=ChatResponse, response_model_exclude_none=True)
 def chat(request: ChatRequest):
     """
     Main chat endpoint with rolling summary (JSON-based).
@@ -175,11 +238,18 @@ def chat(request: ChatRequest):
     - Updates rolling summary if threshold reached
     """
     message = request.message.strip()
-    if not message and not request.intent:
+    has_session_action = bool(request.session and request.session.sessionAction)
+    if not message and not request.intent and not has_session_action:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     try:
-        result = handle_chat(request.conversationId, message, request.guestId, intent=request.intent)
+        result = handle_chat(
+            request.conversationId,
+            message,
+            request.guestId,
+            intent=request.intent,
+            session=request.session.model_dump(exclude_none=True) if request.session else None,
+        )
         return ChatResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -212,10 +282,10 @@ async def chat_stream(request: ChatRequest):
     return StreamingResponse(gen, media_type="text/event-stream")
 
 
-@app.post("/chat/image", response_model=ChatResponse)
-@app.post("/api/v1/chat/image", response_model=ChatResponse)
+@app.post("/chat/image", response_model=ChatResponse, response_model_exclude_none=True)
+@app.post("/api/v1/chat/image", response_model=ChatResponse, response_model_exclude_none=True)
 async def chat_with_image(
-    message: str = Form(...),
+    message: str = Form(""),
     conversationId: Optional[str] = Form(None),
     guestId: Optional[str] = Form(None),
     intent: Optional[str] = Form(None),
@@ -225,7 +295,7 @@ async def chat_with_image(
     Chat endpoint with optional image upload for meal analysis.
 
     Supports multipart/form-data with:
-    - message: User question/message (required)
+    - message: User question/message (optional for image + intent=eat)
     - conversationId: Existing conversation ID (optional)
     - guestId: Guest identifier (optional)
     - image: Image file (JPG, PNG, HEIC, WebP) (optional)
@@ -236,7 +306,8 @@ async def chat_with_image(
     - Generates Trennkost-based evaluation
     """
     message = message.strip()
-    if not message:
+    allow_empty_image_message = bool(image and normalize_ui_intent(intent) == "eat")
+    if not message and not allow_empty_image_message:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     image_path = None
@@ -329,7 +400,18 @@ def get_conversation_messages(request: Request, conversation_id: str, guest_id: 
         raise HTTPException(status_code=403, detail="Access denied")
 
     messages = get_messages(conversation_id)
-    return {"messages": messages}
+    menu_state = get_active_menu_state(conversation_id)
+    current_session = None
+    if menu_state:
+        current_session = build_session_payload(
+            menu_state["menu_state_id"],
+            menu_state["focus_dish_key"],
+            menu_state["dish_matrix"],
+            menu_state["stage"],
+            dish_briefs=menu_state.get("dish_briefs"),
+        )
+
+    return {"messages": messages, "currentSession": current_session}
 
 @app.delete("/conversations/{conversation_id}")
 @app.delete("/api/v1/conversations/{conversation_id}")

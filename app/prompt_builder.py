@@ -153,6 +153,11 @@ def _rank_menu_results(trennkost_results: List[TrennkostResult]) -> List[Trennko
     return sorted(trennkost_results, key=_menu_sort_key)
 
 
+def rank_menu_results(trennkost_results: List[TrennkostResult]) -> List[TrennkostResult]:
+    """Public wrapper for the existing deterministic menu ranking."""
+    return _rank_menu_results(trennkost_results)
+
+
 def build_menu_injection(trennkost_results: List[TrennkostResult]) -> List[str]:
     """SPEISEKARTE-MODUS: inject OK/conditional dish lists for menu analysis."""
     ranked_results = _rank_menu_results(trennkost_results)

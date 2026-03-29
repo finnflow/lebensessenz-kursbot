@@ -569,9 +569,12 @@ def analyze_vision(
             result = evaluate_dish(analysis, mode=evaluation_mode)
             # Add uncertain items as questions — but skip irrelevant ones (herbs/spices)
             if uncertain:
+                unknown_keys = {item.strip().lower() for item in unknowns}
                 # Filter out herbs/spices (NEUTRAL/KRAEUTER) that don't affect verdict
                 relevant_uncertain = []
                 for u in uncertain:
+                    if u.strip().lower() in unknown_keys:
+                        continue
                     ent = ontology.lookup(u)
                     # Only ask about uncertain items that aren't herbs/spices
                     if not ent:
