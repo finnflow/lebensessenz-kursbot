@@ -123,7 +123,7 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 class EatNowSessionRequest(BaseModel):
     type: Literal["eat_now"]
     menuStateId: Optional[str] = None
-    sessionAction: Optional[Literal["select_dish", "waiter_phrase", "other_option", "more_trennkost"]] = None
+    sessionAction: Optional[Literal["select_dish", "waiter_phrase"]] = None
     targetDishKey: Optional[str] = None
 
 
@@ -137,7 +137,7 @@ class EatNowDishResponse(BaseModel):
 
 
 class EatNowVisibleOptionResponse(BaseModel):
-    id: Literal["other_option", "more_trennkost", "waiter_phrase"]
+    id: Literal["waiter_phrase"]
     label: str
 
 
