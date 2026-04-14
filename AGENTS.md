@@ -22,6 +22,7 @@
 ## Working Commands
 - `./start.sh`
 - `source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+- `./scripts/validate.sh` (default local blocking lane)
 - `pytest tests/test_engine.py tests/test_food_core_gold_matrix.py tests/test_ontology_schema.py -v`
 - `pytest tests/test_normalization.py tests/test_normalization_e2e.py -v`
 - `pytest tests/test_grounding_policy.py tests/test_prompt_builder_output_contract.py tests/test_output_contract.py -v`
