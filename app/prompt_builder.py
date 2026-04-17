@@ -14,7 +14,7 @@ from app.breakfast_policy import (
     build_breakfast_recipe_instruction,
 )
 from app.grounding_policy import FALLBACK_SENTENCE
-from trennkost.models import TrennkostResult, Verdict, TrafficLight
+from trennkost.models import AnalysisMode, TrennkostResult, Verdict, TrafficLight
 from trennkost.formatter import format_results_for_llm
 
 SYSTEM_INSTRUCTIONS = f"""Du bist ein kurs-assistierender Bot.
@@ -280,6 +280,10 @@ def build_prompt_food_analysis(
         return build_prompt_menu_overview(trennkost_results, user_message)
 
     verdict_str = trennkost_results[0].verdict.value if trennkost_results else "UNKNOWN"
+    is_vollwert = (
+        trennkost_results[0].verdict_basis == "traffic_light"
+        if trennkost_results else False
+    )
 
     groups_present: set = set()
     for r in trennkost_results:
@@ -288,11 +292,17 @@ def build_prompt_food_analysis(
         g in groups_present for g in ("KH", "GETREIDE", "HUELSENFRUECHTE", "TROCKENOBST")
     )
 
+    verdict_basis_note = (
+        "- Basis: Vollwert-/Ampelanalyse (keine Trennkost-Kombinationsregeln geprüft).\n"
+        if is_vollwert else
+        "- Das Verdict wurde DETERMINISTISCH ermittelt und darf NICHT überschrieben, abgeschwächt oder umgekehrt werden.\n"
+    )
+
     return (
         f"USER'S ORIGINAL MESSAGE: {user_message}\n\n"
         "ANTWORT-ANWEISUNGEN:\n"
         f"KRITISCH: Das deterministische Verdict lautet '{verdict_str}' und ist verbindlich.\n"
-        "- Das Verdict wurde DETERMINISTISCH ermittelt und darf NICHT überschrieben, abgeschwächt oder umgekehrt werden.\n"
+        + verdict_basis_note +
         "- Formuliere für den User natürlich, aber halte die Bedeutung des Verdicts exakt stabil (kein exaktes Legacy-Wording nötig).\n"
         "- Trenne klar: (1) Verdict, (2) Offene Fragen/Klärung, (3) Guidance/Hinweise.\n"
         "- Offene Fragen sind Klärung und ändern das deterministische Verdict nicht.\n"

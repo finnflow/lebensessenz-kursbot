@@ -20,7 +20,6 @@ def test_target_schema_fields_load_from_canonical_ontology():
     assert banana.item_id == "banane"
     assert banana.group == FoodGroup.OBST
     assert banana.group_strict == CombinationGroup.FRUIT_DENSE
-    assert banana.group_light == CombinationGroup.KH
     assert banana.post_meal_wait_profile == "FRUIT_DENSE_OR_DRIED_45_60"
 
     apple = ontology.lookup("Apfel")
@@ -33,13 +32,11 @@ def test_target_schema_fields_load_from_canonical_ontology():
     assert dried is not None
     assert dried.group == FoodGroup.TROCKENOBST
     assert dried.group_strict == CombinationGroup.DRIED_FRUIT
-    assert dried.group_light == CombinationGroup.KH
 
     tofu = ontology.lookup("Tofu")
     assert tofu is not None
     assert tofu.group == FoodGroup.HUELSENFRUECHTE
     assert tofu.group_strict == CombinationGroup.PROTEIN
-    assert tofu.group_light == CombinationGroup.KH
     assert tofu.risk_codes == ["SOY"]
     assert tofu.guidance_codes == ["SOY_IN_MODERATION"]
 
@@ -47,7 +44,6 @@ def test_target_schema_fields_load_from_canonical_ontology():
     assert mayo is not None
     assert mayo.group == FoodGroup.NEUTRAL
     assert mayo.group_strict == CombinationGroup.FETT
-    assert mayo.group_light == CombinationGroup.FETT
     assert mayo.high_fat is True
     assert mayo.risk_codes == ["HEAVY_FAT_LOAD"]
     assert mayo.modifier_policy == "CONDIMENT_ONLY"
@@ -56,7 +52,6 @@ def test_target_schema_fields_load_from_canonical_ontology():
     assert seitan is not None
     assert seitan.group == FoodGroup.PROTEIN
     assert seitan.group_strict == CombinationGroup.PROTEIN
-    assert seitan.group_light == CombinationGroup.KH
     assert seitan.risk_codes == ["GLUTEN_HIGH"]
     assert seitan.guidance_codes == ["GLUTEN_AWARE"]
 
@@ -64,7 +59,6 @@ def test_target_schema_fields_load_from_canonical_ontology():
     assert tempeh is not None
     assert tempeh.group == FoodGroup.HUELSENFRUECHTE
     assert tempeh.group_strict == CombinationGroup.PROTEIN
-    assert tempeh.group_light == CombinationGroup.KH
 
 
 def test_fruit_rows_use_consistent_strict_groups_and_wait_profiles():
@@ -90,21 +84,18 @@ def test_fruit_rows_use_consistent_strict_groups_and_wait_profiles():
         item = ontology.lookup(canonical)
         assert item is not None
         assert item.group_strict == CombinationGroup.FRUIT_WATERY
-        assert item.group_light == CombinationGroup.FRUIT_WATERY
         assert item.post_meal_wait_profile == "FRUIT_WATERY_20_30"
 
     for canonical in dense_examples:
         item = ontology.lookup(canonical)
         assert item is not None
         assert item.group_strict == CombinationGroup.FRUIT_DENSE
-        assert item.group_light == CombinationGroup.KH
         assert item.post_meal_wait_profile == "FRUIT_DENSE_OR_DRIED_45_60"
 
     for canonical in dried_examples:
         item = ontology.lookup(canonical)
         assert item is not None
         assert item.group_strict == CombinationGroup.DRIED_FRUIT
-        assert item.group_light == CombinationGroup.KH
         assert item.post_meal_wait_profile == "FRUIT_DENSE_OR_DRIED_45_60"
 
     fruit_items = [
@@ -115,7 +106,6 @@ def test_fruit_rows_use_consistent_strict_groups_and_wait_profiles():
     assert fruit_items
     assert all(item.item_id for item in fruit_items)
     assert all(item.group_strict for item in fruit_items)
-    assert all(item.group_light for item in fruit_items)
     assert all(item.post_meal_wait_profile for item in fruit_items)
 
 
@@ -187,7 +177,6 @@ def test_mayonnaise_keeps_legacy_group_but_exposes_target_mapping():
     assert mayo is not None
     assert mayo.group == FoodGroup.NEUTRAL
     assert mayo.group_strict == CombinationGroup.FETT
-    assert mayo.group_light == CombinationGroup.FETT
 
 
 def test_lookup_to_food_item_preserves_additive_fields():
@@ -199,7 +188,6 @@ def test_lookup_to_food_item_preserves_additive_fields():
     assert item.food_family == "condiment"
     assert item.group == FoodGroup.NEUTRAL
     assert item.group_strict == CombinationGroup.NEUTRAL
-    assert item.group_light == CombinationGroup.NEUTRAL
     assert item.modifier_policy == "CONDIMENT"
     assert item.base_item_id == "zitrone"
     assert item.intrinsic_conflict_code == "CITRUS_CONTEXTUAL"
@@ -256,16 +244,16 @@ def test_loader_handles_legacy_and_malformed_rows(tmp_path):
     risk_profiles_json = tmp_path / "risk_profiles.json"
     guidance_profiles_json = tmp_path / "guidance_profiles.json"
 
-    header = "canonical,synonyms,group,subgroup,ambiguity_flag,ambiguity_note,high_fat,notes,item_id,food_family,group_strict,group_light,post_meal_wait_profile,modifier_policy,base_item_id,intrinsic_conflict_code,risk_codes,guidance_codes"
+    header = "canonical,synonyms,group,subgroup,ambiguity_flag,ambiguity_note,high_fat,notes,item_id,food_family,group_strict,post_meal_wait_profile,modifier_policy,base_item_id,intrinsic_conflict_code,risk_codes,guidance_codes"
     rows = [
         header,
         "# comment row should be ignored",
-        ",".join(["Legacy Apple", "Legacy Apfel", "OBST", "FRISCH", "false", "", "false", "", "", "", "", "", "", "", "", "", "", ""]),
-        ",".join(["", "", "OBST", "FRISCH", "false", "", "false", "", "", "", "", "", "", "", "", "", "", ""]),
-        ",".join(["Broken Group", "", "NOT_A_GROUP", "", "false", "", "false", "", "", "", "", "", "", "", "", "", "", ""]),
-        ",".join(["Broken Strict", "", "NEUTRAL", "", "false", "", "false", "", "", "", "INVALID_STRICT", "", "", "", "", "", "", ""]),
-        ",".join(["Broken Extra", "", "NEUTRAL", "", "false", "", "false", "", "", "", "", "", "", "", "", "", "", "", "unexpected"]),
-        ",".join(["Broken Ref", "", "NEUTRAL", "", "false", "", "false", "", "", "", "", "", "UNKNOWN_WAIT", "", "", "", "MISSING_RISK", "MISSING_GUIDANCE"]),
+        ",".join(["Legacy Apple", "Legacy Apfel", "OBST", "FRISCH", "false", "", "false", "", "", "", "", "", "", "", "", "", ""]),
+        ",".join(["", "", "OBST", "FRISCH", "false", "", "false", "", "", "", "", "", "", "", "", "", ""]),
+        ",".join(["Broken Group", "", "NOT_A_GROUP", "", "false", "", "false", "", "", "", "", "", "", "", "", "", ""]),
+        ",".join(["Broken Strict", "", "NEUTRAL", "", "false", "", "false", "", "", "", "INVALID_STRICT", "", "", "", "", "", ""]),
+        ",".join(["Broken Extra", "", "NEUTRAL", "", "false", "", "false", "", "", "", "", "", "", "", "", "", "", "unexpected"]),
+        ",".join(["Broken Ref", "", "NEUTRAL", "", "false", "", "false", "", "", "", "", "UNKNOWN_WAIT", "", "", "", "MISSING_RISK", "MISSING_GUIDANCE"]),
     ]
     ontology_csv.write_text("\n".join(rows), encoding="utf-8")
     _write_json(compounds_json, '{"compounds": {}}')
@@ -286,7 +274,6 @@ def test_loader_handles_legacy_and_malformed_rows(tmp_path):
     assert legacy.item_id == "legacy_apple"
     assert legacy.group == FoodGroup.OBST
     assert legacy.group_strict == CombinationGroup.FRUIT_WATERY
-    assert legacy.group_light == CombinationGroup.FRUIT_WATERY
 
     broken_group = ontology.lookup("Broken Group")
     assert broken_group is not None

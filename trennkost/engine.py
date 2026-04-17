@@ -11,8 +11,8 @@ from typing import List, Dict, Set, Optional, Tuple, Union
 from collections import defaultdict
 
 from trennkost.models import (
+    AnalysisMode,
     CombinationGroup,
-    EvaluationMode,
     FoodGroup,
     FoodSubgroup,
     RiskSeverity,
@@ -99,9 +99,6 @@ SUMMARY_GROUP_LABELS = {
     CombinationGroup.FETT.value: "Fette",
 }
 
-# TODO(vollwert-mode): legacy "light" naming left in place intentionally; rename fully later without changing logic.
-VOLLWERT_MODE_RELAXATION_CODE = "LIGHT_MODE_RELAXED"
-
 
 class TrennkostEngine:
     """Deterministic rule engine for food combination checking."""
@@ -139,76 +136,157 @@ class TrennkostEngine:
     def evaluate(
         self,
         analysis: DishAnalysis,
-        mode: Union[str, EvaluationMode] = EvaluationMode.STRICT,
+        mode: Union[str, AnalysisMode] = AnalysisMode.TRENNKOST,
     ) -> TrennkostResult:
         """
-        Evaluate a DishAnalysis against all rules.
+        Evaluate a DishAnalysis.
 
-        Returns TrennkostResult with verdict, problems, and required questions.
+        Trennkost mode: full rule-based evaluation + ampel layer.
+        Vollwert mode: ampel/risk layer only, no trennkost combination rules.
         """
-        active_mode = mode if isinstance(mode, EvaluationMode) else EvaluationMode(mode)
+        active_mode = mode if isinstance(mode, AnalysisMode) else AnalysisMode(mode)
         all_items = analysis.items + analysis.assumed_items
 
-        strict_result = self._evaluate_mode(analysis, mode=EvaluationMode.STRICT)
-        active_result = (
-            strict_result
-            if active_mode == EvaluationMode.STRICT
-            else self._evaluate_mode(analysis, mode=active_mode)
-        )
-
-        # ── Build structured risk / ampel ───────────────────────────
+        # ── Build structured risk / ampel (always, both modes) ──────
         risk_facts = self._build_risk_facts(all_items)
         risk_codes = list(dict.fromkeys(fact.risk_code for fact in risk_facts))
         traffic_light = self._aggregate_traffic_light(risk_facts)
 
-        mode_relaxation_applied = (
-            active_mode == EvaluationMode.VOLLWERT
-            and active_result["verdict"] != strict_result["verdict"]
+        if active_mode == AnalysisMode.VOLLWERT:
+            return self._evaluate_vollwert(analysis, risk_facts, risk_codes, traffic_light)
+
+        # ── Trennkost mode: full rule evaluation ────────────────────
+        result_data = self._evaluate_mode(analysis)
+        return TrennkostResult(
+            dish_name=analysis.dish_name,
+            verdict=result_data["verdict"],
+            analysis_mode=AnalysisMode.TRENNKOST,
+            verdict_basis="trennkost",
+            traffic_light=traffic_light,
+            summary=result_data["summary"],
+            problems=result_data["problems"],
+            health_hints=result_data.get("health_hints", []),
+            required_questions=result_data["required_questions"],
+            risk_codes=risk_codes,
+            risk_facts=risk_facts,
+            guidance_codes=result_data["guidance_codes"],
+            guidance_facts=result_data["guidance_facts"],
+            ok_combinations=result_data["ok_notes"],
+            groups_found=result_data["display_groups_found"],
+            strict_groups_found=result_data["combination_groups_found"],
+            debug={
+                "rules_checked": len(self.rules),
+                "rules_triggered": result_data["rules_triggered"],
+                "unknown_items": analysis.unknown_items,
+                "assumed_items": [it.raw_name for it in analysis.assumed_items],
+                "group_set": sorted(result_data["group_set"]),
+                "display_group_set": sorted(result_data["display_groups_found"].keys()),
+                "analysis_mode": "trennkost",
+                "verdict_basis": "trennkost",
+                "traffic_light": traffic_light.value,
+                "risk_codes": risk_codes,
+                "guidance_codes": result_data["guidance_codes"],
+            },
         )
-        mode_delta_codes = [VOLLWERT_MODE_RELAXATION_CODE] if mode_relaxation_applied else []
+
+    def _evaluate_vollwert(
+        self,
+        analysis: DishAnalysis,
+        risk_facts: List[ItemRiskFact],
+        risk_codes: List[str],
+        traffic_light: TrafficLight,
+    ) -> TrennkostResult:
+        """
+        Vollwert-mode evaluation: ampel/risk layer only.
+
+        No trennkost combination rules are applied. Verdict derives from traffic_light.
+        """
+        all_items = analysis.items + analysis.assumed_items
+
+        # ── Build display groups (for context only, no rule checking) ─
+        display_groups_found: Dict[str, List[str]] = defaultdict(list)
+        combination_groups_found: Dict[str, List[str]] = defaultdict(list)
+
+        for item in all_items:
+            combination_group = resolve_combination_group(item)
+            display_group = combination_group_to_display_group(combination_group, fallback=item.group)
+            label = self._format_item_label(item)
+            combination_groups_found[combination_group.value].append(label)
+            display_groups_found[display_group.value].append(label)
+
+        # ── Health hints (non-trennkost) ────────────────────────────
+        health_hints = build_health_recommendation_problems(all_items)
+
+        # ── Guidance facts ──────────────────────────────────────────
+        fat_guidance_facts = self._build_guidance(analysis, dict(combination_groups_found))
+        profile_guidance_facts = self._build_profile_guidance_facts(
+            all_items=all_items,
+            existing_fat_guidance=bool(fat_guidance_facts),
+        )
+        guidance_facts = fat_guidance_facts + profile_guidance_facts
+        guidance_codes = list(dict.fromkeys(fact.code for fact in guidance_facts))
+
+        # ── Clarification questions for unknowns / ambiguous items ──
+        required_questions = self._build_questions(
+            analysis, dict(display_groups_found),
+            bool(analysis.unknown_items), bool(analysis.assumed_items),
+        )
+
+        # ── Derive verdict from traffic_light ───────────────────────
+        verdict = self._verdict_from_traffic_light(traffic_light)
+        summary = self._build_vollwert_summary(analysis.dish_name, traffic_light)
 
         return TrennkostResult(
             dish_name=analysis.dish_name,
-            verdict=active_result["verdict"],
-            active_mode=active_mode,
-            strict_verdict=strict_result["verdict"],
-            active_mode_verdict=active_result["verdict"],
-            mode_relaxation_applied=mode_relaxation_applied,
-            mode_delta_codes=mode_delta_codes,
+            verdict=verdict,
+            analysis_mode=AnalysisMode.VOLLWERT,
+            verdict_basis="traffic_light",
             traffic_light=traffic_light,
-            summary=active_result["summary"],
-            problems=active_result["problems"],
-            health_hints=active_result.get("health_hints", []),
-            required_questions=active_result["required_questions"],
+            summary=summary,
+            problems=[],
+            health_hints=health_hints,
+            required_questions=required_questions,
             risk_codes=risk_codes,
             risk_facts=risk_facts,
-            guidance_codes=active_result["guidance_codes"],
-            guidance_facts=active_result["guidance_facts"],
-            ok_combinations=active_result["ok_notes"],
-            groups_found=active_result["display_groups_found"],
-            strict_groups_found=strict_result["combination_groups_found"],
+            guidance_codes=guidance_codes,
+            guidance_facts=guidance_facts,
+            ok_combinations=[],
+            groups_found=dict(display_groups_found),
+            strict_groups_found={},
             debug={
-                "rules_checked": len(self.rules),
-                "rules_triggered": active_result["rules_triggered"],
+                "rules_checked": 0,
+                "rules_triggered": 0,
                 "unknown_items": analysis.unknown_items,
                 "assumed_items": [it.raw_name for it in analysis.assumed_items],
-                "group_set": sorted(active_result["group_set"]),
-                "display_group_set": sorted(active_result["display_groups_found"].keys()),
-                "strict_group_set": sorted(strict_result["group_set"]),
-                "active_mode": active_mode.value,
-                "strict_verdict": strict_result["verdict"].value,
-                "active_mode_verdict": active_result["verdict"].value,
-                "mode_delta_codes": mode_delta_codes,
+                "group_set": sorted(combination_groups_found.keys()),
+                "display_group_set": sorted(display_groups_found.keys()),
+                "analysis_mode": "vollwert",
+                "verdict_basis": "traffic_light",
                 "traffic_light": traffic_light.value,
                 "risk_codes": risk_codes,
-                "guidance_codes": active_result["guidance_codes"],
+                "guidance_codes": guidance_codes,
             },
         )
+
+    def _verdict_from_traffic_light(self, traffic_light: TrafficLight) -> Verdict:
+        """Derive verdict from traffic_light for vollwert mode."""
+        if traffic_light == TrafficLight.RED:
+            return Verdict.NOT_OK
+        if traffic_light == TrafficLight.YELLOW:
+            return Verdict.CONDITIONAL
+        return Verdict.OK
+
+    def _build_vollwert_summary(self, dish_name: str, traffic_light: TrafficLight) -> str:
+        """Build vollwert-mode summary (no trennkost language)."""
+        if traffic_light == TrafficLight.GREEN:
+            return f"{dish_name}: Keine bekannten Risikofaktoren gefunden."
+        if traffic_light == TrafficLight.YELLOW:
+            return f"{dish_name}: Bedingt empfehlenswert — einzelne Risikofaktoren beachten."
+        return f"{dish_name}: Risikofaktoren vorhanden — bitte beachten."
 
     def _evaluate_mode(
         self,
         analysis: DishAnalysis,
-        mode: EvaluationMode,
     ) -> Dict[str, object]:
         all_items = analysis.items + analysis.assumed_items
 
@@ -218,7 +296,7 @@ class TrennkostEngine:
         subgroups_found: Dict[str, Set[FoodSubgroup]] = defaultdict(set)
 
         for item in all_items:
-            combination_group = resolve_combination_group(item, mode=mode)
+            combination_group = resolve_combination_group(item)
             display_group = combination_group_to_display_group(combination_group, fallback=item.group)
             label = self._format_item_label(item)
             combination_groups_found[combination_group.value].append(label)
@@ -283,7 +361,7 @@ class TrennkostEngine:
         health_hints = build_health_recommendation_problems(all_items)
 
         # ── Special deterministic protein rules ─────────────────────
-        r018_problem = build_r018_mixed_protein_problem(all_items, mode=mode)
+        r018_problem = build_r018_mixed_protein_problem(all_items)
         if r018_problem is not None:
             problems.append(r018_problem)
 
@@ -298,10 +376,9 @@ class TrennkostEngine:
         )
 
         # ── Build structured guidance ───────────────────────────────
-        fat_guidance_facts = self._build_guidance(analysis, combination_groups_found, mode=mode)
+        fat_guidance_facts = self._build_guidance(analysis, combination_groups_found)
         profile_guidance_facts = self._build_profile_guidance_facts(
             all_items=all_items,
-            mode=mode,
             existing_fat_guidance=bool(fat_guidance_facts),
         )
         guidance_facts = fat_guidance_facts + profile_guidance_facts
@@ -465,13 +542,12 @@ class TrennkostEngine:
         self,
         analysis: DishAnalysis,
         groups_found: Dict[str, List[str]],
-        mode: EvaluationMode = EvaluationMode.STRICT,
     ) -> List[GuidanceFact]:
         """Build structured, verdict-independent guidance facts."""
         all_items = analysis.items + analysis.assumed_items
         fat_items = [
             item for item in all_items
-            if resolve_combination_group(item, mode=mode) == CombinationGroup.FETT
+            if resolve_combination_group(item) == CombinationGroup.FETT
         ]
         if not fat_items:
             return []
@@ -552,7 +628,6 @@ class TrennkostEngine:
     def _build_profile_guidance_facts(
         self,
         all_items: List[FoodItem],
-        mode: EvaluationMode,
         existing_fat_guidance: bool = False,
     ) -> List[GuidanceFact]:
         """
@@ -563,7 +638,7 @@ class TrennkostEngine:
         grouped: Dict[str, Dict[str, object]] = {}
 
         for item in all_items:
-            item_group = resolve_combination_group(item, mode=mode)
+            item_group = resolve_combination_group(item)
             # Fat-only combos already use the dedicated synthetic fat guidance path.
             if existing_fat_guidance and item_group == CombinationGroup.FETT:
                 continue
@@ -725,7 +800,7 @@ def get_engine() -> TrennkostEngine:
 
 def evaluate_dish(
     analysis: DishAnalysis,
-    mode: Union[str, EvaluationMode] = EvaluationMode.STRICT,
+    mode: Union[str, AnalysisMode] = AnalysisMode.TRENNKOST,
 ) -> TrennkostResult:
     """Convenience: evaluate a DishAnalysis using the singleton engine."""
     return get_engine().evaluate(analysis, mode=mode)

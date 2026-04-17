@@ -19,8 +19,6 @@ def _make_result(verdict: Verdict) -> TrennkostResult:
     return TrennkostResult(
         dish_name="Testgericht",
         verdict=verdict,
-        strict_verdict=verdict,
-        active_mode_verdict=verdict,
         traffic_light=TrafficLight.RED,
         summary="Deterministisches Ergebnis.",
         required_questions=[

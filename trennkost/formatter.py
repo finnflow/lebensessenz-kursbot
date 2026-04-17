@@ -5,7 +5,7 @@ Transforms TrennkostResult objects into text for LLM context and RAG queries.
 """
 from typing import List
 
-from trennkost.models import TrennkostResult, Verdict
+from trennkost.models import AnalysisMode, TrennkostResult, Verdict
 
 
 _GROUP_DISPLAY = {
@@ -115,8 +115,14 @@ def format_results_for_llm(results: List[TrennkostResult], breakfast_context: bo
     The LLM must NOT change the verdict — only explain it from course material.
     """
     parts = []
-    parts.append("═══ TRENNKOST-ANALYSE (DETERMINISTISCH) ═══")
-    parts.append("WICHTIG: Das Verdict wurde regelbasiert ermittelt und darf NICHT verändert werden.")
+    is_vollwert = any(r.verdict_basis == "traffic_light" for r in results)
+    if is_vollwert:
+        parts.append("═══ VOLLWERT-/AMPEL-ANALYSE (DETERMINISTISCH) ═══")
+        parts.append("MODUS: Vollwert — keine Trennkost-Kombinationsregeln angewendet.")
+        parts.append("Das Verdict basiert auf der Ampel-/Risiko-Analyse.")
+    else:
+        parts.append("═══ TRENNKOST-ANALYSE (DETERMINISTISCH) ═══")
+        parts.append("WICHTIG: Das Verdict wurde regelbasiert ermittelt und darf NICHT verändert werden.")
     parts.append("Deine Aufgabe: Erkläre das Ergebnis anhand der Kurs-Snippets.")
 
     has_no_questions = any(not r.required_questions for r in results)
@@ -127,6 +133,7 @@ def format_results_for_llm(results: List[TrennkostResult], breakfast_context: bo
     for r in results:
         parts.append(f"── {r.dish_name} ──")
         parts.append(f"Verdict: {r.verdict.value}")
+        parts.append(f"Verdict-Basis: {r.verdict_basis}")
         parts.append(f"Zusammenfassung: {r.summary}")
         parts.append(f"Ampel: {r.traffic_light.value}")
 

@@ -20,8 +20,6 @@ def _make_result(dish_name: str, verdict: Verdict) -> TrennkostResult:
     return TrennkostResult(
         dish_name=dish_name,
         verdict=verdict,
-        strict_verdict=verdict,
-        active_mode_verdict=verdict,
         traffic_light=TrafficLight.GREEN,
         summary="Test",
     )

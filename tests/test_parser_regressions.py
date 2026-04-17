@@ -108,4 +108,4 @@ def test_modifier_aware_natural_language_cases(case):
     assert bool(result.required_questions) is case["expect_needs_clarification"]
 
     if case.get("expect_not_not_ok_by_default"):
-        assert result.active_mode_verdict.value != "NOT_OK"
+        assert result.verdict.value != "NOT_OK"

@@ -21,7 +21,7 @@ def _result_for(engine: TrennkostEngine, raw_items: list[str]):
         dish_name=" + ".join(raw_items),
         raw_items=raw_items,
     )
-    return engine.evaluate(analysis, mode="light")
+    return engine.evaluate(analysis, mode="vollwert")
 
 
 # ----------------------------
@@ -63,13 +63,15 @@ def test_prompt_builder_current_bucket_language(engine):
 def test_engine_structured_fields_exist_before_rendering(engine):
     result = _result_for(engine, ["Banane", "Mandeln"])
 
-    assert hasattr(result, "strict_verdict")
-    assert hasattr(result, "active_mode_verdict")
-    assert hasattr(result, "mode_relaxation_applied")
+    assert hasattr(result, "analysis_mode")
+    assert hasattr(result, "verdict_basis")
     assert hasattr(result, "traffic_light")
     assert hasattr(result, "risk_codes")
     assert hasattr(result, "guidance_codes")
     assert hasattr(result, "required_questions")
+    from trennkost.models import AnalysisMode
+    assert result.analysis_mode == AnalysisMode.VOLLWERT
+    assert result.verdict_basis == "traffic_light"
 
 
 def test_formatter_accepts_results_with_required_questions(engine):
@@ -93,7 +95,9 @@ def test_formatter_accepts_results_with_guidance(engine):
 
 
 def test_formatter_accepts_results_with_problems(engine):
-    result = _result_for(engine, ["Pommes", "Schwein"])
+    # Use trennkost mode to get rule-based problems
+    analysis = normalize_dish(dish_name="Pommes + Schwein", raw_items=["Pommes", "Schwein"])
+    result = engine.evaluate(analysis, mode="trennkost")
     assert result.problems
 
     rendered = format_results_for_llm([result])

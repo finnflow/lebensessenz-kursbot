@@ -327,8 +327,9 @@ async def chat_with_image(
 
 class AnalyzeRequest(BaseModel):
     text: str
-    mode: str = "strict"  # explicit ingredients only ("strict") or include assumed ("assumption")
-    evaluation_mode: str = "strict"  # deterministic evaluation mode: "strict" or "light"
+    mode: str = "strict"          # ingredient scope: "strict" (explicit only) or "assumption"
+    analysis_mode: str = "trennkost"  # "trennkost" | "vollwert" (aliases: "strict"/"light")
+    evaluation_mode: Optional[str] = None  # deprecated alias for analysis_mode
 
 @app.post("/analyze")
 @app.post("/api/v1/analyze")
@@ -346,6 +347,7 @@ def analyze_food(request: AnalyzeRequest):
     results = trennkost_analyze_text(
         text,
         mode=request.mode,
+        analysis_mode=request.analysis_mode,
         evaluation_mode=request.evaluation_mode,
     )
     return {
