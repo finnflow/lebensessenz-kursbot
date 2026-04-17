@@ -163,8 +163,7 @@
         "Möhre",
         "Gurke",
         "Koriander",
-        "Chili",
-        "Mayonnaise"
+        "Chili"
       ]
     },
     "Bibimbap": {
@@ -244,10 +243,8 @@
       "needs_clarification": "Mit Möhre oder Kartoffeln?",
       "note": "Ohne Möhre/Kartoffel: OK — PROTEIN (Rindfleisch, Speck) + NEUTRAL (Pilze, Zwiebeln). Mit Möhre: NOT_OK (PROTEIN + KH). Französischer Schmorfleisch-Klassiker — pur ohne KH Trennkost-freundlich.",
       "optional_items": [
-        "Möhre",
         "Knoblauch",
-        "Rotwein",
-        "Kartoffel"
+        "Rotwein"
       ]
     },
     "Borschtsch": {
@@ -260,10 +257,7 @@
       "needs_clarification": "Mit Rindfleisch, Kartoffeln und/oder Saure Sahne?",
       "note": "Variiert: Vegetarisch ohne Kartoffel: OK — NEUTRAL (Rote Bete, Weißkohl, Tomate). Mit Kartoffeln: CONDITIONAL (KH). Mit Rindfleisch + Kartoffeln: NOT_OK (KH+PROTEIN, R001). Mit Saure Sahne: MILCH. Ukrainischer Klassiker — vegetarisch purste Variante Trennkost-freundlich.",
       "optional_items": [
-        "Rindfleisch",
-        "Kartoffel",
         "Saure Sahne",
-        "Möhre",
         "Dill"
       ]
     },
@@ -274,10 +268,9 @@
         "Rosmarin",
         "Olivenöl"
       ],
-      "needs_clarification": "Mit Kartoffeln als Beilage oder pur?",
+      "needs_clarification": "Mit Kartoffeln als Beilage oder pur mit Gemüse?",
       "note": "Pur: OK — PROTEIN (Hähnchen) + NEUTRAL (Knoblauch, Rosmarin). Mit Kartoffeln: NOT_OK (KH + PROTEIN). Mit Olivenöl (kleine Menge): CONDITIONAL. Klassisches Sonntagsgericht — pur Trennkost-freundlich!",
       "optional_items": [
-        "Kartoffel",
         "Thymian",
         "Zitrone",
         "Zwiebel"
@@ -332,11 +325,9 @@
       "optional_items": [
         "Reis",
         "Kichererbsen",
-        "Avocado",
         "Spinat",
         "Süßkartoffel",
-        "Tofu",
-        "Tahini"
+        "Tofu"
       ]
     },
     "Bulgogi": {
@@ -428,8 +419,6 @@
       "needs_clarification": "Mit Hähnchen oder ohne?",
       "note": "Croutons = KH, Parmesan = MILCH → schon NOT_OK. Mit Hähnchen zusätzlich PROTEIN.",
       "optional_items": [
-        "Hähnchen",
-        "Ei",
         "Olivenöl"
       ]
     },
@@ -497,8 +486,7 @@
       "needs_clarification": null,
       "note": "NOT_OK: intrinsisch konfliktuelle Chicken Nuggets plus Pommes. Nutzt das Prepared-Protein-Canonical direkt statt Nuggets+Panade lose nachzubauen.",
       "optional_items": [
-        "Ketchup",
-        "Mayonnaise"
+        "Ketchup"
       ]
     },
     "Chili con Carne": {
@@ -514,7 +502,6 @@
       "optional_items": [
         "Käse",
         "Sauerrahm",
-        "Avocado",
         "Paprika"
       ]
     },
@@ -530,7 +517,6 @@
       "optional_items": [
         "Mais",
         "Süßkartoffel",
-        "Avocado",
         "Käse"
       ]
     },
@@ -575,10 +561,8 @@
       "needs_clarification": "Mit Möhre oder Kartoffeln als Einlage?",
       "note": "Ohne Möhre/Kartoffel: OK — PROTEIN (Hähnchen, Speck) + NEUTRAL (Pilze, Zwiebeln). Mit Möhre: NOT_OK (PROTEIN + KH). Traditionell oft mit Möhre — dann NOT_OK. Pur mit Brot: NOT_OK (KH + PROTEIN).",
       "optional_items": [
-        "Möhre",
         "Knoblauch",
-        "Rotwein",
-        "Kartoffel"
+        "Rotwein"
       ]
     },
     "Couscous mit Gemüse": {
@@ -681,7 +665,6 @@
       "note": "NOT_OK: KH (Hefeteig aus Weizenmehl) + MILCH (Milch im Teig, Butter). Mit Vanillesauce: mehr MILCH (bleibt NOT_OK). Mit Pflaumen: zusätzlich OBST + KH (R007). Süddeutsches Gericht.",
       "optional_items": [
         "Vanillesauce",
-        "Pflaumen",
         "Salzkruste",
         "Zucker"
       ]
@@ -771,7 +754,6 @@
       "optional_items": [
         "Bohnen",
         "Saure Sahne",
-        "Avocado",
         "Chili",
         "Zwiebel",
         "Koriander"
@@ -787,8 +769,6 @@
       "needs_clarification": "Vegetarisch oder mit Speck/Wurst?",
       "note": "Hier: getrocknete Erbsen = HUELSENFRUECHTE (nicht frische grüne Erbsen = NEUTRAL!). Vegetarisch: CONDITIONAL — HUELSENFRUECHTE + KH (Möhre) + NEUTRAL. Mit Speck/Wurst: NOT_OK (HUELSENFRUECHTE + PROTEIN).",
       "optional_items": [
-        "Speck",
-        "Wurst",
         "Petersilie"
       ]
     },
@@ -866,8 +846,7 @@
       "note": "NOT_OK: intrinsisch konfliktuelle Fischstäbchen plus Pommes. Nutzt das Prepared-Protein-Canonical direkt statt Fisch+Panade lose nachzubauen. Mit Mayonnaise: zusätzlich high_fat FETT.",
       "optional_items": [
         "Zitronensaft",
-        "Ketchup",
-        "Mayonnaise"
+        "Ketchup"
       ]
     },
     "Fish and Chips": {
@@ -881,7 +860,6 @@
       "optional_items": [
         "Zitrone",
         "Erbsen",
-        "Mayonnaise",
         "Ketchup"
       ]
     },
@@ -1023,11 +1001,7 @@
       "note": "Pur: OK — reines NEUTRAL. Mit Hähnchen/Thunfisch: OK (PROTEIN + NEUTRAL). Mit Käse: OK (MILCH + NEUTRAL). Mit Olivenöl: CONDITIONAL. Mit Croutons + Hähnchen: OK (KH + NEUTRAL + PROTEIN... Moment: KH + PROTEIN = NOT_OK!). Croutons + Käse: KH + MILCH = NOT_OK. Ohne Croutons sehr flexibel.",
       "optional_items": [
         "Olivenöl",
-        "Essig",
-        "Hähnchen",
-        "Thunfisch",
-        "Käse",
-        "Croutons"
+        "Essig"
       ]
     },
     "Gemüseauflauf": {
@@ -1151,9 +1125,7 @@
       "note": "Gulasch pur (ohne KH-Beilage): OK — PROTEIN (Rindfleisch) + NEUTRAL (Paprika, Zwiebel, Tomatensauce). Mit Kartoffeln oder Nudeln: NOT_OK (KH + PROTEIN).",
       "optional_items": [
         "Paprikapulver",
-        "Lorbeer",
-        "Kartoffel",
-        "Pasta"
+        "Lorbeer"
       ]
     },
     "Gyoza": {
@@ -1223,8 +1195,7 @@
       "note": "Generischer Restaurant-Fallback: Hotdog plus Pommes. Modifier-aware Varianten wie vegetarischer oder veganer Hotdog mit Pommes bleiben vorsichtig über die bestehenden Wurst-Canonicals modelliert.",
       "optional_items": [
         "Senf",
-        "Ketchup",
-        "Mayonnaise"
+        "Ketchup"
       ]
     },
     "Hummus mit Gemüsesticks": {
@@ -1269,11 +1240,7 @@
       ],
       "needs_clarification": "Mit Nudeln oder Einlagen?",
       "note": "Mit Möhre: NOT_OK — PROTEIN (Hähnchen) + KH (Möhre = stärkehaltiges Gemüse). Ohne Möhre (nur Hähnchen + stärkearmes Gemüse): OK. Mit Nudeln: NOT_OK (KH + PROTEIN). Klassische Hühnerbrühe ohne Einlagen und ohne Möhre: OK.",
-      "optional_items": [
-        "Nudeln",
-        "Grießklößchen",
-        "Suppennudeln"
-      ]
+      "optional_items": []
     },
     "Imam Bayildi": {
       "base_items": [
@@ -1360,12 +1327,10 @@
       "needs_clarification": "Mit Mayonnaise (FETT) oder Essig-Dressing? Mit Speck?",
       "note": "Ohne Fleisch: CONDITIONAL — KH (Kartoffel) + FETT (Mayonnaise, high_fat). Mayonnaise = größere Fettmenge → nur NEUTRAL-Beilage empfohlen. Mit Speck: NOT_OK (KH + PROTEIN).",
       "optional_items": [
-        "Mayonnaise",
         "Senf",
         "Essig",
         "Gurke",
-        "Schnittlauch",
-        "Speck"
+        "Schnittlauch"
       ]
     },
     "Kartoffelsuppe": {
@@ -1379,7 +1344,6 @@
       "note": "Pur (ohne Milch/Protein): OK — KH (Kartoffel, Möhre) + NEUTRAL (Sellerie, Zwiebel). Mit Sahne: NOT_OK (KH + MILCH). Mit Speck: NOT_OK (KH + PROTEIN).",
       "optional_items": [
         "Sahne",
-        "Speck",
         "Petersilie",
         "Schnittlauch"
       ]
@@ -1441,7 +1405,6 @@
       "note": "Ohne Reis: OK — PROTEIN (Rindfleisch) + NEUTRAL (Weißkohl, Zwiebeln). Mit Reis in der Füllung: NOT_OK (KH + PROTEIN). Mit Speck zusätzlich: mehr PROTEIN (gleiche Gruppe, OK). Mit KH-Beilagen (Kartoffeln): NOT_OK.",
       "optional_items": [
         "Speck",
-        "Reis",
         "Tomatensauce"
       ]
     },
@@ -1475,8 +1438,7 @@
       "optional_items": [
         "Sojasoße",
         "Reisessig",
-        "Sesamöl",
-        "Reis"
+        "Sesamöl"
       ]
     },
     "Käsebrot": {
@@ -1814,7 +1776,6 @@
       "optional_items": [
         "Hackfleisch",
         "Bohnen",
-        "Avocado",
         "Saure Sahne",
         "Jalapeño",
         "Tomate"
@@ -1934,8 +1895,7 @@
         "Garnele",
         "Tintenfisch",
         "Frühlingszwiebel",
-        "Sojasoße",
-        "Mayonnaise"
+        "Sojasoße"
       ]
     },
     "Omelette": {
@@ -1948,7 +1908,6 @@
         "Pilze",
         "Spinat",
         "Paprika",
-        "Käse",
         "Schinken",
         "Schnittlauch"
       ]
@@ -1964,11 +1923,9 @@
       "needs_clarification": "Mit Risotto Milanese (NOT_OK) oder mit Gremolata pur (OK)?",
       "note": "Pur mit Gremolata (Petersilie, Zitrone, Knoblauch): OK — PROTEIN (Kalbshaxe) + NEUTRAL. Mit Möhre im Schmorfond: beachten (Möhre = KH). Traditionell mit Risotto Milanese: NOT_OK (KH + MILCH).",
       "optional_items": [
-        "Möhre",
         "Weißwein",
         "Petersilie",
-        "Zitrone",
-        "Risotto"
+        "Zitrone"
       ]
     },
     "Overnight Oats": {
@@ -2204,7 +2161,6 @@
       "needs_clarification": "Welcher Protein? Mit Edamame?",
       "note": "Standard: NOT_OK — KH (Reis) + PROTEIN (Lachs). Mit Edamame: zusätzlich HUELSENFRUECHTE + KH. Mit Mango: zusätzlich OBST + KH. Vegane Variante ohne Fisch: KH + NEUTRAL/HUELSENFRUECHTE prüfen.",
       "optional_items": [
-        "Avocado",
         "Edamame",
         "Gurke",
         "Sesam",
@@ -2308,8 +2264,7 @@
         "Olivenöl",
         "Zitrone",
         "Petersilie",
-        "Koriander",
-        "Kichererbsen"
+        "Koriander"
       ]
     },
     "Raclette": {
@@ -2369,9 +2324,6 @@
       "needs_clarification": "Mit Apfelmus oder Schmand/Speck gereicht?",
       "note": "NOT_OK: KH (Kartoffel) + PROTEIN (Ei). Auch bekannt als Kartoffelpuffer oder Latkes. Mit Apfelmus: zusätzlich OBST + KH (R007). Mit Schmand: zusätzlich MILCH + KH (R002). Mit Speck: mehr PROTEIN.",
       "optional_items": [
-        "Weizenmehl",
-        "Apfelmus",
-        "Sahne",
         "Speck"
       ]
     },
@@ -2404,10 +2356,8 @@
       "needs_clarification": "Pur oder mit Kartoffelklößen/Knödeln als Beilage?",
       "note": "Pur (ohne KH-Beilage): OK — PROTEIN (Rindfleisch, Speck) + NEUTRAL (Senf, Gurke, Zwiebeln). Mit Möhre im Fond: NOT_OK (PROTEIN+KH). Mit Kartoffelklößen: NOT_OK (KH+PROTEIN, R001). Traditionell mit Klößen — dann NOT_OK.",
       "optional_items": [
-        "Möhre",
         "Sellerie",
-        "Rotwein",
-        "Kartoffel"
+        "Rotwein"
       ]
     },
     "Risotto": {
@@ -2436,10 +2386,7 @@
       "note": "Pur (nur Beeren ohne Zucker/Stärke): OK — reines OBST. Mit Speisestärke und Zucker (KH): NOT_OK (OBST + KH, R007). Mit Sahne oder Vanillesauce: NOT_OK (OBST + MILCH, R009). Pur ohne Zusätze = perfektes Trennkost-Dessert.",
       "optional_items": [
         "Blaubeere",
-        "Johannisbeere",
-        "Speisestärke",
-        "Zucker",
-        "Sahne"
+        "Johannisbeere"
       ]
     },
     "Rotes Linsen-Dal": {
@@ -2468,9 +2415,6 @@
       "needs_clarification": "Pur oder mit Ei/Speck/Käse?",
       "note": "Pur: CONDITIONAL — KH (Kartoffel) + NEUTRAL (Zwiebeln) + FETT (Olivenöl, kleine Menge). Mit Ei obendrauf: NOT_OK (KH + PROTEIN). Mit Speck: NOT_OK (KH + PROTEIN). Mit Käse: NOT_OK (KH + MILCH).",
       "optional_items": [
-        "Ei",
-        "Speck",
-        "Käse",
         "Schnittlauch"
       ]
     },
@@ -2509,8 +2453,6 @@
       "note": "Pur (ohne Brot/Reis): OK — MILCH (Paneer) + NEUTRAL (Spinat, Gemüse, Gewürze). Mit Sahne: mehr MILCH, bleibt OK. Mit Naan oder Reis: NOT_OK (KH + MILCH).",
       "optional_items": [
         "Sahne",
-        "Naan",
-        "Reis",
         "Garam Masala"
       ]
     },
@@ -2583,7 +2525,6 @@
       "needs_clarification": null,
       "note": "Traditionell mit Kartoffelklößen: NOT_OK — PROTEIN (Rindfleisch) + KH (Kartoffel). Rotkohl = NEUTRAL, ändert nichts. Sauerbraten pur (ohne Klöße, nur mit Rotkohl): OK (PROTEIN + NEUTRAL).",
       "optional_items": [
-        "Rosinen",
         "Essig",
         "Lorbeer",
         "Zwiebel"
@@ -2638,9 +2579,6 @@
       "needs_clarification": "Mit Kartoffelknödeln/-beilagen oder pur mit Gemüse?",
       "note": "Pur (ohne KH-Beilagen): OK — PROTEIN (Schwein) + NEUTRAL (Zwiebel, Knoblauch, Sellerie). Mit Kartoffelknödeln oder Bratkartoffeln: NOT_OK (KH + PROTEIN). Mit Möhre im Braten: beachten, dass Möhre = KH (stärkehaltig).",
       "optional_items": [
-        "Möhre",
-        "Kartoffel",
-        "Kartoffelknödel",
         "Rotkohl"
       ]
     },
@@ -2856,9 +2794,7 @@
       "note": "Mais-Tacoschale = KH. Mit Fleisch: NOT_OK (KH + PROTEIN). Mit Bohnen: NOT_OK (KH + HUELSENFRUECHTE). Mit Käse/Sauerrahm: NOT_OK (KH + MILCH). Rein vegane Gemüse-Füllung: OK (KH + NEUTRAL).",
       "optional_items": [
         "Kopfsalat",
-        "Tomate",
-        "Avocado",
-        "Sahne"
+        "Tomate"
       ]
     },
     "Tafelspitz": {
@@ -2872,9 +2808,7 @@
       "note": "Mit Möhre im Fond: NOT_OK — PROTEIN (Rindfleisch) + KH (Möhre). Ohne Möhre: OK. Mit Kartoffeln als Beilage: NOT_OK (KH + PROTEIN). Mit Meerrettich (NEUTRAL): OK. Wiener Klassiker — kaum ohne Möhre traditionell.",
       "optional_items": [
         "Meerrettich",
-        "Schnittlauchsauce",
-        "Kartoffel",
-        "Brot"
+        "Schnittlauchsauce"
       ]
     },
     "Tempura": {
@@ -2904,7 +2838,6 @@
         "Sesam",
         "Frühlingszwiebel",
         "Sesamöl",
-        "Reis",
         "Brokkoli"
       ]
     },
@@ -2919,7 +2852,6 @@
       "needs_clarification": "Mit Reis als Beilage?",
       "note": "Pur (ohne Reis): CONDITIONAL — PROTEIN (Hähnchen) + FETT (Kokosmilch, größere Menge) + NEUTRAL (Gemüse). Kein explizites Verbot für PROTEIN + FETT. Mit Reis: NOT_OK (KH + PROTEIN).",
       "optional_items": [
-        "Reis",
         "Aubergine",
         "Bambussprosse",
         "Chili",
@@ -2985,9 +2917,7 @@
       "optional_items": [
         "Sesamöl",
         "Ingwer",
-        "Knoblauch",
-        "Reis",
-        "Reisnudeln"
+        "Knoblauch"
       ]
     },
     "Tom Yum": {
@@ -3106,7 +3036,6 @@
       "needs_clarification": null,
       "note": "NOT_OK: OBST (Apfel) + FETT (Walnüsse, Mayonnaise). Obst darf nicht mit Fett kombiniert werden (R014). Außerdem OBST + NEUTRAL (Sellerie) = NOT_OK, da nur Blattgrün als Ausnahme gilt (R013). Mit Joghurt: zusätzlich OBST + MILCH.",
       "optional_items": [
-        "Joghurt",
         "Zitrone",
         "Petersilie"
       ]
@@ -3129,9 +3058,7 @@
       "needs_clarification": "Mit gekochten Kartoffeln als Beilage oder ohne KH-Beilage?",
       "note": "Schon das panierte Schnitzel selbst bleibt intrinsisch konfliktuell. Gekochte Kartoffeln sind eine häufige, aber nicht erzwungene KH-Beilage.",
       "optional_items": [
-        "Kartoffel gekocht",
-        "Zitronensaft",
-        "Preiselbeeren"
+        "Zitronensaft"
       ]
     },
     "Wrap": {

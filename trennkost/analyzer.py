@@ -362,6 +362,32 @@ def _try_parse_as_ingredient_list(text: str) -> Optional[List[Dict[str, Any]]]:
     return [{"name": dish_name, "items": ingredients}]
 
 
+_NEGATION_PATTERN = re.compile(
+    r"\b(?:ohne|kein|keine|keinen|keinem|not|without|no)\s+"
+    r"([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß\s\-]{1,30})",
+    re.IGNORECASE,
+)
+
+
+def _extract_negations(text: str) -> List[str]:
+    """
+    Erkennt explizite Ausschlüsse wie 'ohne Mayo', 'kein Tahini',
+    'without soy sauce'. Gibt normalisierte Canonical-Namen zurück.
+    """
+    ontology = get_ontology()
+    excluded: List[str] = []
+    seen: set = set()
+    for match in _NEGATION_PATTERN.finditer(text):
+        raw = match.group(1).strip().rstrip(".,;")
+        entry = ontology.lookup(raw)
+        canonical = entry.canonical if entry else raw
+        key = canonical.lower()
+        if key not in seen:
+            excluded.append(canonical)
+            seen.add(key)
+    return excluded
+
+
 def _parse_text_input(text: str) -> List[Dict[str, Any]]:
     """
     Parse text input into dish(es) with ingredients.
@@ -462,6 +488,7 @@ def analyze_text(
     Returns:
         List of TrennkostResult (one per dish)
     """
+    excluded = _extract_negations(text)
     parsed = _parse_text_input(text)
     resolved_inputs = [build_resolved_input(dish_info) for dish_info in parsed]
     results = []
@@ -473,6 +500,7 @@ def analyze_text(
         analysis = adapt_resolved_input_to_dish_analysis(
             resolved_input,
             llm_fn=llm_fn,
+            excluded_items=excluded,
         )
 
         # In strict mode, remove assumed items from the analysis

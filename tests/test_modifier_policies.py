@@ -129,6 +129,17 @@ def test_preparation_modifier_is_structurally_recognized():
     assert analysis.items[0].recognized_modifiers == [ModifierTag.PREP_FRIED]
 
 
+def test_gebraten_does_not_trigger_fried_risk_code():
+    analysis = normalize_dish("Test", raw_items=["gebratenes Hähnchen"])
+    assert analysis.items[0].canonical == "Hähnchen"
+    assert ModifierTag.PREP_FRIED in analysis.items[0].recognized_modifiers
+    # PREP_FRIED als Modifier ist korrekt — aber kein FRIED-Risikocode
+    # (gebraten ≠ frittiert, kein R_FRIED-Verdikt)
+    from trennkost.engine import build_r_fried_problem
+    result = build_r_fried_problem(analysis.items)
+    assert result is None
+
+
 def test_analyzer_keeps_modifier_aware_burger_question_on_uncertain_path():
     result = analyze_text("Ist ein veganer Burger ok?")[0]
 

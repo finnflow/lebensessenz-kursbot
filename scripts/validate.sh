@@ -14,6 +14,11 @@ PYTEST_CMD=(
   "${PYTHON}" -m pytest
   tests/test_engine.py
   tests/test_output_contract.py
+  tests/test_health_hints.py
+  tests/test_food_core_gold_matrix.py
+  tests/test_modifier_policies.py
+  tests/test_compound_alignment.py
+  tests/test_negation.py
   -v
 )
 

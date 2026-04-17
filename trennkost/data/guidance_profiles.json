@@ -24,6 +24,10 @@
     "SOY_IN_MODERATION": {
       "description": "The course material recommends being cautious with soy-based foods.",
       "title": "Use soy in moderation"
+    },
+    "AIRFRYER_FAT_HINT": {
+      "title": "Heißluft statt Frittieren",
+      "description": "Deutlich weniger Fett als frittiert — trotzdem Fettmenge im Blick behalten."
     }
   }
 }

@@ -110,6 +110,7 @@ class ModifierTag(str, Enum):
     PREP_BREADED = "PREP_BREADED"
     PREP_NATUR = "PREP_NATUR"
     PREP_FRIED = "PREP_FRIED"
+    PREP_AIRFRYER = "PREP_AIRFRYER"
     HINT_CLASSIC = "HINT_CLASSIC"
 
 
@@ -217,6 +218,7 @@ class TrennkostResult(BaseModel):
     traffic_light: TrafficLight = TrafficLight.GREEN
     summary: str                                            # One-line human summary
     problems: List[RuleProblem] = Field(default_factory=list)
+    health_hints: List[RuleProblem] = Field(default_factory=list)
     required_questions: List[RequiredQuestion] = Field(default_factory=list)
     risk_codes: List[str] = Field(default_factory=list)
     risk_facts: List[ItemRiskFact] = Field(default_factory=list)

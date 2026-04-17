@@ -38,6 +38,28 @@ from trennkost.ontology import (
 from trennkost.health_recommendations import build_health_recommendation_problems
 from trennkost.protein_rules import build_r018_mixed_protein_problem
 
+
+def build_r_fried_problem(all_items: List[FoodItem]) -> Optional[RuleProblem]:
+    fried_items = [item for item in all_items if "FRIED" in item.risk_codes]
+    if not fried_items:
+        return None
+    affected = [
+        f"{item.raw_name} → {item.canonical}" if item.canonical else item.raw_name
+        for item in fried_items
+    ]
+    return RuleProblem(
+        rule_id="R_FRIED",
+        description="Frittierte Zubereitung — hohe Fettlast",
+        severity=Severity.CRITICAL,
+        affected_items=affected,
+        affected_groups=["KH"],
+        source_ref="modul-1.1",
+        explanation=(
+            "Frittierte Lebensmittel haben eine extreme Fettlast und sind "
+            "im Trennkost-System grundsätzlich nicht empfohlen."
+        ),
+    )
+
 logger = logging.getLogger(__name__)
 
 RULES_JSON = Path(__file__).parent / "data" / "rules.json"
@@ -156,6 +178,7 @@ class TrennkostEngine:
             traffic_light=traffic_light,
             summary=active_result["summary"],
             problems=active_result["problems"],
+            health_hints=active_result.get("health_hints", []),
             required_questions=active_result["required_questions"],
             risk_codes=risk_codes,
             risk_facts=risk_facts,
@@ -257,12 +280,17 @@ class TrennkostEngine:
                 ))
 
         # ── Special health recommendations (not Trennkost rules) ────
-        problems.extend(build_health_recommendation_problems(all_items))
+        health_hints = build_health_recommendation_problems(all_items)
 
         # ── Special deterministic protein rules ─────────────────────
         r018_problem = build_r018_mixed_protein_problem(all_items, mode=mode)
         if r018_problem is not None:
             problems.append(r018_problem)
+
+        # ── Fried food verdict ───────────────────────────────────────
+        r_fried = build_r_fried_problem(all_items)
+        if r_fried is not None:
+            problems.append(r_fried)
 
         # ── Build required questions ────────────────────────────────
         required_questions = self._build_questions(
@@ -288,6 +316,7 @@ class TrennkostEngine:
             "verdict": verdict,
             "summary": summary,
             "problems": problems,
+            "health_hints": health_hints,
             "required_questions": required_questions,
             "guidance_codes": guidance_codes,
             "guidance_facts": guidance_facts,
@@ -634,7 +663,10 @@ class TrennkostEngine:
         Priority: NOT_OK > CONDITIONAL > UNKNOWN > OK
         """
         has_critical = any(p.severity == Severity.CRITICAL for p in problems)
-        has_not_ok = any(p.rule_id.startswith("R0") and p.severity == Severity.CRITICAL for p in problems)
+        has_not_ok = any(
+            (p.rule_id.startswith("R0") or p.rule_id == "R_FRIED") and p.severity == Severity.CRITICAL
+            for p in problems
+        )
 
         if has_not_ok:
             return Verdict.NOT_OK

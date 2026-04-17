@@ -148,6 +148,12 @@ def format_results_for_llm(results: List[TrennkostResult], breakfast_context: bo
                 if p.source_ref:
                     parts.append(f"    Quelle: {p.source_ref}")
 
+        if r.health_hints:
+            parts.append("GESUNDHEITSHINWEIS (kein Trennkost-Verstoß):")
+            for h in r.health_hints:
+                parts.append(f"  [{h.rule_id}] {h.description}")
+                parts.append(f"    {h.explanation}")
+
         if r.required_questions:
             parts.append("Offene Fragen (bitte an den User weitergeben):")
             for q in r.required_questions:

@@ -59,12 +59,14 @@ def build_resolved_vision_input(vision_dish: Dict[str, Any]) -> ResolvedInput:
 def adapt_resolved_input_to_dish_analysis(
     resolved_input: ResolvedInput,
     llm_fn: Optional[Callable] = None,
+    excluded_items=None,
 ) -> DishAnalysis:
     """Adapt the boundary model back to the existing engine-facing contract."""
     return normalize_dish(
         dish_name=resolved_input.dish_name,
         raw_items=resolved_input.explicit or None,
         llm_fn=llm_fn,
+        excluded_items=excluded_items,
     )
 
 

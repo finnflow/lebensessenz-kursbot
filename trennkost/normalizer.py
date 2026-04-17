@@ -103,6 +103,10 @@ _MODIFIER_PATTERNS = [
     (ModifierTag.PREP_BREADED, re.compile(r"\b(?:paniert\w*|breaded)\b", re.IGNORECASE)),
     (ModifierTag.PREP_NATUR, re.compile(r"\bnatur\b", re.IGNORECASE)),
     (ModifierTag.PREP_FRIED, re.compile(r"\b(?:frittiert\w*|fried|gebraten\w*)\b", re.IGNORECASE)),
+    (ModifierTag.PREP_AIRFRYER, re.compile(
+        r"\b(?:hei[sß]luft|airfryer|air\s*fryer|luftfritteuse|hot\s*air)\b",
+        re.IGNORECASE
+    )),
     (ModifierTag.HINT_CLASSIC, re.compile(r"\b(?:klassisch\w*|classic|normal\w*)\b", re.IGNORECASE)),
 ]
 
@@ -114,6 +118,7 @@ _MODIFIER_STRIP_PATTERNS = [
     re.compile(r"\b(?:paniert\w*|breaded)\b", re.IGNORECASE),
     re.compile(r"\bnatur\b", re.IGNORECASE),
     re.compile(r"\b(?:frittiert\w*|fried|gebraten\w*)\b", re.IGNORECASE),
+    re.compile(r"\b(?:hei[sß]luft|airfryer|air\s*fryer|luftfritteuse|hot\s*air)\b", re.IGNORECASE),
     re.compile(r"\b(?:klassisch\w*|classic|normal\w*)\b", re.IGNORECASE),
 ]
 
@@ -205,7 +210,7 @@ def _resolve_modifier_specs(
 
     prep_tags = [
         tag for tag in tags
-        if tag in {ModifierTag.PREP_BREADED, ModifierTag.PREP_NATUR, ModifierTag.PREP_FRIED}
+        if tag in {ModifierTag.PREP_BREADED, ModifierTag.PREP_NATUR, ModifierTag.PREP_FRIED, ModifierTag.PREP_AIRFRYER}
     ]
     if prep_tags:
         full_match = ontology.lookup(raw_name)
@@ -232,6 +237,7 @@ def normalize_dish(
     dish_name: str,
     raw_items: Optional[List[str]] = None,
     llm_fn=None,
+    excluded_items: Optional[List[str]] = None,
 ) -> DishAnalysis:
     """
     Normalize a dish into classified food items.
@@ -297,6 +303,10 @@ def normalize_dish(
             if modifier_specs:
                 for spec in modifier_specs:
                     fi = _build_modifier_item(ontology, spec)
+                    if ModifierTag.PREP_AIRFRYER in fi.recognized_modifiers:
+                        fi.risk_codes = [c for c in fi.risk_codes if c != "FRIED"]
+                        if "AIRFRYER_FAT_HINT" not in fi.guidance_codes:
+                            fi.guidance_codes.append("AIRFRYER_FAT_HINT")
                     if fi.group == FoodGroup.UNKNOWN:
                         unknown_items.append(fi.raw_name)
                     _append_normalized_item(items, fi, ontology)
@@ -349,6 +359,14 @@ def normalize_dish(
                         it.group = FoodGroup(group_str)
                         it.canonical = cls.get("canonical", it.raw_name)
                         it.confidence = 0.6  # LLM-classified = lower confidence
+
+    # Apply negation filter — only affects assumed/optional, never explicit raw_items
+    if excluded_items:
+        excluded_lower = {e.lower() for e in excluded_items}
+        assumed_items = [
+            item for item in assumed_items
+            if (item.canonical or item.raw_name).lower() not in excluded_lower
+        ]
 
     # Update unknown_items list (remove items that got classified)
     final_unknowns = [it.raw_name for it in items if it.group == FoodGroup.UNKNOWN]

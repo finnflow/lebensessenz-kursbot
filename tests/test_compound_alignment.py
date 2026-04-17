@@ -59,7 +59,7 @@ def test_hotdog_compounds_exist_as_generic_restaurant_fallbacks():
 
     assert hotdog_with_fries is not None
     assert hotdog_with_fries["base_items"] == ["Brot", "Wurst", "Pommes"]
-    assert hotdog_with_fries["optional_items"] == ["Senf", "Ketchup", "Mayonnaise"]
+    assert hotdog_with_fries["optional_items"] == ["Senf", "Ketchup"]
 
 
 def test_target_compound_families_use_aligned_canonical_labels():
@@ -123,7 +123,7 @@ def test_wiener_schnitzel_keeps_breaded_core_without_forcing_generic_potatoes():
     assert canonicals[0] == "Paniertes Schnitzel"
     assert {"Schwein", "Paniermehl", "Ei"}.issubset(set(canonicals))
     assert "Kartoffel" not in canonicals
-    assert "Kartoffel gekocht" in assumed_canonicals
+    assert "Kartoffel gekocht" not in assumed_canonicals
 
 
 def test_fischstaebchen_mit_pommes_uses_intrinsic_prepared_canonical():
