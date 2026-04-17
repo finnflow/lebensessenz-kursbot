@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from trennkost.engine import TrennkostEngine
 from trennkost.formatter import format_results_for_llm
-from trennkost.models import EvaluationMode, FoodGroup, FoodItem, FoodSubgroup, Severity, Verdict
+from trennkost.models import AnalysisMode, FoodGroup, FoodItem, FoodSubgroup, Severity, Verdict
 from trennkost.normalizer import normalize_dish
 from trennkost.protein_rules import build_r018_mixed_protein_problem
 
@@ -25,7 +25,6 @@ def _protein_item(name: str, subgroup: FoodSubgroup) -> FoodItem:
         group=FoodGroup.PROTEIN,
         subgroup=subgroup,
         group_strict=None,
-        group_light=None,
     )
 
 
@@ -35,7 +34,7 @@ def test_same_protein_subgroup_has_no_r018():
         _protein_item("Rindfleisch", FoodSubgroup.FLEISCH),
     ]
 
-    problem = build_r018_mixed_protein_problem(items, mode=EvaluationMode.STRICT)
+    problem = build_r018_mixed_protein_problem(items, mode=AnalysisMode.TRENNKOST)
 
     assert problem is None
 
@@ -46,7 +45,7 @@ def test_distinct_protein_subgroups_emit_r018():
         _protein_item("Ei", FoodSubgroup.EIER),
     ]
 
-    problem = build_r018_mixed_protein_problem(items, mode=EvaluationMode.STRICT)
+    problem = build_r018_mixed_protein_problem(items, mode=AnalysisMode.TRENNKOST)
 
     assert problem is not None
     assert problem.rule_id == "R018"
@@ -61,7 +60,7 @@ def test_r018_affected_items_are_subgroup_based_and_stable():
         _protein_item("Rindfleisch", FoodSubgroup.FLEISCH),
     ]
 
-    problem = build_r018_mixed_protein_problem(items, mode=EvaluationMode.STRICT)
+    problem = build_r018_mixed_protein_problem(items, mode=AnalysisMode.TRENNKOST)
 
     assert problem is not None
     assert problem.affected_items == [
@@ -77,7 +76,7 @@ def test_r018_severity_stays_critical():
         _protein_item("Ei", FoodSubgroup.EIER),
     ]
 
-    problem = build_r018_mixed_protein_problem(items, mode=EvaluationMode.STRICT)
+    problem = build_r018_mixed_protein_problem(items, mode=AnalysisMode.TRENNKOST)
 
     assert problem is not None
     assert problem.severity == Severity.CRITICAL

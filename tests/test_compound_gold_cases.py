@@ -69,10 +69,9 @@ def test_hotdog_modifier_aware_paths_override_generic_fallback():
 
 def test_lasagne_is_a_stable_compound_not_ok(engine):
     analysis = normalize_dish("Lasagne")
-    result = engine.evaluate(analysis, mode="light")
+    result = engine.evaluate(analysis)
 
-    assert result.strict_verdict.value == "NOT_OK"
-    assert result.active_mode_verdict.value == "NOT_OK"
+    assert result.verdict.value == "NOT_OK"
 
 
 def test_burger_and_wrap_stay_cautious_compounds(engine):

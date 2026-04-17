@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from trennkost.models import CombinationGroup, EvaluationMode, FoodGroup, Verdict
+from trennkost.models import AnalysisMode, CombinationGroup, FoodGroup, Verdict
 from trennkost.normalizer import normalize_dish
 from trennkost.ontology import (
     Ontology,
@@ -40,22 +40,12 @@ def test_resolvers_expose_strict_and_display_groups(ontology):
     assert resolve_effective_group(tofu) == FoodGroup.PROTEIN
     assert resolve_effective_group(mayo) == FoodGroup.FETT
 
-    assert resolve_combination_group(banana, mode=EvaluationMode.LIGHT) == CombinationGroup.KH
-    assert resolve_combination_group(dried, mode=EvaluationMode.LIGHT) == CombinationGroup.KH
-    assert resolve_combination_group(tofu, mode=EvaluationMode.LIGHT) == CombinationGroup.KH
-    assert resolve_combination_group(mayo, mode=EvaluationMode.LIGHT) == CombinationGroup.FETT
-
-    assert resolve_effective_group(banana, mode=EvaluationMode.LIGHT) == FoodGroup.KH
-    assert resolve_effective_group(dried, mode=EvaluationMode.LIGHT) == FoodGroup.KH
-    assert resolve_effective_group(tofu, mode=EvaluationMode.LIGHT) == FoodGroup.KH
-    assert resolve_effective_group(mayo, mode=EvaluationMode.LIGHT) == FoodGroup.FETT
-
 
 def test_engine_uses_strict_group_resolver(monkeypatch):
     analysis = normalize_dish("Test", raw_items=["Kartoffel", "Mayonnaise"])
 
-    def fake_resolver(item, mode=EvaluationMode.STRICT):
-        if item.canonical == "Mayonnaise" and mode == EvaluationMode.STRICT:
+    def fake_resolver(item, mode=AnalysisMode.TRENNKOST):
+        if item.canonical == "Mayonnaise" and mode == AnalysisMode.TRENNKOST:
             return CombinationGroup.NEUTRAL
         return item.group_strict or CombinationGroup.UNKNOWN
 

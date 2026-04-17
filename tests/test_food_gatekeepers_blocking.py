@@ -40,9 +40,7 @@ def test_protein_gatekeepers(engine, raw_items, expected_verdict, must_have_rule
     result = engine.evaluate(analysis)
     rule_ids = _problem_ids(result)
 
-    assert result.strict_verdict == expected_verdict
-    assert result.active_mode_verdict == expected_verdict
-    assert result.mode_relaxation_applied is False
+    assert result.verdict == expected_verdict
     assert result.required_questions == []
     assert analysis.unknown_items == []
     assert must_have_rules.issubset(rule_ids)
@@ -56,8 +54,7 @@ def test_green_smoothie_gatekeeper_stays_ok_without_r013(engine):
     )
     result = engine.evaluate(analysis)
 
-    assert result.strict_verdict == Verdict.OK
-    assert result.active_mode_verdict == Verdict.OK
+    assert result.verdict == Verdict.OK
     assert result.required_questions == []
     assert "R013" not in _problem_ids(result)
 
@@ -66,8 +63,7 @@ def test_apfel_und_paprika_stays_conditional_with_r013(engine):
     analysis = normalize_dish("Apfel + Paprika", raw_items=["Apfel", "Paprika"])
     result = engine.evaluate(analysis)
 
-    assert result.strict_verdict == Verdict.CONDITIONAL
-    assert result.active_mode_verdict == Verdict.CONDITIONAL
+    assert result.verdict == Verdict.CONDITIONAL
     assert "R013" in _problem_ids(result)
 
 
@@ -78,8 +74,7 @@ def test_reis_brokkoli_olivenoel_stays_ok_with_structured_fat_guidance(engine):
     )
     result = engine.evaluate(analysis)
 
-    assert result.strict_verdict == Verdict.OK
-    assert result.active_mode_verdict == Verdict.OK
+    assert result.verdict == Verdict.OK
     assert result.guidance_codes == ["FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT"]
     assert result.required_questions == []
 
@@ -88,8 +83,7 @@ def test_pommes_text_path_keeps_red_traffic_light_and_risk_codes():
     result = analyze_text("Pommes", llm_fn=None, mode="strict", evaluation_mode="strict")[0]
 
     assert result.dish_name == "Pommes"
-    assert result.strict_verdict == Verdict.OK
-    assert result.active_mode_verdict == Verdict.OK
+    assert result.verdict == Verdict.NOT_OK
     assert result.traffic_light == TrafficLight.RED
     assert result.risk_codes == ["FRIED", "HEAVY_FAT_LOAD"]
     assert result.required_questions == []
@@ -105,7 +99,7 @@ def test_cordon_bleu_keeps_intrinsic_semantics_and_not_ok_verdict(engine):
     intrinsic = next(item for item in analysis.items if item.canonical == "Cordon Bleu")
     assert intrinsic.decompose_for_logic is True
     assert intrinsic.intrinsic_conflict_code == "STUFFED_BREADED_PROTEIN_CONFLICT"
-    assert result.strict_verdict == Verdict.NOT_OK
+    assert result.verdict == Verdict.NOT_OK
     assert "R001" in _problem_ids(result)
 
 
