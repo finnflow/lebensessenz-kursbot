@@ -31,7 +31,6 @@ ALLOWED_INTRINSIC_CONFLICT_CODES = {
 STRUCTURED_FIELDS_REQUIRING_EXPLICIT_ITEM_ID = {
     "food_family",
     "group_strict",
-    "group_light",
     "post_meal_wait_profile",
     "modifier_policy",
     "base_item_id",

@@ -24,8 +24,6 @@ def _make_result(
     return TrennkostResult(
         dish_name=dish_name,
         verdict=verdict,
-        strict_verdict=verdict,
-        active_mode_verdict=verdict,
         traffic_light=traffic_light,
         summary="Test",
         required_questions=questions,

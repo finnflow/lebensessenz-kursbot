@@ -474,7 +474,8 @@ def analyze_text(
     text: str,
     llm_fn: Optional[Callable] = None,
     mode: str = "strict",
-    evaluation_mode: str = "strict",
+    analysis_mode: str = "trennkost",
+    evaluation_mode: Optional[str] = None,
 ) -> List[TrennkostResult]:
     """
     Analyze food items from text input.
@@ -483,11 +484,14 @@ def analyze_text(
         text: User input (ingredient list, dish name, or menu text)
         llm_fn: Optional LLM callable for unknown item classification
         mode: "strict" = only explicit ingredients, "assumption" = include assumed
-        evaluation_mode: deterministic evaluation mode ("strict" or "light")
+        analysis_mode: "trennkost" | "vollwert" (aliases: "strict"/"light" accepted)
+        evaluation_mode: deprecated alias for analysis_mode
 
     Returns:
         List of TrennkostResult (one per dish)
     """
+    if evaluation_mode is not None:
+        analysis_mode = evaluation_mode
     excluded = _extract_negations(text)
     parsed = _parse_text_input(text)
     resolved_inputs = [build_resolved_input(dish_info) for dish_info in parsed]
@@ -512,19 +516,18 @@ def analyze_text(
                 unknown_items=analysis.unknown_items,
                 assumed_items=[],  # Don't include in verdict
             )
-            result = evaluate_dish(strict_analysis, mode=evaluation_mode)
+            result = evaluate_dish(strict_analysis, mode=analysis_mode)
             # But still mention assumed items as questions
             from trennkost.models import RequiredQuestion
             assumed_names = [it.raw_name for it in analysis.assumed_items]
             assumed_groups = [
-                f"{it.raw_name} ({resolve_effective_group(it, mode=evaluation_mode).value})"
+                f"{it.raw_name} ({resolve_effective_group(it).value})"
                 for it in analysis.assumed_items
             ]
             if assumed_names:
                 # Different message depending on current verdict
                 if result.verdict == Verdict.NOT_OK:
                     # Bei NOT_OK: Assumed items verstärken nur die Problematik, keine Frage nötig
-                    # Skip adding this to required_questions
                     pass
                 else:
                     question_text = (
@@ -546,16 +549,15 @@ def analyze_text(
                         unknown_items=analysis.unknown_items,
                         assumed_items=analysis.assumed_items,
                     )
-                    assumption_result = evaluate_dish(assumption_analysis, mode=evaluation_mode)
+                    assumption_result = evaluate_dish(assumption_analysis, mode=analysis_mode)
                     if assumption_result.verdict == Verdict.NOT_OK:
                         result.verdict = Verdict.CONDITIONAL
-                        result.active_mode_verdict = Verdict.CONDITIONAL
                         result.summary = (
                             f"{dish_name}: Bedingt OK — "
                             f"mit typischen Zusatz-Zutaten wäre es NOT_OK."
                         )
         else:
-            result = evaluate_dish(analysis, mode=evaluation_mode)
+            result = evaluate_dish(analysis, mode=analysis_mode)
 
         results.append(result)
 
@@ -566,7 +568,8 @@ def analyze_vision(
     vision_dishes: List[Dict[str, Any]],
     llm_fn: Optional[Callable] = None,
     mode: str = "strict",
-    evaluation_mode: str = "strict",
+    analysis_mode: str = "trennkost",
+    evaluation_mode: Optional[str] = None,
 ) -> List[TrennkostResult]:
     """
     Analyze dishes extracted from a vision API response.
@@ -575,11 +578,14 @@ def analyze_vision(
         vision_dishes: List of {"name": str, "items": [str], "uncertain_items": [str]}
         llm_fn: Optional LLM callable
         mode: "strict" or "assumption"
-        evaluation_mode: deterministic evaluation mode ("strict" or "light")
+        analysis_mode: "trennkost" | "vollwert"
+        evaluation_mode: deprecated alias for analysis_mode
 
     Returns:
         List of TrennkostResult
     """
+    if evaluation_mode is not None:
+        analysis_mode = evaluation_mode
     resolved_inputs = [build_resolved_vision_input(dish) for dish in vision_dishes]
     results = []
     ontology = get_ontology()
@@ -594,7 +600,7 @@ def analyze_vision(
         unknowns = analysis.unknown_items
 
         if mode == "strict":
-            result = evaluate_dish(analysis, mode=evaluation_mode)
+            result = evaluate_dish(analysis, mode=analysis_mode)
             # Add uncertain items as questions — but skip irrelevant ones (herbs/spices)
             if uncertain:
                 unknown_keys = {item.strip().lower() for item in unknowns}
@@ -609,10 +615,7 @@ def analyze_vision(
                         relevant_uncertain.append(u)
                         continue
 
-                    effective_group = resolve_effective_group(
-                        ontology.lookup_to_food_item(u),
-                        mode=evaluation_mode,
-                    )
+                    effective_group = resolve_effective_group(ontology.lookup_to_food_item(u))
                     if effective_group != FoodGroup.NEUTRAL or ent.subgroup != FoodSubgroup.KRAEUTER:
                         relevant_uncertain.append(u)
 
@@ -625,10 +628,9 @@ def analyze_vision(
                     ))
                 if result.verdict == Verdict.OK and relevant_uncertain:
                     result.verdict = Verdict.CONDITIONAL
-                    result.active_mode_verdict = Verdict.CONDITIONAL
                     result.summary = f"{name}: Bedingt OK — einige Zutaten unsicher."
         else:
-            result = evaluate_dish(analysis, mode=evaluation_mode)
+            result = evaluate_dish(analysis, mode=analysis_mode)
 
         # LLM-classify any remaining unknowns
         if unknowns and llm_fn:
@@ -637,7 +639,7 @@ def analyze_vision(
                 raw_items=resolved_input.explicit or None,
                 llm_fn=llm_fn,
             )
-            result = evaluate_dish(analysis_with_llm, mode=evaluation_mode)
+            result = evaluate_dish(analysis_with_llm, mode=analysis_mode)
 
         results.append(result)
 

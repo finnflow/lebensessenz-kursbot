@@ -2,7 +2,7 @@
 from collections import defaultdict
 from typing import Dict, List, Optional
 
-from trennkost.models import CombinationGroup, EvaluationMode, FoodItem, RuleProblem, Severity
+from trennkost.models import AnalysisMode, CombinationGroup, FoodItem, RuleProblem, Severity
 from trennkost.ontology import resolve_combination_group
 
 
@@ -14,7 +14,7 @@ def _format_item_label(item: FoodItem) -> str:
 
 def build_r018_mixed_protein_problem(
     all_items: List[FoodItem],
-    mode: EvaluationMode,
+    mode: AnalysisMode = AnalysisMode.TRENNKOST,
 ) -> Optional[RuleProblem]:
     """
     Build optional R018 problem when multiple PROTEIN subgroups are combined.

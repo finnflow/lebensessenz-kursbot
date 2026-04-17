@@ -12,8 +12,8 @@ import re
 from typing import Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from trennkost.models import (
+    AnalysisMode,
     CombinationGroup,
-    EvaluationMode,
     FoodGroup,
     FoodSubgroup,
     FoodItem,
@@ -47,18 +47,6 @@ STRICT_GROUP_DEFAULTS: Dict[FoodGroup, CombinationGroup] = {
     FoodGroup.UNKNOWN: CombinationGroup.UNKNOWN,
 }
 
-VOLLWERT_GROUP_DEFAULTS: Dict[FoodGroup, CombinationGroup] = {
-    FoodGroup.OBST: CombinationGroup.FRUIT_WATERY,
-    FoodGroup.TROCKENOBST: CombinationGroup.KH,
-    FoodGroup.NEUTRAL: CombinationGroup.NEUTRAL,
-    FoodGroup.KH: CombinationGroup.KH,
-    FoodGroup.HUELSENFRUECHTE: CombinationGroup.HUELSENFRUECHTE,
-    FoodGroup.PROTEIN: CombinationGroup.PROTEIN,
-    FoodGroup.MILCH: CombinationGroup.MILCH,
-    FoodGroup.FETT: CombinationGroup.FETT,
-    FoodGroup.UNKNOWN: CombinationGroup.UNKNOWN,
-}
-
 STRICT_FRUIT_GROUPS = {
     CombinationGroup.FRUIT_WATERY,
     CombinationGroup.FRUIT_DENSE,
@@ -79,38 +67,26 @@ COMBINATION_TO_DISPLAY_GROUP: Dict[CombinationGroup, FoodGroup] = {
 }
 
 
-def _normalize_evaluation_mode(mode: Union[str, EvaluationMode]) -> EvaluationMode:
-    try:
-        return mode if isinstance(mode, EvaluationMode) else EvaluationMode(mode)
-    except ValueError as exc:
-        raise NotImplementedError(f"Evaluation group mode '{mode}' is not supported") from exc
-
-
 def resolve_combination_group(
     item: FoodItem,
-    mode: Union[str, EvaluationMode] = EvaluationMode.STRICT,
+    mode: Union[str, AnalysisMode] = AnalysisMode.TRENNKOST,
 ) -> CombinationGroup:
     """
-    Central resolver for mode-aware combination groups used in deterministic evaluation.
-    """
-    evaluation_mode = _normalize_evaluation_mode(mode)
+    Resolve combination group for a food item.
 
+    Always uses trennkost/strict group semantics. The mode parameter is accepted
+    for backward compatibility but has no effect.
+    """
     if item.group == FoodGroup.UNKNOWN:
         return CombinationGroup.UNKNOWN
-
-    if evaluation_mode == EvaluationMode.STRICT:
-        return item.group_strict or STRICT_GROUP_DEFAULTS.get(item.group, CombinationGroup.UNKNOWN)
-
-    return item.group_light or VOLLWERT_GROUP_DEFAULTS.get(item.group, CombinationGroup.UNKNOWN)
+    return item.group_strict or STRICT_GROUP_DEFAULTS.get(item.group, CombinationGroup.UNKNOWN)
 
 
 def resolve_strict_combination_group(
     item: FoodItem,
-    mode: Union[str, EvaluationMode] = EvaluationMode.STRICT,
+    mode: Union[str, AnalysisMode] = AnalysisMode.TRENNKOST,
 ) -> CombinationGroup:
-    """
-    Backwards-compatible wrapper for the evaluation-group resolver.
-    """
+    """Backward-compatible wrapper for resolve_combination_group."""
     return resolve_combination_group(item, mode=mode)
 
 
@@ -130,11 +106,9 @@ def strict_combination_group_to_display_group(
 
 def resolve_effective_group(
     item: FoodItem,
-    mode: Union[str, EvaluationMode] = EvaluationMode.STRICT,
+    mode: Union[str, AnalysisMode] = AnalysisMode.TRENNKOST,
 ) -> FoodGroup:
-    """
-    Central resolver for the user-facing display group of the active evaluation mode.
-    """
+    """Resolve user-facing display group for an item."""
     combination_group = resolve_combination_group(item, mode=mode)
     return combination_group_to_display_group(combination_group, fallback=item.group)
 
@@ -293,13 +267,6 @@ class Ontology:
                 f"Ontology row {line_number} for '{canonical}' has unknown strict group '{group_strict_raw}'"
             )
 
-        # TODO(vollwert-mode): legacy "light" naming left in place intentionally; rename fully later without changing logic.
-        group_light_raw = (row.get("group_light") or "").strip()
-        if group_light_raw and group_light_raw not in CombinationGroup._value2member_map_:
-            self._record_issue(
-                f"Ontology row {line_number} for '{canonical}' has unknown light group '{group_light_raw}'"
-            )
-
         synonyms = self._parse_csv_list(row.get("synonyms"))
         group = self._parse_food_group(row.get("group"))
         subgroup = self._parse_food_subgroup(row.get("subgroup"))
@@ -307,10 +274,6 @@ class Ontology:
         group_strict = self._parse_combination_group(
             row.get("group_strict"),
             fallback=STRICT_GROUP_DEFAULTS[group],
-        )
-        group_light = self._parse_combination_group(
-            row.get("group_light"),
-            fallback=VOLLWERT_GROUP_DEFAULTS[group],
         )
         risk_codes = self._parse_csv_list(row.get("risk_codes"))
         guidance_codes = self._parse_csv_list(row.get("guidance_codes"))
@@ -323,7 +286,6 @@ class Ontology:
             group=group,
             subgroup=subgroup,
             group_strict=group_strict,
-            group_light=group_light,
             post_meal_wait_profile=row.get("post_meal_wait_profile") or None,
             modifier_policy=row.get("modifier_policy") or None,
             ambiguity_flag=self._parse_bool(row.get("ambiguity_flag")),
@@ -490,7 +452,6 @@ class Ontology:
                 subgroup=entry.subgroup,
                 food_family=entry.food_family,
                 group_strict=entry.group_strict,
-                group_light=entry.group_light,
                 post_meal_wait_profile=entry.post_meal_wait_profile,
                 modifier_policy=entry.modifier_policy,
                 base_item_id=entry.base_item_id,
@@ -516,7 +477,6 @@ class Ontology:
                 subgroup=None,
                 food_family=None,
                 group_strict=CombinationGroup.UNKNOWN,
-                group_light=CombinationGroup.UNKNOWN,
                 post_meal_wait_profile=None,
                 modifier_policy=None,
                 base_item_id=None,

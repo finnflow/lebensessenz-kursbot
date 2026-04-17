@@ -6,6 +6,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from trennkost.engine import TrennkostEngine
+from trennkost.models import AnalysisMode
 from trennkost.normalizer import normalize_dish
 from trennkost.ontology import get_ontology
 
@@ -24,9 +25,7 @@ ENGINE_GOLD_CASES_P0 = [
     {
         "id": "pommes_single",
         "raw_items": ["Pommes"],
-        "strict_verdict": "NOT_OK",
-        "light_verdict": "NOT_OK",
-        "mode_relaxation_applied": False,
+        "verdict": "NOT_OK",
         "traffic_light_exact": "RED",
         "must_have_risk_codes": {"FRIED", "HEAVY_FAT_LOAD"},
         "must_have_guidance_codes": set(),
@@ -36,9 +35,7 @@ ENGINE_GOLD_CASES_P0 = [
     {
         "id": "pommes_mayo_guidance",
         "raw_items": ["Pommes", "Mayonnaise"],
-        "strict_verdict": "NOT_OK",
-        "light_verdict": "NOT_OK",
-        "mode_relaxation_applied": False,
+        "verdict": "NOT_OK",
         "traffic_light_exact": "RED",
         "must_have_risk_codes": {"FRIED", "HEAVY_FAT_LOAD"},
         "must_have_guidance_codes": {"FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT"},
@@ -48,9 +45,7 @@ ENGINE_GOLD_CASES_P0 = [
     {
         "id": "pommes_airfryer_ok",
         "raw_items": ["Pommes Heißluft"],
-        "strict_verdict": "OK",
-        "light_verdict": "OK",
-        "mode_relaxation_applied": False,
+        "verdict": "OK",
         "traffic_light_exact": None,
         "must_have_risk_codes": set(),
         "must_have_guidance_codes": {"AIRFRYER_FAT_HINT"},
@@ -60,9 +55,7 @@ ENGINE_GOLD_CASES_P0 = [
     {
         "id": "bratkartoffeln_single_not_ok",
         "raw_items": ["Bratkartoffeln"],
-        "strict_verdict": "NOT_OK",
-        "light_verdict": "NOT_OK",
-        "mode_relaxation_applied": False,
+        "verdict": "NOT_OK",
         "traffic_light_exact": None,
         "must_have_risk_codes": {"FRIED"},
         "must_have_guidance_codes": set(),
@@ -72,9 +65,7 @@ ENGINE_GOLD_CASES_P0 = [
     {
         "id": "pommes_schwein_not_ok",
         "raw_items": ["Pommes", "Schwein"],
-        "strict_verdict": "NOT_OK",
-        "light_verdict": "NOT_OK",
-        "mode_relaxation_applied": False,
+        "verdict": "NOT_OK",
         "traffic_light_exact": None,
         "must_have_risk_codes": {"FRIED", "HEAVY_FAT_LOAD"},
         "must_have_guidance_codes": set(),
@@ -84,9 +75,7 @@ ENGINE_GOLD_CASES_P0 = [
     {
         "id": "kartoffel_brokkoli_base_ok",
         "raw_items": ["Kartoffel", "Brokkoli"],
-        "strict_verdict": "OK",
-        "light_verdict": "OK",
-        "mode_relaxation_applied": False,
+        "verdict": "OK",
         "traffic_light_exact": "GREEN",
         "must_have_risk_codes": set(),
         "must_have_guidance_codes": set(),
@@ -96,9 +85,7 @@ ENGINE_GOLD_CASES_P0 = [
     {
         "id": "bratkartoffeln_ei_not_ok",
         "raw_items": ["Bratkartoffeln", "Ei"],
-        "strict_verdict": "NOT_OK",
-        "light_verdict": "NOT_OK",
-        "mode_relaxation_applied": False,
+        "verdict": "NOT_OK",
         "traffic_light_exact": None,
         "must_have_risk_codes": {"FRIED"},
         "must_have_guidance_codes": set(),
@@ -108,9 +95,7 @@ ENGINE_GOLD_CASES_P0 = [
     {
         "id": "quinoa_avocado_guidance_only",
         "raw_items": ["Quinoa", "Avocado"],
-        "strict_verdict": "OK",
-        "light_verdict": "OK",
-        "mode_relaxation_applied": False,
+        "verdict": "OK",
         "traffic_light_exact": None,
         "must_have_risk_codes": set(),
         "must_have_guidance_codes": {"FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT"},
@@ -120,9 +105,7 @@ ENGINE_GOLD_CASES_P0 = [
     {
         "id": "apfel_oel_not_ok",
         "raw_items": ["Apfel", "Olivenöl"],
-        "strict_verdict": "CONDITIONAL",
-        "light_verdict": "CONDITIONAL",
-        "mode_relaxation_applied": False,
+        "verdict": "CONDITIONAL",
         "traffic_light_exact": None,
         "must_have_risk_codes": set(),
         "must_have_guidance_codes": set(),
@@ -132,9 +115,7 @@ ENGINE_GOLD_CASES_P0 = [
     {
         "id": "cordon_bleu_intrinsic_conflict",
         "raw_items": ["Cordon Bleu"],
-        "strict_verdict": "NOT_OK",
-        "light_verdict": "NOT_OK",
-        "mode_relaxation_applied": False,
+        "verdict": "NOT_OK",
         "traffic_light_exact": None,
         "must_have_risk_codes": set(),
         "must_have_guidance_codes": set(),
@@ -145,9 +126,7 @@ ENGINE_GOLD_CASES_P0 = [
     {
         "id": "chicken_nuggets_intrinsic_conflict",
         "raw_items": ["Chicken Nuggets"],
-        "strict_verdict": "NOT_OK",
-        "light_verdict": "NOT_OK",
-        "mode_relaxation_applied": False,
+        "verdict": "NOT_OK",
         "traffic_light_exact": None,
         "must_have_risk_codes": set(),
         "must_have_guidance_codes": set(),
@@ -157,52 +136,45 @@ ENGINE_GOLD_CASES_P0 = [
     },
 ]
 
-ENGINE_GOLD_CASES_P1 = [
+# Vollwert-mode cases: no trennkost rules, verdict from traffic_light
+ENGINE_GOLD_CASES_VOLLWERT = [
     {
-        "id": "banane_mandeln_light_relaxed",
+        "id": "banane_mandeln_vollwert",
         "raw_items": ["Banane", "Mandeln"],
-        "strict_verdict": "CONDITIONAL",
-        "light_verdict": "OK",
-        "mode_relaxation_applied": True,
-        "traffic_light_exact": None,
-        "must_have_risk_codes": set(),
-        "must_have_guidance_codes": {"FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT"},
-        "must_have_problem_rule_ids": {"R014"},
-        "needs_clarification": False,
+        "vollwert_verdict": "OK",     # No risk codes → GREEN → OK
+        "no_problems": True,
     },
     {
-        "id": "dattel_mandeln_light_relaxed",
+        "id": "dattel_mandeln_vollwert",
         "raw_items": ["Dattel", "Mandeln"],
-        "strict_verdict": "CONDITIONAL",
-        "light_verdict": "OK",
-        "mode_relaxation_applied": True,
-        "traffic_light_exact": None,
-        "must_have_risk_codes": set(),
-        "must_have_guidance_codes": {"FAT_WITH_CONFLICT_GROUP_TINY_AMOUNT"},
-        "must_have_problem_rule_ids": {"R014"},
-        "needs_clarification": False,
+        "vollwert_verdict": "OK",
+        "no_problems": True,
     },
     {
-        "id": "tofu_reis_light_relaxed",
+        "id": "tofu_reis_vollwert",
         "raw_items": ["Tofu", "Reis"],
-        "strict_verdict": "NOT_OK",
-        "light_verdict": "OK",
-        "mode_relaxation_applied": True,
-        "traffic_light_exact": None,
+        "vollwert_verdict": "CONDITIONAL",  # Tofu has SOY (YELLOW risk) → YELLOW → CONDITIONAL
         "must_have_risk_codes": {"SOY"},
-        "must_have_guidance_codes": set(),
-        "must_have_problem_rule_ids": {"R001"},
-        "needs_clarification": False,
+        "no_problems": True,
     },
 ]
 
 
-def _evaluate_raw_items(engine: TrennkostEngine, raw_items: list[str]):
+def _evaluate_trennkost(engine: TrennkostEngine, raw_items: list[str]):
     analysis = normalize_dish(
         dish_name=" + ".join(raw_items),
         raw_items=raw_items,
     )
-    result = engine.evaluate(analysis, mode="light")
+    result = engine.evaluate(analysis, mode="trennkost")
+    return analysis, result
+
+
+def _evaluate_vollwert(engine: TrennkostEngine, raw_items: list[str]):
+    analysis = normalize_dish(
+        dish_name=" + ".join(raw_items),
+        raw_items=raw_items,
+    )
+    result = engine.evaluate(analysis, mode="vollwert")
     return analysis, result
 
 
@@ -226,11 +198,11 @@ def _assert_intrinsic_semantics(ontology, analysis, intrinsic_item: str):
 
 @pytest.mark.parametrize("case", ENGINE_GOLD_CASES_P0, ids=lambda c: c["id"])
 def test_engine_gold_matrix_p0(engine, ontology, case):
-    analysis, result = _evaluate_raw_items(engine, case["raw_items"])
+    analysis, result = _evaluate_trennkost(engine, case["raw_items"])
 
-    assert result.strict_verdict.value == case["strict_verdict"]
-    assert result.active_mode_verdict.value == case["light_verdict"]
-    assert result.mode_relaxation_applied is case["mode_relaxation_applied"]
+    assert result.analysis_mode == AnalysisMode.TRENNKOST
+    assert result.verdict_basis == "trennkost"
+    assert result.verdict.value == case["verdict"]
 
     if case["traffic_light_exact"] is not None:
         assert result.traffic_light.value == case["traffic_light_exact"]
@@ -245,20 +217,16 @@ def test_engine_gold_matrix_p0(engine, ontology, case):
         _assert_intrinsic_semantics(ontology, analysis, intrinsic_item)
 
 
-@pytest.mark.p1_light_mode
-@pytest.mark.xfail(strict=False, reason="P1 non-blocking characterization in default suite")
-@pytest.mark.parametrize("case", ENGINE_GOLD_CASES_P1, ids=lambda c: c["id"])
-def test_engine_gold_matrix_p1_light_mode(engine, case):
-    analysis, result = _evaluate_raw_items(engine, case["raw_items"])
+@pytest.mark.parametrize("case", ENGINE_GOLD_CASES_VOLLWERT, ids=lambda c: c["id"])
+def test_engine_gold_matrix_vollwert(engine, case):
+    analysis, result = _evaluate_vollwert(engine, case["raw_items"])
 
-    assert result.strict_verdict.value == case["strict_verdict"]
-    assert result.active_mode_verdict.value == case["light_verdict"]
-    assert result.mode_relaxation_applied is case["mode_relaxation_applied"]
+    assert result.analysis_mode == AnalysisMode.VOLLWERT
+    assert result.verdict_basis == "traffic_light"
+    assert result.verdict.value == case["vollwert_verdict"]
+    assert result.problems == [] if case.get("no_problems") else True
 
-    if case["traffic_light_exact"] is not None:
-        assert result.traffic_light.value == case["traffic_light_exact"]
-
-    assert case["must_have_risk_codes"].issubset(set(result.risk_codes))
-    assert case["must_have_guidance_codes"].issubset(set(result.guidance_codes))
-    assert case["must_have_problem_rule_ids"].issubset(_problem_rule_ids(result))
-    assert bool(result.required_questions) is case["needs_clarification"]
+    if "must_have_guidance_codes" in case:
+        assert case["must_have_guidance_codes"].issubset(set(result.guidance_codes))
+    if "must_have_risk_codes" in case:
+        assert case["must_have_risk_codes"].issubset(set(result.risk_codes))

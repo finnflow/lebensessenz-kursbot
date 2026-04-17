@@ -89,16 +89,17 @@ class TrafficLight(str, Enum):
     RED = "RED"
 
 
-class EvaluationMode(str, Enum):
-    STRICT = "strict"
-    VOLLWERT = "light"
-    # TODO(vollwert-mode): legacy "light" naming left in place intentionally; rename fully later without changing logic.
-    LIGHT = "light"
+class AnalysisMode(str, Enum):
+    TRENNKOST = "trennkost"
+    VOLLWERT = "vollwert"
 
     @classmethod
     def _missing_(cls, value):
-        if isinstance(value, str) and value.strip().lower() == "vollwert":
-            return cls.VOLLWERT
+        if isinstance(value, str):
+            aliases = {"strict": "trennkost", "light": "vollwert"}
+            mapped = aliases.get(value.strip().lower())
+            if mapped:
+                return cls(mapped)
         return super()._missing_(value)
 
 
@@ -140,8 +141,6 @@ class FoodItem(BaseModel):
     subgroup: Optional[FoodSubgroup] = None
     food_family: Optional[str] = None
     group_strict: Optional[CombinationGroup] = None
-    # TODO(vollwert-mode): legacy "light" naming left in place intentionally; rename fully later without changing logic.
-    group_light: Optional[CombinationGroup] = None
     post_meal_wait_profile: Optional[str] = None
     modifier_policy: Optional[str] = None
     base_item_id: Optional[str] = None
@@ -209,12 +208,9 @@ class ItemRiskFact(BaseModel):
 class TrennkostResult(BaseModel):
     """Final output of the rule engine."""
     dish_name: str
-    verdict: Verdict                                        # Active-mode verdict for compatibility
-    active_mode: EvaluationMode = EvaluationMode.STRICT
-    strict_verdict: Verdict
-    active_mode_verdict: Verdict
-    mode_relaxation_applied: bool = False
-    mode_delta_codes: List[str] = Field(default_factory=list)
+    verdict: Verdict
+    analysis_mode: AnalysisMode = AnalysisMode.TRENNKOST
+    verdict_basis: str = "trennkost"                        # "trennkost" | "traffic_light"
     traffic_light: TrafficLight = TrafficLight.GREEN
     summary: str                                            # One-line human summary
     problems: List[RuleProblem] = Field(default_factory=list)
@@ -226,7 +222,7 @@ class TrennkostResult(BaseModel):
     guidance_facts: List[GuidanceFact] = Field(default_factory=list)
     ok_combinations: List[str] = Field(default_factory=list)  # What IS ok in this dish
     groups_found: Dict[str, List[str]] = Field(default_factory=dict)  # group → [items]
-    strict_groups_found: Dict[str, List[str]] = Field(default_factory=dict)  # strict group → [items]
+    strict_groups_found: Dict[str, List[str]] = Field(default_factory=dict)  # combination group → [items]
     debug: Optional[Dict[str, Any]] = None
 
 
@@ -264,8 +260,6 @@ class OntologyEntry(BaseModel):
     group: FoodGroup = FoodGroup.UNKNOWN
     subgroup: Optional[FoodSubgroup] = None
     group_strict: Optional[CombinationGroup] = None
-    # TODO(vollwert-mode): legacy "light" naming left in place intentionally; rename fully later without changing logic.
-    group_light: Optional[CombinationGroup] = None
     post_meal_wait_profile: Optional[str] = None
     modifier_policy: Optional[str] = None
     ambiguity_flag: bool = False
